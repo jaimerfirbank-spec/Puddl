@@ -940,7 +940,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   </div>
   <!-- Header actions -->
   <div style="flex:1;display:flex;justify-content:flex-end;align-items:center;gap:6px;">
-<button onclick="openCustomizePanel()" title="Customize nodes &amp; connections" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;">Settings</button>
+<button onclick="openCustomizePanel()" title="Customize connections" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;">Settings</button>
     <div class="settings-wrap">
       <button id="btn-settings" onclick="toggleSettings(event)" title="Tools" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;">Tools ▾</button>
       <div id="settings-dropdown">
@@ -1897,66 +1897,14 @@ function selectConnColour(col){
 <div class="modal-bg hidden" id="customize-modal-bg">
   <div class="modal" style="width:800px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--bdr);flex-shrink:0;">
-      <h3 style="margin:0;font-size:18px;font-weight:700;color:var(--ink);">Customize Nodes & Connections</h3>
+      <h3 style="margin:0;font-size:18px;font-weight:700;color:var(--ink);">Customize Connections</h3>
       <button onclick="closeCustomizePanel()" style="background:none;border:none;color:var(--ink-h);cursor:pointer;font-size:24px;line-height:1;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;" title="Close">&times;</button>
-    </div>
-    
-    <!-- Tabs -->
-    <div style="display:flex;background:var(--surf-2);border-bottom:1px solid var(--bdr);flex-shrink:0;">
-      <button id="customize-tab-nodes" onclick="switchCustomizeTab('nodes')" style="flex:1;padding:12px 20px;background:var(--surf);border:none;border-bottom:2px solid var(--accent-2);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer;">Nodes</button>
-      <button id="customize-tab-connections" onclick="switchCustomizeTab('connections')" style="flex:1;padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--ink-m);font-weight:500;font-size:13px;cursor:pointer;">Connections</button>
     </div>
     
     <!-- Content Area -->
     <div style="flex:1;overflow-y:auto;padding:24px;">
-      <!-- Nodes Tab -->
-      <div id="customize-content-nodes">
-        <div style="margin-bottom:24px;">
-          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Label position</h4>
-          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Show the node name inside the shape or below it.</p>
-          <div style="display:flex;gap:8px;">
-            <button id="btn-label-below" onclick="setNodeLabelPosition('below')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Below</button>
-            <button id="btn-label-inside" onclick="setNodeLabelPosition('inside')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Inside</button>
-          </div>
-        </div>
-        <div style="margin-bottom:24px;">
-          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Default node style</h4>
-          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Apply a fill style to all nodes instantly.</p>
-          <div style="display:flex;gap:8px;">
-            <button id="btn-style-filled" onclick="setDefaultNodeStyle('filled')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Filled</button>
-            <button id="btn-style-outline" onclick="setDefaultNodeStyle('outline')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Outline</button>
-          </div>
-        </div>
-        <div style="margin-bottom:24px;">
-          <h4 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:var(--ink);">Node Categories</h4>
-          <p style="margin:0 0 16px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Add, remove, or customize node categories. Changes apply immediately to all existing nodes.</p>
-
-          <div id="categories-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
-            <!-- Categories will be rendered here -->
-          </div>
-
-          <button onclick="addNewCategory()" style="padding:8px 16px;background:var(--accent-2);color:white;border:none;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;">+ Add Category</button>
-        </div>
-
-        <div style="margin-bottom:24px;">
-          <h4 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:var(--ink);">Areas</h4>
-          <p style="margin:0 0 16px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Add, rename, or remove the geographic areas available when adding a node.</p>
-          <div id="areas-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;"></div>
-          <button onclick="addNewArea()" style="padding:8px 16px;background:var(--accent-2);color:white;border:none;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;">+ Add Area</button>
-        </div>
-
-        <div style="margin-bottom:24px;">
-          <h4 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:var(--ink);">Node Fields</h4>
-          <p style="margin:0 0 16px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Customize the fields available for each node type.</p>
-          
-          <div id="fields-config" style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-            <!-- Fields configuration will be rendered here -->
-          </div>
-        </div>
-      </div>
-      
-      <!-- Connections Tab -->
-      <div id="customize-content-connections" style="display:none;">
+      <!-- Connections -->
+      <div id="customize-content-connections">
         <!-- Loop Connection Style -->
         <div style="margin-bottom:28px;">
           <h4 style="margin:0 0 6px 0;font-size:14px;font-weight:600;color:var(--ink);">Loop Connection Style</h4>
@@ -8390,34 +8338,10 @@ function closeCustomizePanel(){
   document.getElementById('customize-modal-bg').classList.add('hidden');
 }
 
-function switchCustomizeTab(tab){
-  // Update tab buttons
-  document.querySelectorAll('[id^="customize-tab-"]').forEach(btn => {
-    btn.style.background = 'none';
-    btn.style.borderBottom = '2px solid transparent';
-    btn.style.color = 'var(--ink-m)';
-    btn.style.fontWeight = '500';
-  });
-  
-  const activeTab = document.getElementById('customize-tab-' + tab);
-  activeTab.style.background = 'var(--surf)';
-  activeTab.style.borderBottom = '2px solid var(--accent-2)';
-  activeTab.style.color = 'var(--ink)';
-  activeTab.style.fontWeight = '600';
-  
-  // Show/hide content
-  document.getElementById('customize-content-nodes').style.display = tab === 'nodes' ? 'block' : 'none';
-  document.getElementById('customize-content-connections').style.display = tab === 'connections' ? 'block' : 'none';
-  
-  if (tab === 'nodes') {
-    renderCategoriesList();
-    renderAreasList();
-    renderFieldsConfig();
-  } else {
-    initLoopStyleDraft();
-    initConnDraft();
-    renderConnectionStylesList();
-  }
+function renderConnectionsSettings(){
+  initLoopStyleDraft();
+  initConnDraft();
+  renderConnectionStylesList();
 }
 
 function renderCatShapePicker(cat){
@@ -8473,8 +8397,9 @@ if(!window._catPickerClickSet){
 
 function renderCategoriesList(){
   const container = document.getElementById('categories-list');
+  if(!container) return;
   const cats = currentMapMode === 'personal' ? PERSONAL_CATEGORIES : CATEGORIES;
-  
+
   container.innerHTML = cats.map((cat, index) => `
     <div style="display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf);">
       <div style="display:flex;align-items:center;gap:8px;flex:1;flex-wrap:wrap;align-items:flex-start;">
@@ -8494,6 +8419,7 @@ function renderCategoriesList(){
 
 function renderFieldsConfig(){
   const container = document.getElementById('fields-config');
+  if(!container) return;
   container.innerHTML = `
     <div style="padding:16px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf);">
       <h5 style="margin:0 0 12px 0;font-size:13px;font-weight:600;color:var(--ink);">Grant name</h5>
@@ -8606,9 +8532,7 @@ function syncNodeStyleButtons(){
 }
 
 function renderCustomizePanel(){
-  switchCustomizeTab('nodes');
-  setNodeLabelPosition(NODE_LABEL_POSITION);
-  syncNodeStyleButtons();
+  renderConnectionsSettings();
 }
 
 // ── Areas management ──────────────────────────────────────────────────────────
@@ -9088,24 +9012,7 @@ function updateConnectionSelects(){
 }
 
 function resetCustomizations(){
-  if(confirm('Reset all customizations to default values? This cannot be undone.')) {
-    // Reset categories
-    CATEGORIES = [
-      {id:'cat1', label:'', type:'person', colour:'#FF9ED2'},
-      {id:'cat2', label:'', type:'person', colour:'#B09FFF'},
-      {id:'cat3', label:'', type:'org',    colour:'#7FE8E8'},
-      {id:'cat4', label:'', type:'org',    colour:'#FF8C8C'},
-      {id:'cat5', label:'', type:'org',    colour:'#C5E86C'},
-      {id:'cat6', label:'', type:'org',    colour:'#FFB347'},
-      {id:'cat7', label:'', type:'org',    colour:'#A8D8EA'},
-      {id:'cat8', label:'', type:'org',    colour:'#F9C784'},
-      {id:'cat9', label:'', type:'org',    colour:'#D4A5E0'},
-      {id:'cat10',label:'', type:'org',    colour:'#98E8C1'},
-    ];
-
-    // Reset areas
-    AREAS = [];
-
+  if(confirm('Reset connection styles to default values? This cannot be undone.')) {
     // Reset connection styles
     CONNECTION_STYLES = [
       {id:'strong', label:'Strong', colour:'rgba(0,0,0,0.8)', lineWidth:4.5, dashPattern:[], arrowScale:1.3},
@@ -9116,10 +9023,10 @@ function resetCustomizations(){
       {id:'double', label:'Double', colour:'rgba(0,0,0,0.6)', lineWidth:2, dashPattern:[], arrowScale:1, isDouble:true}
     ];
     _connStylesDraft = null;
-    
+
     renderCustomizePanel();
-    rebuildCatFilter(); rebuildAreaFilter(); updateColourLegend(); updateConnectionSelects(); saveState(); draw();
-    showStatus('Customizations reset to defaults.');
+    updateConnectionSelects(); saveState(); draw();
+    showStatus('Connection styles reset to defaults.');
   }
 }
 
