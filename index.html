@@ -5130,8 +5130,12 @@ canvas.addEventListener('mousedown',e=>{
   if(!document.getElementById('modal-bg').classList.contains('hidden')) return;
   // Close autocomplete suggestions on canvas click
   const sb=document.getElementById('search-suggestions');if(sb) sb.style.display='none';
-  // View mode: no dragging or connecting
-  if(isViewMode){ return; }
+  // View mode (incl. Demo): no dragging nodes or connecting, but the canvas can still be panned
+  if(isViewMode){
+    panDragging=true;panSX=e.offsetX;panSY=e.offsetY;panPX=panX;panPY=panY;
+    canvas.style.cursor='grab';
+    return;
+  }
   const n=nodeAt(e.offsetX,e.offsetY);
   if(mode==='move'){
     if(n){
