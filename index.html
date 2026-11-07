@@ -2073,42 +2073,12 @@ let AREAS = [];
 // Selected area in modal
 let selectedArea = null;
 
-// Customizable options for new field types
-let FUNDING_SOURCES = [
-  'National Lottery Community Fund',
-  'Arts Council England',
-  'National Lottery Heritage Fund',
-  'Children in Need',
-  'Big Lottery Fund',
-  'Local Authority',
-  'NHS England',
-  'Sport England',
-  'Other Government Grant',
-  'Private Foundation',
-  'Corporate Sponsorship',
-  'Individual Donations'
-];
+// Customizable options for new field types. Start empty: each organisation adds its own.
+let FUNDING_SOURCES = [];
 
-let GROUP_STATUSES = [
-  'CIC',
-  'Constituted Group',
-  'Un-constituted Group',
-  'Charity',
-  'Trust',
-  'CIO',
-  'Social Enterprise',
-  'N/A'
-];
+let GROUP_STATUSES = [];
 
-let PROTECTED_CHARACTERISTICS = [
-  'Age',
-  'Sex',
-  'Religion',
-  'Ethnicity',
-  'SEND',
-  'LGBTQ+',
-  'Maternity/Pregnancy'
-];
+let PROTECTED_CHARACTERISTICS = [];
 
 // Centre node uses label text only — no logo image
 
@@ -8524,6 +8494,7 @@ function renderFieldsConfig(){
     <div style="padding:16px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf);">
       <h5 style="margin:0 0 12px 0;font-size:13px;font-weight:600;color:var(--ink);">Grant name</h5>
       <div style="display:flex;flex-direction:column;gap:8px;">
+        ${FUNDING_SOURCES.length?'':'<div style="font-size:11px;color:var(--txt-h);font-style:italic;">No options yet. Add your own below.</div>'}
         ${FUNDING_SOURCES.map((source, index) => `
           <div style="display:flex;align-items:center;gap:8px;">
             <input type="text" value="${source}" onchange="updateFundingSource(${index}, this.value)" style="flex:1;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;">
@@ -8536,6 +8507,7 @@ function renderFieldsConfig(){
     <div style="padding:16px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf);">
       <h5 style="margin:0 0 12px 0;font-size:13px;font-weight:600;color:var(--ink);">Group Status</h5>
       <div style="display:flex;flex-direction:column;gap:8px;">
+        ${GROUP_STATUSES.length?'':'<div style="font-size:11px;color:var(--txt-h);font-style:italic;">No options yet. Add your own below.</div>'}
         ${GROUP_STATUSES.map((status, index) => `
           <div style="display:flex;align-items:center;gap:8px;">
             <input type="text" value="${status}" onchange="updateGroupStatusOption(${index}, this.value)" style="flex:1;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;">
@@ -8548,6 +8520,7 @@ function renderFieldsConfig(){
     <div style="padding:16px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf);">
       <h5 style="margin:0 0 12px 0;font-size:13px;font-weight:600;color:var(--ink);">Protected Characteristics</h5>
       <div style="display:flex;flex-direction:column;gap:8px;">
+        ${PROTECTED_CHARACTERISTICS.length?'':'<div style="font-size:11px;color:var(--txt-h);font-style:italic;">No options yet. Add your own below.</div>'}
         ${PROTECTED_CHARACTERISTICS.map((opt, index) => `
           <div style="display:flex;align-items:center;gap:8px;">
             <input type="text" value="${opt}" onchange="updateProtectedCharOption(${index}, this.value)" style="flex:1;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;">
@@ -9121,6 +9094,9 @@ function resetCustomizations(){
     // Reset areas
     AREAS = [];
 
+    // Reset field option lists
+    FUNDING_SOURCES = []; GROUP_STATUSES = []; PROTECTED_CHARACTERISTICS = [];
+
     // Reset connection styles
     CONNECTION_STYLES = [
       {id:'strong', label:'Strong', colour:'rgba(0,0,0,0.8)', lineWidth:4.5, dashPattern:[], arrowScale:1.3},
@@ -9152,7 +9128,7 @@ function updateFundingSource(index, value) {
 }
 
 function deleteFundingSource(index) {
-  if(FUNDING_SOURCES.length > 1) {
+  if(FUNDING_SOURCES.length > 0) {
     FUNDING_SOURCES.splice(index, 1);
     renderFieldsConfig(); 
     // Update all existing grant dropdowns in the modal
@@ -9189,7 +9165,7 @@ function updateGroupStatusOption(index, value) {
 }
 
 function deleteGroupStatusOption(index) {
-  if(GROUP_STATUSES.length > 1) {
+  if(GROUP_STATUSES.length > 0) {
     GROUP_STATUSES.splice(index, 1);
     renderFieldsConfig();
     populateGroupStatusSelect(document.getElementById('modal-groupstatus')?.value||'');
@@ -9216,7 +9192,7 @@ function updateProtectedCharOption(index, value) {
 }
 
 function deleteProtectedCharOption(index) {
-  if(PROTECTED_CHARACTERISTICS.length > 1) {
+  if(PROTECTED_CHARACTERISTICS.length > 0) {
     PROTECTED_CHARACTERISTICS.splice(index, 1);
     renderFieldsConfig();
     renderProtectedCharChips();
