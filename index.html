@@ -1927,7 +1927,7 @@ function selectConnColour(col){
             <button id="btn-style-outline" onclick="setDefaultNodeStyle('outline')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Outline</button>
           </div>
         </div>
-        <div style="margin-bottom:24px;">
+        <div style="margin-bottom:24px;display:none;" id="settings-node-categories">
           <h4 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:var(--ink);">Node Categories</h4>
           <p style="margin:0 0 16px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Add, remove, or customize node categories. Changes apply immediately to all existing nodes.</p>
 
@@ -2028,18 +2028,9 @@ function selectConnColour(col){
 
 <script>
 // ── Category system ───────────────────────────────────────────────────────────
-let CATEGORIES = [
-  {id:'cat1', label:'', type:'person', colour:'#F58A3A'},
-  {id:'cat2', label:'', type:'person', colour:'#FFD93A'},
-  {id:'cat3', label:'', type:'org',    colour:'#52B788'},
-  {id:'cat4', label:'', type:'org',    colour:'#2B9A8F'},
-  {id:'cat5', label:'', type:'org',    colour:'#3B82F6'},
-  {id:'cat6', label:'', type:'org',    colour:'#1E40AF'},
-  {id:'cat7', label:'', type:'org',    colour:'#A8D8EA'},
-  {id:'cat8', label:'', type:'org',    colour:'#F9C784'},
-  {id:'cat9', label:'', type:'org',    colour:'#D4A5E0'},
-  {id:'cat10',label:'', type:'org',    colour:'#98E8C1'},
-];
+// No preset categories: users choose colour and shape per node.
+// The category engine is kept so organisations can define their own later.
+let CATEGORIES = [];
 let catIdCtr = 10;
 
 // Loop connection style (single global style applied to all loop edges)
@@ -2526,6 +2517,23 @@ function draw(){
         {x:node.x-r*0.866,     y:node.y+r*0.5    }
       ]);
     }
+    if(sh==='hexagon'){
+      const pts=[];
+      for(let i=0;i<6;i++){ const a=Math.PI/3*i; pts.push({x:node.x+r*Math.cos(a), y:node.y+r*Math.sin(a)}); }
+      return rayPolyEdge(node.x,node.y,ux,uy,pts);
+    }
+    if(sh==='pill'){
+      const hw=r*1.45, hh=r*0.65;
+      return rayPolyEdge(node.x,node.y,ux,uy,[
+        {x:node.x-hw, y:node.y-hh},{x:node.x+hw, y:node.y-hh},
+        {x:node.x+hw, y:node.y+hh},{x:node.x-hw, y:node.y+hh}
+      ]);
+    }
+    if(sh==='star'){
+      const pts=[];
+      for(let i=0;i<10;i++){ const a=-Math.PI/2+Math.PI/5*i; const rad=(i%2===0)?r:r*0.45; pts.push({x:node.x+rad*Math.cos(a), y:node.y+rad*Math.sin(a)}); }
+      return rayPolyEdge(node.x,node.y,ux,uy,pts);
+    }
     // circle / square / rectangle — existing behaviour (circle approximation is fine for square/rect)
     return {x:node.x+ux*r,y:node.y+uy*r};
   }
@@ -2919,7 +2927,7 @@ function draw(){
     const _fs=d.FS;
     ctx.font=`400 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
     const _sh=n.shape||'circle';
-    const _shapeBottom=_sh==='triangle'?n.y+r*0.5:_sh==='rectangle'?n.y+r*0.85:n.y+r;
+    const _shapeBottom=_sh==='triangle'?n.y+r*0.5:_sh==='rectangle'?n.y+r*0.85:_sh==='pill'?n.y+r*0.65:_sh==='star'?n.y+r*0.81:_sh==='hexagon'?n.y+r*0.87:n.y+r;
     const _labelY=_shapeBottom+5/zoom;
     const _maxW=r*3.5;
     const _lh=_fs+2;
@@ -2960,7 +2968,7 @@ function draw(){
       const _sph=_fs2+5/zoom;
       const _spw=_stw+10/zoom;
       const _sh2=n.shape||'circle';
-      const _shapeBot=_sh2==='triangle'?n.y+r*0.5:_sh2==='rectangle'?n.y+r*0.85:n.y+r;
+      const _shapeBot=_sh2==='triangle'?n.y+r*0.5:_sh2==='rectangle'?n.y+r*0.85:_sh2==='pill'?n.y+r*0.65:_sh2==='star'?n.y+r*0.81:_sh2==='hexagon'?n.y+r*0.87:n.y+r;
       const _pilY=NODE_LABEL_POSITION==='below'
         ? _shapeBot + (_fs2+2)*2 + 8/zoom
         : _shapeBot + 7/zoom;
@@ -3065,6 +3073,26 @@ function drawNodeShape(ctx, x, y, r, shape, zoom){
     ctx.lineTo(x, y+r);
     ctx.lineTo(x-r*0.65, y);
     ctx.closePath();
+  } else if(s === 'hexagon'){
+    ctx.beginPath();
+    for(let i=0;i<6;i++){
+      const a=Math.PI/3*i;
+      const px=x+r*Math.cos(a), py=y+r*Math.sin(a);
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath();
+  } else if(s === 'pill'){
+    const hw=r*1.45, hh=r*0.65;
+    rr(ctx, x-hw, y-hh, hw*2, hh*2, hh);
+  } else if(s === 'star'){
+    ctx.beginPath();
+    for(let i=0;i<10;i++){
+      const a=-Math.PI/2+Math.PI/5*i;
+      const rad=(i%2===0)?r:r*0.45;
+      const px=x+rad*Math.cos(a), py=y+rad*Math.sin(a);
+      if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.closePath();
   } else { // circle (default)
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI*2);
@@ -3077,6 +3105,9 @@ function shapeImageBox(x, y, r, shape){
   if(s === 'rectangle') return {x:x-r*1.45, y:y-r*0.85, w:r*2.9, h:r*1.7};
   if(s === 'triangle')  return {x:x-r*0.866, y:y-r, w:r*1.732, h:r*1.5};
   if(s === 'diamond')   return {x:x-r*0.65, y:y-r, w:r*1.3, h:r*2};
+  if(s === 'hexagon')   return {x:x-r*0.75, y:y-r*0.7, w:r*1.5, h:r*1.4};
+  if(s === 'pill')      return {x:x-r*1.2, y:y-r*0.65, w:r*2.4, h:r*1.3};
+  if(s === 'star')      return {x:x-r*0.45, y:y-r*0.4, w:r*0.9, h:r*0.9};
   return {x:x-r, y:y-r, w:r*2, h:r*2}; // circle
 }
 
@@ -4938,7 +4969,7 @@ function renderNodeView(n, isCentre){
   document.getElementById('modal-edit-panel').style.display='none';
 
   const vp=document.getElementById('modal-view-content');
-  const shapeLabels={circle:'Circle',square:'Square',rectangle:'Wide',diamond:'Diamond',triangle:'Triangle'};
+  const shapeLabels={circle:'Circle',square:'Square',rectangle:'Wide',diamond:'Diamond',triangle:'Triangle',hexagon:'Hexagon',pill:'Pill',star:'Star'};
   let html=`<div style="font-size:20px;font-weight:600;color:var(--ink);margin-bottom:12px;">${n.label}</div>`;
   html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">`;
   html+=`<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${n.colour||'#ccc'};flex-shrink:0;"></span>`;
@@ -5099,8 +5130,12 @@ canvas.addEventListener('mousedown',e=>{
   if(!document.getElementById('modal-bg').classList.contains('hidden')) return;
   // Close autocomplete suggestions on canvas click
   const sb=document.getElementById('search-suggestions');if(sb) sb.style.display='none';
-  // View mode: no dragging or connecting
-  if(isViewMode){ return; }
+  // View mode (incl. Demo): no dragging nodes or connecting, but the canvas can still be panned
+  if(isViewMode){
+    panDragging=true;panSX=e.offsetX;panSY=e.offsetY;panPX=panX;panPY=panY;
+    canvas.style.cursor='grab';
+    return;
+  }
   const n=nodeAt(e.offsetX,e.offsetY);
   if(mode==='move'){
     if(n){
@@ -6870,15 +6905,8 @@ function switchToPersonalMap(){
     edges=(pm.edges||[]).map(e=>({source:e.from||e.source,target:e.to||e.target,strength:e.strength||'moderate',colour:e.colour||'',note:e.note||''}));
     mapTitle=pm.mapTitle||currentUser+"'s Map";
   } else {
-    // First time - create personal map with user as centre
+    // First time - start from a blank map (no starter node)
     nodes=[];edges=[];idCtr_p=0;
-    const cx=0,cy=0;
-    const centreNode={
-      id:++idCtr, type:'centre', label:currentUser,
-      colour:'#E8736A', x:cx, y:cy, vx:0,vy:0,
-      pinned:true, fx:cx, fy:cy, notes:'', grants:[], contacts:[], groupSize:'', groupStatus:'', trainingCompleted:'', mainAreaOfDelivery:'', protectedCharacteristics:[], operationalTimetable:''
-    };
-    nodes=[centreNode];
     mapTitle=currentUser+"'s Connections Map";
   }
 
@@ -6965,13 +6993,8 @@ function confirmWho(){
 
   centralEventLabel=name;
 
+  // New maps start blank: no starter node is created
   if(nodes.length===0){
-    const centreNode={
-      id:++idCtr, type:'centre', label:name,
-      colour:'#E8736A', x:0, y:0, vx:0, vy:0,
-      pinned:true, fx:0, fy:0, notes:'', grants:[], contacts:[], groupSize:'', groupStatus:'', trainingCompleted:'', mainAreaOfDelivery:'', protectedCharacteristics:[], operationalTimetable:''
-    };
-    nodes.push(centreNode);
     buildSim();
   }
   saveState(); markUnsaved();
@@ -7157,6 +7180,9 @@ function buildShapeSelector(){
     { id:'rectangle', label:'Wide',    svg:'<rect x="1" y="6" width="22" height="12" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>' },
     { id:'diamond',   label:'Diamond', svg:'<polygon points="12,2 22,12 12,22 2,12" stroke="currentColor" stroke-width="2" fill="none"/>' },
     { id:'triangle',  label:'Triangle',svg:'<polygon points="12,3 22,21 2,21" stroke="currentColor" stroke-width="2" fill="none"/>' },
+    { id:'hexagon',   label:'Hexagon', svg:'<polygon points="21,12 16.5,19.8 7.5,19.8 3,12 7.5,4.2 16.5,4.2" stroke="currentColor" stroke-width="2" fill="none"/>' },
+    { id:'pill',      label:'Pill',    svg:'<rect x="1" y="7" width="22" height="10" rx="5" stroke="currentColor" stroke-width="2" fill="none"/>' },
+    { id:'star',      label:'Star',    svg:'<polygon points="12,2 14.6,8.7 21.8,9.2 16.3,13.8 18,20.8 12,17 6,20.8 7.7,13.8 2.2,9.2 9.4,8.7" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>' },
   ];
   shapes.forEach(s=>{
     const btn=document.createElement('button');
@@ -9090,18 +9116,7 @@ function updateConnectionSelects(){
 function resetCustomizations(){
   if(confirm('Reset all customizations to default values? This cannot be undone.')) {
     // Reset categories
-    CATEGORIES = [
-      {id:'cat1', label:'', type:'person', colour:'#FF9ED2'},
-      {id:'cat2', label:'', type:'person', colour:'#B09FFF'},
-      {id:'cat3', label:'', type:'org',    colour:'#7FE8E8'},
-      {id:'cat4', label:'', type:'org',    colour:'#FF8C8C'},
-      {id:'cat5', label:'', type:'org',    colour:'#C5E86C'},
-      {id:'cat6', label:'', type:'org',    colour:'#FFB347'},
-      {id:'cat7', label:'', type:'org',    colour:'#A8D8EA'},
-      {id:'cat8', label:'', type:'org',    colour:'#F9C784'},
-      {id:'cat9', label:'', type:'org',    colour:'#D4A5E0'},
-      {id:'cat10',label:'', type:'org',    colour:'#98E8C1'},
-    ];
+    CATEGORIES = [];
 
     // Reset areas
     AREAS = [];
