@@ -6678,10 +6678,6 @@ function capturePresStop(){
   rebuildPresStopList();
   selectPresStop(presentationStops.length-1);
   showStatus('View captured as stop '+num);
-  const _cl=document.createElement('a');
-  _cl.download='puddl-stop-'+num+'.png';
-  _cl.href=canvas.toDataURL('image/png');
-  _cl.click();
 }
 
 function deletePresStop(idx){
