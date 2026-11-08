@@ -1101,16 +1101,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
       <input type="text" id="search-input" placeholder="Search nodes…" oninput="applyFilters();buildSearchSuggestions()" autocomplete="off" style="width:100%;">
       <div id="search-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius);box-shadow:var(--shadow-md);z-index:100;max-height:180px;overflow-y:auto;margin-top:2px;"></div>
     </div>
-    <!-- Category multi-select -->
-    <div id="cat-filter-wrap" class="ms-wrap" style="margin-bottom:6px;">
-      <div class="ms-label">All categories</div>
-      <div id="cat-filter-chips" class="ms-chips" style="display:none;"></div>
-    </div>
-    <!-- Area multi-select -->
-    <div id="area-filter-wrap" class="ms-wrap" style="margin-bottom:6px;">
-      <div class="ms-label">All areas</div>
-      <div id="area-filter-chips" class="ms-chips" style="display:none;"></div>
-    </div>
+    <!-- Category and Area filters removed: nodes carry their own colour, shape and notes. -->
     <!-- Connection type multi-select -->
     <div id="conn-type-filter-wrap" class="ms-wrap" style="margin-bottom:6px;">
       <div class="ms-label">All connection types</div>
