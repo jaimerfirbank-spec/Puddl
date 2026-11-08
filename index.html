@@ -1922,6 +1922,14 @@ function selectConnColour(col){
             <button id="btn-style-outline" onclick="setDefaultNodeStyle('outline')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Outline</button>
           </div>
         </div>
+        <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Size nodes by connections</h4>
+          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Nodes start at the size you pick and grow as they gain connections, so the busiest ones stand out.</p>
+          <div style="display:flex;gap:8px;">
+            <button id="btn-sizeconn-off" onclick="setSizeByConnections(false)" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Off</button>
+            <button id="btn-sizeconn-on" onclick="setSizeByConnections(true)" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">On</button>
+          </div>
+        </div>
         <div style="margin-bottom:24px;display:none;" id="settings-node-categories">
           <h4 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:var(--ink);">Node Categories</h4>
           <p style="margin:0 0 16px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Add, remove, or customize node categories. Changes apply immediately to all existing nodes.</p>
@@ -2112,6 +2120,8 @@ let dragNode=null,dragMoving=false,dragStartSX=0,dragStartSY=0;
 let panDragging=false,panSX=0,panSY=0,panPX=0,panPY=0;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
+let SIZE_BY_CONNECTIONS=false;   // when true, nodes grow with their number of connections
+let _degCache=null;             // node id -> connection count, rebuilt each frame
 let showNodeLabels=true;
 let DEFAULT_NODE_OUTLINE=false; // false=filled, true=outline
 let highlightIds=new Set(),highlightEdges=new Set(),secondaryIds=new Set();
@@ -2159,6 +2169,12 @@ resize();
 function restoreNodeImages(){
   nodes.forEach(n=>{ if(n.nodeImg&&!n._nodeImgObj) loadNodeImage(n); });
 }
+// d3 reads each node's collision radius once and keeps it, so call this after node sizes change
+function refreshCollisionRadii(){
+  const f=sim&&sim.force('collision');
+  if(f&&f.initialize) f.initialize(sim.nodes(),Math.random);
+}
+let _sizeSigEdges=-1;
 function buildSim(){
   if(sim) sim.stop();
   sim=d3.forceSimulation(nodes)
@@ -2255,9 +2271,26 @@ function nodeDims(n){
   const catW=n.colourLabel?ctx.measureText(n.colourLabel).width:0;
   const areaW=n.area?ctx.measureText(n.area).width:0;
   const maxTW=Math.max(lw,catW,areaW);
-  const r = n.nodeSize==='small' ? 28 : n.nodeSize==='large' ? 60 : n.nodeSize==='xl' ? 120 : n.nodeSize==='xxl' ? 240 : 40;
+  let r = n.nodeSize==='small' ? 28 : n.nodeSize==='large' ? 60 : n.nodeSize==='xl' ? 120 : n.nodeSize==='xxl' ? 240 : 40;
+  if(SIZE_BY_CONNECTIONS){ r = Math.round(r * connectionScale(n)); }
   return {w:r*2, h:r*2, r, tagText:'', FS};
 }
+
+// Number of connections per node, cached for the current frame
+function connectionCount(n){
+  if(!_degCache){
+    _degCache=new Map();
+    const bump=id=>_degCache.set(id,(_degCache.get(id)||0)+1);
+    edges.forEach(e=>{
+      const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+      const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+      bump(a); if(b!==a) bump(b);
+    });
+  }
+  return _degCache.get(n.id)||0;
+}
+// Growth factor: +18% per connection, capped at 2.6x so hubs never swallow the map
+function connectionScale(n){ return Math.min(1+0.18*connectionCount(n), 2.6); }
 function getNodeSubText(n){
   // Legacy — used in a few places; return category only
   return n.colourLabel||'';
@@ -2335,6 +2368,7 @@ function snap(){
     presentationStops:presentationStops||[],
     areas:AREAS,
     nodeLabelPosition:NODE_LABEL_POSITION,
+    sizeByConnections:SIZE_BY_CONNECTIONS,
     defaultNodeStyle:DEFAULT_NODE_OUTLINE?'outline':'filled',
   });
 }
@@ -2380,6 +2414,7 @@ function restoreSnap(s){
   presentationStops=d.presentationStops||[];
   if(d.areas&&Array.isArray(d.areas)&&d.areas.length) AREAS=d.areas;
   if(d.nodeLabelPosition) NODE_LABEL_POSITION=d.nodeLabelPosition;
+  SIZE_BY_CONNECTIONS=!!d.sizeByConnections;
   if(d.defaultNodeStyle) DEFAULT_NODE_OUTLINE=d.defaultNodeStyle==='outline';
   if(inPresentationEditMode) rebuildPresStopList();
   const mtd=document.getElementById('map-title-display');
@@ -2429,6 +2464,12 @@ function adaptColourForDark(col){
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function draw(){
+  _degCache=null;
+  if(SIZE_BY_CONNECTIONS&&sim&&edges.length!==_sizeSigEdges){
+    _sizeSigEdges=edges.length;
+    refreshCollisionRadii();
+    if(forceOn) sim.alpha(Math.max(sim.alpha(),0.3)).restart();
+  }
   const _dark=document.documentElement.getAttribute('data-theme')==='dark';
   const dpr=window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -8631,10 +8672,25 @@ function syncNodeStyleButtons(){
   if(bo){ bo.style.background=val==='outline'?'var(--ink)':''; bo.style.color=val==='outline'?'var(--surf)':''; }
 }
 
+function syncSizeByConnButtons(){
+  const off=document.getElementById('btn-sizeconn-off'), on=document.getElementById('btn-sizeconn-on');
+  if(off){ off.style.background=!SIZE_BY_CONNECTIONS?'var(--ink)':''; off.style.color=!SIZE_BY_CONNECTIONS?'var(--surf)':''; }
+  if(on){ on.style.background=SIZE_BY_CONNECTIONS?'var(--ink)':''; on.style.color=SIZE_BY_CONNECTIONS?'var(--surf)':''; }
+}
+function setSizeByConnections(val){
+  SIZE_BY_CONNECTIONS=!!val;
+  syncSizeByConnButtons();
+  _degCache=null;
+  _sizeSigEdges=val?edges.length:-1;
+  if(typeof sim!=='undefined'&&sim){ refreshCollisionRadii(); if(forceOn) sim.alpha(0.6).restart(); }
+  saveState(); markUnsaved(); draw();
+}
+
 function renderCustomizePanel(){
   switchCustomizeTab('nodes');
   setNodeLabelPosition(NODE_LABEL_POSITION);
   syncNodeStyleButtons();
+  syncSizeByConnButtons();
 }
 
 // ── Areas management ──────────────────────────────────────────────────────────
@@ -9120,6 +9176,8 @@ function resetCustomizations(){
 
     // Reset areas
     AREAS = [];
+
+    SIZE_BY_CONNECTIONS = false;
 
     // Reset connection styles
     CONNECTION_STYLES = [
