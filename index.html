@@ -677,6 +677,8 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   font-family:'DM Sans',sans-serif;
 }
 #present-overlay.active{display:flex;}
+body.share-mode #present-overlay{z-index:10000;}
+body.share-mode #present-exit{display:none !important;}
 #present-left{
   width:50%;min-width:220px;
   display:flex;flex-direction:column;
@@ -758,7 +760,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 }
 .pres-mini-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
 #present-badge{
-  position:absolute;bottom:60px;left:20px;
+  position:absolute;bottom:112px;left:56px;
   font-size:10px;font-weight:600;letter-spacing:0.06em;
   text-transform:uppercase;color:var(--ink-h);
   opacity:0.45;pointer-events:none;
@@ -998,6 +1000,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
       </div>
     </div>
     <button onclick="saveFile()" title="Save HTML file" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;">↓ Save file</button>
+    <button onclick="saveShareFile()" title="Save a view-only copy to email or put on a website. Opens straight into the presentation, no login, no editing." style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;">✉ Save for sharing</button>
     <div id="demo-save-btn" style="display:none;align-items:center;gap:6px;padding:0 14px;height:28px;border-radius:var(--radius);border:1px solid var(--bdr);background:var(--surf-3);color:var(--ink-h);font-size:11px;font-weight:600;cursor:default;" title="Save (inactive in demo)">⬇ Save file</div>
     <div style="width:1px;height:20px;background:var(--bdr);margin:0 4px;"></div>
     <button id="btn-pres-mode" onclick="togglePresentationEditMode()" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;" title="Set up and run a presentation">▶ Present</button>
@@ -1067,6 +1070,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 <div id="bg-image-data" style="display:none"></div>
 <div id="puddl-saved-state" style="display:none"></div>
 <div id="puddl-narration" style="display:none"></div>
+<div id="puddl-share" style="display:none"></div>
 
 <!-- Auth Modal -->
 <div id="auth-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:'DM Sans',sans-serif;">
@@ -6791,7 +6795,9 @@ function enterPresentationMode(){
   presPlayReset();
 }
 
+const IS_SHARE_VIEW=(function(){ try{ const e=document.getElementById('puddl-share'); const v=e&&e.textContent.trim()==='1'; if(v&&e) e.textContent=''; return !!v; }catch(err){ return false; } })();
 function exitPresentationMode(){
+  if(IS_SHARE_VIEW) return;
   presPlayReset();
   inPresentationMode=false;
   presTargetWorldCX=null; presTargetWorldCY=null;
@@ -6817,6 +6823,7 @@ function presKeyHandler(e){
   else if(e.key===' '){ e.preventDefault(); presPlayToggle(); }
   else if(e.key==='Escape') exitPresentationMode();
 }
+
 
 function presGoToStop(idx,animate){
   const stop=presentationStops[idx];
@@ -7488,9 +7495,16 @@ function showAutoSaveToast(){
   clearTimeout(toast._t);
   toast._t=setTimeout(()=>{ toast.style.opacity='0'; }, 2000);
 }
-function saveFile(){
+function saveShareFile(){
+  if(!presentationStops.length){ showStatus('Add at least one presentation stop first (Present button), then save for sharing.'); return; }
+  saveFile(true);
+  showStatus('Share copy saved. It opens straight into the presentation with no login or editing.');
+}
+function saveFile(share){
   const slug=(mapTitle||'project').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-  const filename=slug+'.html';
+  const filename=slug+(share===true?'-view-only':'')+'.html';
+  const shEl=document.getElementById('puddl-share');
+  if(shEl) shEl.textContent=(share===true)?'1':'';
   // Embed current snapshot so the file restores correctly when re-opened
   const snapEl=document.getElementById('puddl-saved-state');
   if(snapEl) snapEl.textContent=snap();
@@ -7500,11 +7514,12 @@ function saveFile(){
   // Clear after serialising so live session is unaffected
   if(snapEl) snapEl.textContent='';
   if(narEl) narEl.textContent='';
+  if(shEl) shEl.textContent='';
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=filename;
   a.click();
-  markSaved();
+  if(share!==true) markSaved();
   addLog('saved: '+filename);
 }
 
@@ -8692,6 +8707,17 @@ window.addEventListener('load', ()=>{
       const splash=document.getElementById('who-modal-bg');
       if(splash){ splash.style.display='none'; }
       saveState(); draw();
+      if(IS_SHARE_VIEW){
+        document.body.classList.add('share-mode');
+        const au=document.getElementById('auth-modal'); if(au) au.style.display='none';
+        const ca=document.getElementById('canvas-area'); if(ca) ca.style.display='block';
+        const sp=document.getElementById('splash-phase-a'); if(sp) sp.style.display='none';
+        setTimeout(()=>{
+          enterPresentationMode();
+          if(/autoplay/i.test(location.hash||'')) setTimeout(()=>{ presPlayStart(); },300);
+        },150);
+        return;
+      }
       showStatus('Map loaded.');
       return;
     }
@@ -10170,6 +10196,7 @@ try {
 
 // Initialize auth on page load
 async function initAuth() {
+  if (IS_SHARE_VIEW) { hideAuthModal(); return; }
   if (!supabaseClient) {
     showAuthModal();
     document.getElementById('canvas-area').style.display = 'none';
@@ -10202,6 +10229,7 @@ function hideAuthModal() {
 
 // Add logout button to header
 function addLogoutButton() {
+  if (IS_SHARE_VIEW) return;
   const header = document.getElementById('main-header');
   if (header && !document.getElementById('btn-logout')) {
     const logoutBtn = document.createElement('button');
