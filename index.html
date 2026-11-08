@@ -736,6 +736,27 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 .present-nav-btn:disabled{opacity:.3;cursor:default;}
 .present-nav-btn.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
 .present-nav-btn.primary:hover:not(:disabled){background:#3f3f46;border-color:#3f3f46;}
+#present-play-row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 20px 0;background:var(--surf);flex-shrink:0;
+}
+#present-timeline{flex:1;height:6px;border-radius:3px;background:var(--bdr);overflow:hidden;cursor:pointer;}
+#present-timeline-fill{height:100%;width:0%;background:var(--ink);border-radius:3px;transition:width .12s linear;}
+#present-time{font-size:11px;color:var(--ink-h);min-width:74px;text-align:right;font-variant-numeric:tabular-nums;}
+#present-btn-play{min-width:92px;}
+#pres-narration-box{
+  padding:10px 14px;border-top:1px solid var(--bdr);display:flex;flex-direction:column;gap:6px;
+}
+#pres-narration-status{font-size:11px;color:var(--ink-h);line-height:1.4;word-break:break-word;}
+#pres-narration-box input[type=text],#pres-narration-box input[type=number]{
+  width:100%;height:28px;font-size:12px;padding:0 8px;border-radius:6px;
+  border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;
+}
+.pres-mini-btn{
+  font-size:11px;height:26px;padding:0 10px;border-radius:6px;cursor:pointer;
+  border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink-m);font-weight:600;
+}
+.pres-mini-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
 #present-badge{
   position:absolute;bottom:60px;left:20px;
   font-size:10px;font-weight:600;letter-spacing:0.06em;
@@ -1045,6 +1066,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 </div>
 <div id="bg-image-data" style="display:none"></div>
 <div id="puddl-saved-state" style="display:none"></div>
+<div id="puddl-narration" style="display:none"></div>
 
 <!-- Auth Modal -->
 <div id="auth-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:'DM Sans',sans-serif;">
@@ -1197,6 +1219,12 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
         <div id="present-shd"></div>
         <div id="present-body-text"></div>
       </div>
+      <div id="present-play-row">
+        <button class="present-nav-btn primary" id="present-btn-play" onclick="presPlayToggle()" title="Play or pause (Space)">▶ Play</button>
+        <div id="present-timeline" onclick="presTimelineSeek(event)" title="Click to jump"><div id="present-timeline-fill"></div></div>
+        <span id="present-time">0:00 / 0:00</span>
+        <button class="present-nav-btn" id="present-btn-fs" onclick="toggleFullscreen()" title="Full screen" style="padding:7px 10px;">⛶</button>
+      </div>
       <div id="present-nav">
         <button class="present-nav-btn" id="present-btn-back" onclick="presentPrev()">← Back</button>
         <span id="present-progress"></span>
@@ -1235,6 +1263,24 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
       <div>
         <div class="pres-field-lbl">Body <span style="font-weight:400;opacity:.6;">(use <code>- </code> for bullets)</span></div>
         <textarea id="pres-editor-body" placeholder="Body text…&#10;- Bullet point&#10;- Another point" oninput="updatePresStopField('body')"></textarea>
+      </div>
+      <div>
+        <div class="pres-field-lbl">Seconds on screen <span style="font-weight:400;opacity:.6;">(used by Play)</span></div>
+        <input type="number" id="pres-editor-duration" min="1" max="600" step="1" value="8" oninput="updatePresDuration()">
+      </div>
+    </div>
+    <div id="pres-narration-box">
+      <div class="pres-field-lbl">Narration <span style="font-weight:400;opacity:.6;">(optional, one audio track)</span></div>
+      <div id="pres-narration-status">No narration attached.</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="pres-mini-btn" onclick="document.getElementById('pres-narration-file').click()">Attach audio file</button>
+        <button class="pres-mini-btn" id="pres-narration-spread" onclick="presSpreadToNarration()" style="display:none;" title="Give every stop an equal share of the narration">Spread stops evenly</button>
+        <button class="pres-mini-btn" id="pres-narration-remove" onclick="presRemoveNarration()" style="display:none;">Remove</button>
+      </div>
+      <input type="file" id="pres-narration-file" accept="audio/*" style="display:none" onchange="presNarrationFileChosen(this)">
+      <div style="display:flex;gap:6px;">
+        <input type="text" id="pres-narration-url" placeholder="or paste a link to an audio file (https://…)" autocomplete="off">
+        <button class="pres-mini-btn" onclick="presNarrationUseLink()">Use</button>
       </div>
     </div>
     <div id="pres-edit-footer">
@@ -6623,7 +6669,7 @@ function capturePresStop(){
   presentationStops.push({id,panX,panY,zoom,
     worldCX:(W/2-panX)/zoom, worldCY:(H/2-panY)/zoom,
     captureW:W, captureH:H,
-    header:'Stop '+num,subheader:'',body:''});
+    header:'Stop '+num,subheader:'',body:'',duration:8});
   saveState(); markUnsaved();
   rebuildPresStopList();
   selectPresStop(presentationStops.length-1);
@@ -6667,6 +6713,8 @@ function selectPresStop(idx){
   if(eh) eh.value=stop.header||'';
   if(es) es.value=stop.subheader||'';
   if(eb) eb.value=stop.body||'';
+  const ed=document.getElementById('pres-editor-duration');
+  if(ed) ed.value=stop.duration||8;
   const editor=document.getElementById('pres-editor');
   if(editor) editor.style.display='flex';
 }
@@ -6740,9 +6788,11 @@ function enterPresentationMode(){
   presGoToStop(0,false);
   presRender();
   document.addEventListener('keydown',presKeyHandler);
+  presPlayReset();
 }
 
 function exitPresentationMode(){
+  presPlayReset();
   inPresentationMode=false;
   presTargetWorldCX=null; presTargetWorldCY=null;
   presCurrentStop=null; presNeedSnap=false;
@@ -6764,6 +6814,7 @@ function presKeyHandler(e){
   if(!inPresentationMode) return;
   if(e.key==='ArrowRight'||e.key==='ArrowDown'){ e.preventDefault(); presentNext(); }
   else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){ e.preventDefault(); presentPrev(); }
+  else if(e.key===' '){ e.preventDefault(); presPlayToggle(); }
   else if(e.key==='Escape') exitPresentationMode();
 }
 
@@ -6806,6 +6857,7 @@ function presentNext(){
   }
   if(presentationCurrentIdx<presentationStops.length-1){
     presGoToStop(presentationCurrentIdx+1,true);
+    presAfterManualNav();
   }
 }
 
@@ -6817,7 +6869,173 @@ function presentPrev(){
   }
   if(presentationCurrentIdx>0){
     presGoToStop(presentationCurrentIdx-1,true);
+    presAfterManualNav();
   }
+}
+
+// ── Video mode: timed playback with optional narration ─────────────────────
+let presNarration=null;        // {name, src, embedded} — kept OUT of snap()/undo history on purpose (can be large)
+let presNarrationAudio=null;
+let presNarrationDur=0;
+const presPlay={playing:false,ended:false,t0:0,pausedAt:null,timer:null};
+
+function presDur(i){ const st=presentationStops[i]; return Math.max(1,+(st&&st.duration)||8); }
+function presStopStart(i){ let t=0; for(let k=0;k<i;k++) t+=presDur(k); return t; }
+function presTotal(){ let t=0; for(let k=0;k<presentationStops.length;k++) t+=presDur(k); return Math.max(t,presNarrationDur||0); }
+function presIndexAt(E){ let t=0; for(let k=0;k<presentationStops.length;k++){ t+=presDur(k); if(E<t) return k; } return Math.max(0,presentationStops.length-1); }
+function presFmt(sec){ sec=Math.max(0,Math.floor(sec)); return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'); }
+
+function presGetAudio(){
+  if(!presNarration||!presNarration.src) return null;
+  if(!presNarrationAudio||presNarrationAudio._src!==presNarration.src){
+    const a=new Audio(); a.preload='auto'; a.src=presNarration.src; a._src=presNarration.src;
+    presNarrationAudio=a;
+  }
+  return presNarrationAudio;
+}
+function presElapsed(){ return (performance.now()-presPlay.t0)/1000; }
+
+function presUpdateTimeline(E){
+  const total=presTotal()||1;
+  const f=document.getElementById('present-timeline-fill'); if(f) f.style.width=Math.min(100,E/total*100)+'%';
+  const t=document.getElementById('present-time'); if(t) t.textContent=presFmt(E)+' / '+presFmt(total);
+}
+function presSetPlayLabel(){
+  const b=document.getElementById('present-btn-play'); if(!b) return;
+  b.textContent=presPlay.playing?'❚❚ Pause':(presPlay.ended?'↻ Replay':'▶ Play');
+}
+function presClearTimer(){ if(presPlay.timer){ clearInterval(presPlay.timer); presPlay.timer=null; } }
+
+function presPlayStart(){
+  if(!presentationStops.length) return;
+  if(presPlay.ended){ presPlay.ended=false; presPlay.pausedAt=null; presGoToStop(0,true); }
+  const E0=presPlay.pausedAt!=null?presPlay.pausedAt:presStopStart(presentationCurrentIdx);
+  presPlay.t0=performance.now()-E0*1000;
+  presPlay.playing=true; presPlay.pausedAt=null;
+  const a=presGetAudio();
+  if(a){
+    try{ a.currentTime=Math.min(E0,(a.duration&&isFinite(a.duration))?a.duration:E0); }catch(e){}
+    const pr=a.play(); if(pr&&pr.catch) pr.catch(()=>showStatus('Your browser blocked the narration. Press Play again.'));
+  }
+  presClearTimer(); presPlay.timer=setInterval(presTick,100);
+  presSetPlayLabel(); presTick();
+}
+function presPlayPause(){
+  presPlay.pausedAt=presElapsed();
+  presPlay.playing=false; presClearTimer();
+  if(presNarrationAudio) presNarrationAudio.pause();
+  presSetPlayLabel();
+}
+function presPlayEnd(){
+  presClearTimer(); presPlay.playing=false; presPlay.ended=true; presPlay.pausedAt=null;
+  if(presNarrationAudio) presNarrationAudio.pause();
+  presUpdateTimeline(presTotal()); presSetPlayLabel();
+}
+function presPlayReset(){   // leaving or entering presentation: back to a clean, stopped state
+  presClearTimer();
+  presPlay.playing=false; presPlay.ended=false; presPlay.pausedAt=null;
+  if(presNarrationAudio){ presNarrationAudio.pause(); try{ presNarrationAudio.currentTime=0; }catch(e){} }
+  presSetPlayLabel(); presUpdateTimeline(0);
+}
+function presPlayToggle(){ if(presPlay.playing) presPlayPause(); else presPlayStart(); }
+
+function presTick(){
+  const E=presElapsed(), total=presTotal();
+  if(E>=total){ presPlayEnd(); return; }
+  const idx=presIndexAt(E);
+  if(idx!==presentationCurrentIdx) presGoToStop(idx,true);
+  presUpdateTimeline(E);
+  const a=presNarrationAudio;     // the clock leads; pull the audio back in line if it drifts
+  if(a&&!a.paused&&Math.abs(a.currentTime-E)>0.5){ try{ a.currentTime=E; }catch(e){} }
+}
+// Back/Next pressed by hand: restart timing from the start of the stop now showing
+function presAfterManualNav(){
+  presPlay.ended=false;
+  if(presPlay.playing){
+    const E=presStopStart(presentationCurrentIdx);
+    presPlay.t0=performance.now()-E*1000;
+    if(presNarrationAudio){ try{ presNarrationAudio.currentTime=E; }catch(e){} }
+    presUpdateTimeline(E);
+  } else {
+    presPlay.pausedAt=null;
+    presUpdateTimeline(presStopStart(presentationCurrentIdx));
+  }
+  presSetPlayLabel();
+}
+function presTimelineSeek(e){
+  const bar=document.getElementById('present-timeline'); if(!bar||!presentationStops.length) return;
+  const r=bar.getBoundingClientRect();
+  const E=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*presTotal();
+  const idx=presIndexAt(E);
+  if(idx!==presentationCurrentIdx) presGoToStop(idx,true);
+  presPlay.ended=false;
+  presPlay.t0=performance.now()-E*1000;
+  if(presNarrationAudio){ try{ presNarrationAudio.currentTime=E; }catch(err){} }
+  if(!presPlay.playing) presPlay.pausedAt=E;
+  presUpdateTimeline(E); presSetPlayLabel();
+}
+
+// Editor: seconds on screen + narration
+function updatePresDuration(){
+  const stop=presentationStops[presentationSelectedIdx]; if(!stop) return;
+  const el=document.getElementById('pres-editor-duration'); if(!el) return;
+  const v=parseFloat(el.value);
+  stop.duration=Math.max(1,Math.min(600,isFinite(v)?v:8));
+  saveState(); markUnsaved(); presNarrationUI();
+}
+function presNarrationUI(){
+  const st=document.getElementById('pres-narration-status'); if(!st) return;
+  const has=!!presNarration;
+  const sp=document.getElementById('pres-narration-spread'), rm=document.getElementById('pres-narration-remove');
+  if(sp) sp.style.display=(has&&presNarrationDur>0&&presentationStops.length>0)?'inline-block':'none';
+  if(rm) rm.style.display=has?'inline-block':'none';
+  if(!has){ st.textContent='No narration attached.'; return; }
+  const len=presNarrationDur>0?' ('+presFmt(presNarrationDur)+')':'';
+  const sum=presentationStops.reduce((a,x,i)=>a+presDur(i),0);
+  st.textContent='Narration: '+presNarration.name+len+(presNarration.embedded?' · stored inside the saved file':' · linked')+
+    (presNarrationDur>0?'. Stops add up to '+presFmt(sum)+'.':'.');
+}
+function presNarrationLoaded(){
+  presNarrationDur=0;
+  const a=presGetAudio();
+  if(a){
+    const done=()=>{ presNarrationDur=(isFinite(a.duration)?a.duration:0)||0; presNarrationUI(); presUpdateTimeline(0); };
+    if(a.readyState>=1) done(); else a.addEventListener('loadedmetadata',done,{once:true});
+  }
+  presNarrationUI();
+}
+function presNarrationFileChosen(inp){
+  const f=inp.files&&inp.files[0]; inp.value='';
+  if(!f) return;
+  if(!/^audio\//.test(f.type)&&!/\.(mp3|m4a|wav|ogg|aac|webm)$/i.test(f.name)){ showStatus('Please choose an audio file (MP3, M4A or WAV).'); return; }
+  const MAX=12*1024*1024;
+  if(f.size>MAX){ showStatus('That file is '+(f.size/1048576).toFixed(1)+' MB. Keep embedded narration under 12 MB, or paste a link to a hosted file instead.'); return; }
+  const rd=new FileReader();
+  rd.onload=()=>{ presNarration={name:f.name,src:rd.result,embedded:true}; presNarrationAudio=null; presNarrationLoaded(); markUnsaved(); showStatus('Narration attached. Save the file to keep it.'); };
+  rd.onerror=()=>showStatus('Could not read that audio file.');
+  rd.readAsDataURL(f);
+}
+function presNarrationUseLink(){
+  const inp=document.getElementById('pres-narration-url'); if(!inp) return;
+  let u=(inp.value||'').trim(); if(!u) return;
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(u)) u='https://'+u;
+  try{ const parsed=new URL(u); if(parsed.protocol!=='https:'&&parsed.protocol!=='http:') throw 0; u=parsed.href; }
+  catch(e){ showStatus('That is not a valid web address.'); return; }
+  presNarration={name:u,src:u,embedded:false}; presNarrationAudio=null; inp.value='';
+  presNarrationLoaded(); markUnsaved();
+}
+function presRemoveNarration(){
+  if(presNarrationAudio){ presNarrationAudio.pause(); }
+  presNarration=null; presNarrationAudio=null; presNarrationDur=0;
+  presNarrationUI(); markUnsaved();
+}
+function presSpreadToNarration(){
+  if(!(presNarrationDur>0)||!presentationStops.length) return;
+  const per=Math.max(1,Math.round(presNarrationDur/presentationStops.length*10)/10);
+  presentationStops.forEach(st=>{ st.duration=per; });
+  const ed=document.getElementById('pres-editor-duration'); if(ed&&presentationStops[presentationSelectedIdx]) ed.value=per;
+  saveState(); markUnsaved(); presNarrationUI();
+  showStatus('Each stop now stays on screen for '+per+' seconds.');
 }
 
 function updatePresLeftPanel(){
@@ -7276,9 +7494,12 @@ function saveFile(){
   // Embed current snapshot so the file restores correctly when re-opened
   const snapEl=document.getElementById('puddl-saved-state');
   if(snapEl) snapEl.textContent=snap();
+  const narEl=document.getElementById('puddl-narration');
+  if(narEl) narEl.textContent=presNarration?JSON.stringify(presNarration):'';
   const blob=new Blob(['<!DOCTYPE html>\n'+document.documentElement.outerHTML],{type:'text/html'});
   // Clear after serialising so live session is unaffected
   if(snapEl) snapEl.textContent='';
+  if(narEl) narEl.textContent='';
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=filename;
@@ -8453,6 +8674,11 @@ window.addEventListener('load', ()=>{
     const embedded=snapEl&&snapEl.textContent.trim();
     if(embedded){
       restoreSnap(embedded);
+      try{
+        const nEl=document.getElementById('puddl-narration');
+        const nRaw=nEl&&nEl.textContent.trim();
+        if(nRaw){ presNarration=JSON.parse(nRaw); if(nEl) nEl.textContent=''; presNarrationLoaded(); }
+      }catch(err){ presNarration=null; }
       const d=JSON.parse(embedded);
       mapTitle=d.mapTitle||'Puddl Systems Map';
       const mtd=document.getElementById('map-title-display');
