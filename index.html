@@ -787,13 +787,35 @@ body.share-mode #present-exit{display:none !important;}
 /* ── Presentation Edit Panel ───────────────────────────────────────────────── */
 #pres-edit-panel{
   display:none;position:fixed;top:50px;right:0;
-  width:310px;height:calc(100vh - 50px);
+  width:460px;height:calc(100vh - 50px);
   background:var(--surf);border-left:1px solid var(--bdr);
   box-shadow:var(--shadow-xl);z-index:50;
-  flex-direction:column;font-family:'DM Sans',sans-serif;
+  flex-direction:row;font-family:'DM Sans',sans-serif;
   overflow:hidden;
 }
 #pres-edit-panel.open{display:flex;}
+#pres-stops-col{
+  width:150px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;
+  background:var(--surf-2);border-right:1px solid var(--bdr);
+}
+#pres-stops-hdr{
+  padding:14px 12px 10px;font-size:12px;font-weight:700;text-transform:uppercase;
+  letter-spacing:0.06em;color:var(--ink-h);border-bottom:1px solid var(--bdr);flex-shrink:0;
+}
+#pres-main-col{
+  flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;min-height:0;
+}
+#pres-stop-list{display:flex;flex-direction:column;gap:3px;}
+.pres-stop-item{position:relative;}
+.pres-stop-item[draggable=true]{cursor:grab;}
+.pres-stop-item.dragging{opacity:.35;}
+.pres-stop-item.drop-before::before,.pres-stop-item.drop-after::after{
+  content:'';position:absolute;left:0;right:0;height:3px;background:var(--ink);border-radius:2px;z-index:2;
+}
+.pres-stop-item.drop-before::before{top:-3px;}
+.pres-stop-item.drop-after::after{bottom:-3px;}
+.pres-stop-item .pres-stop-btn.del{opacity:0;}
+.pres-stop-item:hover .pres-stop-btn.del,.pres-stop-item.selected .pres-stop-btn.del{opacity:1;}
 #pres-edit-hdr{
   padding:12px 14px 10px;border-bottom:1px solid var(--bdr);
   display:flex;align-items:center;gap:8px;flex-shrink:0;
@@ -803,7 +825,7 @@ body.share-mode #present-exit{display:none !important;}
   text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);
 }
 #pres-edit-body{
-  flex:1;overflow-y:auto;padding:10px;
+  flex:1;overflow-y:auto;padding:8px;
   display:flex;flex-direction:column;gap:6px;min-height:0;
 }
 #pres-stop-empty{
@@ -1246,13 +1268,17 @@ body.share-mode #present-exit{display:none !important;}
 
   <!-- ── Presentation Edit Panel ─────────────────────────────────────────── -->
   <div id="pres-edit-panel">
+    <div id="pres-stops-col">
+      <div id="pres-stops-hdr">Stops</div>
+      <div id="pres-edit-body">
+      <div id="pres-stop-empty">No stops yet.<br>Navigate the map to a view you like, then press <strong>Capture view</strong>.</div>
+      <div id="pres-stop-list"></div>
+    </div>
+    </div>
+    <div id="pres-main-col">
     <div id="pres-edit-hdr">
       <span id="pres-edit-hdr-title">Presentation Setup</span>
       <button onclick="exitPresentationEditMode()" style="width:24px;height:24px;padding:0;font-size:14px;border:none;background:transparent;color:var(--ink-h);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:4px;" title="Close panel">✕</button>
-    </div>
-    <div id="pres-edit-body">
-      <div id="pres-stop-empty">No stops yet.<br>Navigate the map to a view you like, then press <strong>Capture view</strong>.</div>
-      <div id="pres-stop-list"></div>
     </div>
     <div id="pres-editor" style="display:none;">
       <div id="pres-editor-lbl">Edit stop content</div>
@@ -1290,6 +1316,7 @@ body.share-mode #present-exit{display:none !important;}
     <div id="pres-edit-footer">
       <button onclick="capturePresStop()" style="width:100%;font-size:12px;height:34px;background:var(--surf-2);border:1.5px dashed var(--bdr-m);color:var(--ink-m);font-weight:600;" title="Save current pan/zoom as a new stop">+ Capture current view</button>
       <button id="btn-start-presentation" onclick="enterPresentationMode()" disabled style="width:100%;font-size:12px;height:34px;background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700;">▶ Start Presentation</button>
+    </div>
     </div>
   </div>
 
@@ -2209,7 +2236,7 @@ function resize(){
   const area=document.getElementById('canvas-area');
   const dpr=window.devicePixelRatio||1;
   area.style.maxWidth='';  // clear first so we read true container width
-  const panelW=inPresentationEditMode?310:0;
+  const panelW=inPresentationEditMode?460:0;
   W=area.clientWidth-panelW;
   H=area.clientHeight;
   if(inPresentationEditMode) area.style.maxWidth=W+'px';
@@ -6745,6 +6772,18 @@ function updatePresStopField(field){
   saveState(); markUnsaved();
 }
 
+let _presDragIdx=null;
+function movePresStopTo(from,to){   // to = final index after the move
+  if(from===to||from<0||to<0||from>=presentationStops.length||to>=presentationStops.length) return;
+  const [st]=presentationStops.splice(from,1);
+  presentationStops.splice(to,0,st);
+  saveState(); markUnsaved();
+  rebuildPresStopList();
+  selectPresStop(to);
+}
+function _presClearDropMarks(){
+  document.querySelectorAll('.pres-stop-item.drop-before,.pres-stop-item.drop-after').forEach(e=>e.classList.remove('drop-before','drop-after'));
+}
 function rebuildPresStopList(){
   const list=document.getElementById('pres-stop-list');
   if(!list) return;
@@ -6752,13 +6791,43 @@ function rebuildPresStopList(){
   presentationStops.forEach((stop,i)=>{
     const div=document.createElement('div');
     div.className='pres-stop-item'+(i===presentationSelectedIdx?' selected':'');
+    div.draggable=true;
+    div.title='Drag to reorder';
     div.onclick=()=>selectPresStop(i);
     div.innerHTML=
       '<span class="pres-stop-num">'+(i+1)+'</span>'+
-      '<span class="pres-stop-label">'+(stop.header||'(untitled)')+'</span>'+
-      '<button class="pres-stop-btn" onclick="event.stopPropagation();movePresStop('+i+',-1)" title="Move up"'+(i===0?' disabled':'')+'>↑</button>'+
-      '<button class="pres-stop-btn" onclick="event.stopPropagation();movePresStop('+i+',1)" title="Move down"'+(i===presentationStops.length-1?' disabled':'')+'>↓</button>'+
-      '<button class="pres-stop-btn del" onclick="event.stopPropagation();deletePresStop('+i+')" title="Remove">✕</button>';
+      '<span class="pres-stop-label"></span>'+
+      '<button class="pres-stop-btn del" title="Remove">✕</button>';
+    div.querySelector('.pres-stop-label').textContent=stop.header||'(untitled)';
+    div.querySelector('.del').onclick=(e)=>{ e.stopPropagation(); deletePresStop(i); };
+    div.addEventListener('dragstart',e=>{
+      _presDragIdx=i; div.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+      try{ e.dataTransfer.setData('text/plain',String(i)); }catch(err){}
+    });
+    div.addEventListener('dragend',()=>{ _presDragIdx=null; div.classList.remove('dragging'); _presClearDropMarks(); });
+    div.addEventListener('dragover',e=>{
+      if(_presDragIdx===null) return;
+      e.preventDefault(); e.dataTransfer.dropEffect='move';
+      const r=div.getBoundingClientRect();
+      const after=(e.clientY-r.top)>r.height/2;
+      _presClearDropMarks();
+      div.classList.add(after?'drop-after':'drop-before');
+      // keep the list scrolling when dragging near its top or bottom edge
+      const sc=document.getElementById('pres-edit-body'), sr=sc.getBoundingClientRect();
+      if(e.clientY<sr.top+36) sc.scrollTop-=14; else if(e.clientY>sr.bottom-36) sc.scrollTop+=14;
+    });
+    div.addEventListener('drop',e=>{
+      if(_presDragIdx===null) return;
+      e.preventDefault();
+      const r=div.getBoundingClientRect();
+      const after=(e.clientY-r.top)>r.height/2;
+      const from=_presDragIdx;
+      let to=after?i+1:i;          // insertion slot before removal
+      if(from<to) to-=1;           // account for removing the dragged item first
+      _presDragIdx=null; _presClearDropMarks();
+      movePresStopTo(from,to);
+    });
     list.appendChild(div);
   });
   const empty=document.getElementById('pres-stop-empty');
