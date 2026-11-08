@@ -775,6 +775,20 @@ body.share-mode #present-exit{display:none !important;}
   transition:all .12s;
 }
 #present-exit:hover{background:var(--surf-3);color:var(--ink);border-color:var(--bdr-m);}
+#present-overlay.map-only #present-left{
+  position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+  width:min(620px,92vw) !important;min-width:0;border:1px solid var(--bdr);
+  border-radius:14px;box-shadow:var(--shadow-xl);overflow:visible;z-index:5;
+  transition:opacity .35s;padding-bottom:0;
+}
+#present-overlay.map-only #present-left-scroll,
+#present-overlay.map-only #present-badge,
+#present-overlay.map-only #present-divider{display:none !important;}
+#present-overlay.map-only #present-right{flex:1 1 100%;}
+#present-overlay.map-only #present-exit{top:-38px;right:0;background:var(--surf);}
+#present-overlay.map-only #present-play-row{padding-top:12px;}
+#present-overlay.map-only.idle #present-left{opacity:0;pointer-events:none;}
+#present-overlay.map-only.idle{cursor:none;}
 #present-divider{
   width:5px;flex-shrink:0;cursor:col-resize;
   background:var(--bdr);transition:background .15s;
@@ -1250,6 +1264,7 @@ body.share-mode #present-exit{display:none !important;}
         <div id="present-timeline" onclick="presTimelineSeek(event)" title="Click to jump"><div id="present-timeline-fill"></div></div>
         <span id="present-time">0:00 / 0:00</span>
         <button class="present-nav-btn" id="present-btn-fs" onclick="toggleFullscreen()" title="Full screen" style="padding:7px 10px;">⛶</button>
+        <button class="present-nav-btn" id="present-btn-notes" onclick="presToggleMapOnly()" title="Show or hide the notes (N)" style="padding:7px 10px;">Hide notes</button>
       </div>
       <div id="present-nav">
         <button class="present-nav-btn" id="present-btn-back" onclick="presentPrev()">← Back</button>
@@ -1280,6 +1295,10 @@ body.share-mode #present-exit{display:none !important;}
       <span id="pres-edit-hdr-title">Presentation Setup</span>
       <button onclick="exitPresentationEditMode()" style="width:24px;height:24px;padding:0;font-size:14px;border:none;background:transparent;color:var(--ink-h);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:4px;" title="Close panel">✕</button>
     </div>
+    <label id="pres-maponly-row" style="display:flex;align-items:center;gap:8px;padding:10px 14px 0;font-size:12px;color:var(--ink-m);cursor:pointer;">
+      <input type="checkbox" id="pres-maponly-chk" onchange="presSetMapOnly(this.checked)" style="width:auto;margin:0;">
+      <span><strong>Map only</strong> (no notes on screen)</span>
+    </label>
     <div id="pres-editor" style="display:none;">
       <div id="pres-editor-lbl">Edit stop content</div>
       <div>
@@ -2217,6 +2236,7 @@ let sim=null;
 let hoverPanelNodeId=null, hoverHideTimer=null, sidePanelNodeId=null;
 
 // ── Presentation Mode state ───────────────────────────────────────────────────
+let presMapOnly=false;           // hide notes: map fills the screen, controls float
 let presentationStops=[];       // [{id,panX,panY,zoom,header,subheader,body}]
 let presentationCurrentIdx=0;
 let presentationSelectedIdx=0;
@@ -2449,6 +2469,7 @@ function snap(){
     loopConnectionStyle:LOOP_CONNECTION_STYLE,
     connectionStyles:CONNECTION_STYLES,
     presentationStops:presentationStops||[],
+    presMapOnly:!!presMapOnly,
     areas:AREAS,
     nodeLabelPosition:NODE_LABEL_POSITION,
     sizeByConnections:SIZE_BY_CONNECTIONS,
@@ -2495,6 +2516,7 @@ function restoreSnap(s){
   if(d.loopConnectionStyle) LOOP_CONNECTION_STYLE={...LOOP_CONNECTION_STYLE,...d.loopConnectionStyle};
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
   presentationStops=d.presentationStops||[];
+  presMapOnly=!!d.presMapOnly;
   if(d.areas&&Array.isArray(d.areas)&&d.areas.length) AREAS=d.areas;
   if(d.nodeLabelPosition) NODE_LABEL_POSITION=d.nodeLabelPosition;
   SIZE_BY_CONNECTIONS=!!d.sizeByConnections;
@@ -6681,6 +6703,7 @@ function enterPresentationEditMode(){
   const area=document.getElementById('canvas-area');
   resize(); draw();
   rebuildPresStopList();
+  presApplyMapOnly();
   if(presentationStops.length>0) selectPresStop(presentationSelectedIdx<presentationStops.length?presentationSelectedIdx:0);
 }
 
@@ -6842,6 +6865,30 @@ function rebuildPresStopList(){
 
 // ── Enter/exit presentation viewing mode ──────────────────────────────────────
 
+function presApplyMapOnly(){
+  const ov=document.getElementById('present-overlay'); if(!ov) return;
+  ov.classList.toggle('map-only',!!presMapOnly);
+  if(!presMapOnly) ov.classList.remove('idle');
+  const b=document.getElementById('present-btn-notes'); if(b) b.textContent=presMapOnly?'Show notes':'Hide notes';
+  const c=document.getElementById('pres-maponly-chk'); if(c) c.checked=!!presMapOnly;
+  if(inPresentationMode){
+    _presResizeCanvas();
+    if(presentationStops[presentationCurrentIdx]) presGoToStop(presentationCurrentIdx,false);
+    presWake();
+  }
+}
+function presSetMapOnly(v){ presMapOnly=!!v; saveState(); markUnsaved(); presApplyMapOnly(); }
+function presToggleMapOnly(){ presSetMapOnly(!presMapOnly); }
+let _presIdleTimer=null;
+function presWake(){
+  const ov=document.getElementById('present-overlay'); if(!ov) return;
+  ov.classList.remove('idle');
+  clearTimeout(_presIdleTimer);
+  if(presMapOnly&&inPresentationMode) _presIdleTimer=setTimeout(()=>ov.classList.add('idle'),3000);
+}
+document.addEventListener('mousemove',()=>{ if(inPresentationMode) presWake(); });
+document.addEventListener('touchstart',()=>{ if(inPresentationMode) presWake(); },{passive:true});
+
 function enterPresentationMode(){
   if(presentationStops.length===0){ showStatus('Add at least one stop first'); return; }
   inPresentationMode=true;
@@ -6858,11 +6905,14 @@ function enterPresentationMode(){
   presRender();
   document.addEventListener('keydown',presKeyHandler);
   presPlayReset();
+  presApplyMapOnly();
 }
 
 const IS_SHARE_VIEW=(function(){ try{ const e=document.getElementById('puddl-share'); const v=e&&e.textContent.trim()==='1'; if(v&&e) e.textContent=''; return !!v; }catch(err){ return false; } })();
 function exitPresentationMode(){
   if(IS_SHARE_VIEW) return;
+  clearTimeout(_presIdleTimer);
+  const _ov=document.getElementById('present-overlay'); if(_ov) _ov.classList.remove('idle');
   presPlayReset();
   inPresentationMode=false;
   presTargetWorldCX=null; presTargetWorldCY=null;
@@ -6883,8 +6933,10 @@ function _presResizeCanvas(){
 
 function presKeyHandler(e){
   if(!inPresentationMode) return;
-  if(e.key==='ArrowRight'||e.key==='ArrowDown'){ e.preventDefault(); presentNext(); }
-  else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){ e.preventDefault(); presentPrev(); }
+  presWake();
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'||e.key==='PageDown'||e.key==='Enter'){ e.preventDefault(); presentNext(); }
+  else if(e.key==='ArrowLeft'||e.key==='ArrowUp'||e.key==='PageUp'||e.key==='Backspace'){ e.preventDefault(); presentPrev(); }
+  else if(e.key==='n'||e.key==='N'){ e.preventDefault(); presToggleMapOnly(); }
   else if(e.key===' '){ e.preventDefault(); presPlayToggle(); }
   else if(e.key==='Escape') exitPresentationMode();
 }
