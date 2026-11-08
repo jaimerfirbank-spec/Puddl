@@ -1348,6 +1348,12 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
         <textarea id="modal-notes" placeholder="e.g. Anything relevant…" style="font-family:'DM Sans',sans-serif;width:100%;height:80px;padding:8px 10px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);font-size:12px;outline:none;resize:none;line-height:1.5;box-sizing:border-box;"></textarea>
       </div>
 
+      <!-- Video link -->
+      <div>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:4px;">Video link <span style="color:var(--txt-h);font-weight:400;">(optional)</span></div>
+        <input type="text" id="modal-video" placeholder="e.g. https://youtu.be/… or a Vimeo or .mp4 link" autocomplete="off" style="font-family:'DM Sans',sans-serif;width:100%;height:32px;font-size:13px;padding:0 10px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;">
+      </div>
+
     </div><!-- end scroll -->
     </div><!-- end modal-edit-panel -->
 
@@ -2353,7 +2359,7 @@ function snap(){
     };
   }
   return JSON.stringify({
-    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{}})),
+    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||''})),
     edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false})),
     colourLegendMap,
     categories:CATEGORIES,
@@ -2978,6 +2984,21 @@ function draw(){
       ctx.fillText(n.label,Math.round(n.x),Math.round(n.y),_maxW);
     }
     ctx.restore();
+    }
+
+    // ── Video badge ───────────────────────────────────────────
+    if(n.videoUrl){
+      const vb=videoBadgeGeom(n);
+      ctx.save();
+      ctx.beginPath(); ctx.arc(vb.x,vb.y,vb.r,0,Math.PI*2);
+      ctx.fillStyle='#18181b'; ctx.fill();
+      ctx.lineWidth=2/zoom; ctx.strokeStyle='#ffffff'; ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(vb.x-vb.r*0.28,vb.y-vb.r*0.42);
+      ctx.lineTo(vb.x+vb.r*0.46,vb.y);
+      ctx.lineTo(vb.x-vb.r*0.28,vb.y+vb.r*0.42);
+      ctx.closePath(); ctx.fillStyle='#ffffff'; ctx.fill();
+      ctx.restore();
     }
 
     // ── Group status pill ─────────────────────────────────────────────────────
@@ -4973,6 +4994,7 @@ function openAddModal(){
   document.getElementById('modal-title').textContent='Add node';
   document.getElementById('modal-name').value='';
   document.getElementById('modal-notes').value='';
+  { const v=document.getElementById('modal-video'); if(v) v.value=''; }
   selectedModalColour='#FFB3C8';
   selectedModalShape='circle';
   selectedModalSize='medium';
@@ -5043,6 +5065,7 @@ function switchToEditMode(){
   document.getElementById('modal-title').textContent='Edit node';
   document.getElementById('modal-name').value=n.label||'';
   document.getElementById('modal-notes').value=n.notes||'';
+  { const v=document.getElementById('modal-video'); if(v) v.value=n.videoUrl||''; }
   selectedModalColour=n.colour||'#FFB3C8';
   selectedModalShape=n.shape||'circle';
   selectedModalSize=n.nodeSize||'medium';
@@ -5085,6 +5108,7 @@ function confirmModal(){
   const nameInp=document.getElementById('modal-name');
   const name=(nameInp?nameInp.value.trim():'');
   const notes=document.getElementById('modal-notes')?.value.trim()||'';
+  const videoUrl=normaliseVideoUrl(document.getElementById('modal-video')?.value||'');
   const colour=selectedModalColour;
   const shape=selectedModalShape;
   const nodeSize=selectedModalSize;
@@ -5098,7 +5122,7 @@ function confirmModal(){
     const newNode={
       id:++idCtr, x:cx, y:cy,
       fx:cx, fy:cy, pinned:true,
-      label:name, colour, shape, nodeSize, titleSize, notes,
+      label:name, colour, shape, nodeSize, titleSize, notes, videoUrl,
       type:'process'
     };
     nodes.push(newNode);
@@ -5119,6 +5143,7 @@ function confirmModal(){
       n.nodeSize=nodeSize;
       n.titleSize=titleSize;
       n.notes=notes;
+      n.videoUrl=videoUrl;
       if(n.type==='centre') centralEventLabel=n.label;
       addLog('edited node "'+n.label+'"');
     }
@@ -5339,7 +5364,107 @@ canvas.addEventListener('mouseleave',()=>{
   }
 });
 
+// ── Video links ─────────────────────────────────────────────────────────
+function normaliseVideoUrl(raw){
+  let u=(raw||'').trim();
+  if(!u) return '';
+  if(!/^[a-z][a-z0-9+.-]*:/i.test(u)) u='https://'+u;
+  try{
+    const parsed=new URL(u);
+    if(parsed.protocol!=='https:'&&parsed.protocol!=='http:') throw new Error('scheme');
+    return parsed.href;
+  }catch(err){
+    if(typeof showStatus==='function') showStatus('That video link is not a valid web address, so it was not saved.');
+    return '';
+  }
+}
+// Decide how to play a link: YouTube/Vimeo embed, direct video file, or just a link
+function videoEmbedInfo(url){
+  let u; try{ u=new URL(url); }catch(e){ return {kind:'link',src:url}; }
+  if(u.protocol!=='https:'&&u.protocol!=='http:') return {kind:'link',src:'#'};
+  const host=u.hostname.replace(/^www\./,'').replace(/^m\./,'');
+  let id=null;
+  if(host==='youtu.be') id=u.pathname.split('/')[1];
+  else if(host==='youtube.com'||host==='youtube-nocookie.com'){
+    if(u.pathname==='/watch') id=u.searchParams.get('v');
+    else { const m=u.pathname.match(/^\/(?:embed|shorts|live|v)\/([\w-]+)/); if(m) id=m[1]; }
+  }
+  if(id&&/^[\w-]{6,20}$/.test(id)) return {kind:'iframe',src:'https://www.youtube-nocookie.com/embed/'+id+'?rel=0'};
+  if(host==='vimeo.com'||host==='player.vimeo.com'){
+    const m=u.pathname.match(/(\d{5,})/);
+    if(m) return {kind:'iframe',src:'https://player.vimeo.com/video/'+m[1]};
+  }
+  if(/\.(mp4|webm|ogg|ogv|mov|m4v)$/i.test(u.pathname)) return {kind:'video',src:u.href};
+  return {kind:'link',src:u.href};
+}
+function closeVideoPlayer(){
+  const m=document.getElementById('video-player-modal');
+  if(m) m.remove();   // removing the element stops playback
+  document.removeEventListener('keydown',_videoEsc,true);
+}
+function _videoEsc(e){ if(e.key==='Escape'){ e.stopPropagation(); closeVideoPlayer(); } }
+function openVideoPlayer(url,title){
+  closeVideoPlayer();
+  const info=videoEmbedInfo(url);
+  const wrap=document.createElement('div');
+  wrap.id='video-player-modal';
+  wrap.style.cssText='position:fixed;inset:0;z-index:600;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;';
+  wrap.addEventListener('click',e=>{ if(e.target===wrap) closeVideoPlayer(); });
+  const box=document.createElement('div');
+  box.style.cssText='background:#111;border-radius:12px;max-width:960px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5);';
+  const bar=document.createElement('div');
+  bar.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;color:#fff;font-family:inherit;font-size:13px;';
+  const t=document.createElement('span'); t.textContent=title||'Video'; t.style.cssText='font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+  const x=document.createElement('button'); x.textContent='✕'; x.setAttribute('aria-label','Close video');
+  x.style.cssText='background:none;border:none;color:#fff;font-size:18px;cursor:pointer;padding:2px 6px;';
+  x.onclick=closeVideoPlayer;
+  bar.appendChild(t); bar.appendChild(x); box.appendChild(bar);
+  if(info.kind==='iframe'){
+    const frame=document.createElement('div'); frame.style.cssText='position:relative;width:100%;aspect-ratio:16/9;background:#000;';
+    const f=document.createElement('iframe');
+    f.src=info.src; f.title=title||'Video';
+    f.setAttribute('allow','autoplay; fullscreen; picture-in-picture; encrypted-media');
+    f.setAttribute('allowfullscreen',''); f.setAttribute('referrerpolicy','strict-origin-when-cross-origin');
+    f.style.cssText='position:absolute;inset:0;width:100%;height:100%;border:0;';
+    frame.appendChild(f); box.appendChild(frame);
+  } else if(info.kind==='video'){
+    const v=document.createElement('video'); v.src=info.src; v.controls=true; v.autoplay=true; v.playsInline=true;
+    v.style.cssText='display:block;width:100%;max-height:70vh;background:#000;';
+    box.appendChild(v);
+  } else {
+    const msg=document.createElement('div'); msg.style.cssText='padding:28px 20px;color:#ddd;font-size:14px;line-height:1.5;';
+    msg.textContent='This link cannot be played inside Puddl. Use the link below to open it.';
+    box.appendChild(msg);
+  }
+  const foot=document.createElement('div'); foot.style.cssText='padding:10px 14px;font-size:12px;';
+  const a=document.createElement('a'); a.href=info.src==='#'?'#':url; a.target='_blank'; a.rel='noopener noreferrer';
+  a.textContent='Open in a new tab'; a.style.cssText='color:#9ec5ff;';
+  foot.appendChild(a); box.appendChild(foot);
+  wrap.appendChild(box); document.body.appendChild(wrap);
+  document.addEventListener('keydown',_videoEsc,true);
+}
+// Badge sits on the top-right of the node; one geometry for drawing and hit testing
+function videoBadgeGeom(n){
+  const r=nodeDims(n).r||40;
+  const br=Math.max(10,Math.min(r*0.26,26));
+  return {x:n.x+r*0.72, y:n.y-r*0.72, r:br};
+}
+let _vidDownX=0,_vidDownY=0;
+canvas.addEventListener('mousedown',e=>{ _vidDownX=e.offsetX; _vidDownY=e.offsetY; },true);
+function handleVideoBadgeClick(e){
+  if(Math.abs(e.offsetX-_vidDownX)>4||Math.abs(e.offsetY-_vidDownY)>4) return false; // it was a drag
+  const wx=(e.offsetX-panX)/zoom, wy=(e.offsetY-panY)/zoom;
+  for(let i=nodes.length-1;i>=0;i--){
+    const n=nodes[i];
+    if(!n.videoUrl||n.type==='centre') continue;
+    const vb=videoBadgeGeom(n);
+    if(Math.hypot(wx-vb.x,wy-vb.y)<=vb.r+3/zoom){ openVideoPlayer(n.videoUrl,n.label); return true; }
+  }
+  return false;
+}
+
 canvas.addEventListener('click',e=>{
+  if(handleVideoBadgeClick(e)) return;
   // Move mode — nothing to do on click (hover handles display)
   if(mode==='move') return;
   if(mode==='connect'){
