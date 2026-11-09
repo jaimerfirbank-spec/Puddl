@@ -2698,16 +2698,36 @@ function drawSimpleNodes(hasHL,_dark){
     if(n.x<vb.x0||n.x>vb.x1||n.y<vb.y0||n.y>vb.y1) return;
     const isHl=highlightIds.has(n.id), isSec=secondaryIds.has(n.id)&&!isHl;
     ctx.globalAlpha=hasHL&&!isHl&&!isSec?0.10:isSec?0.45:1;
-    const r=_simpleR(n);
+    const r=Math.max(_simpleR(n),2.2/zoom);
     ctx.fillStyle=nodeFill(n);
     ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
     if(isHl){ ctx.strokeStyle=_dark?'#fff':'#18181b'; ctx.lineWidth=2/zoom; ctx.strokeRect(n.x-r,n.y-r,r*2,r*2); }
     if(showNodeLabels&&(zoom>=0.9||isHl||isSec)) labels.push([n,r,ctx.globalAlpha]);
   });
   if(labels.length){
+    // Biggest / highlighted nodes get their names first; any name that would overlap one already placed is skipped
     ctx.font=`600 ${11/zoom}px 'DM Sans',sans-serif`;
     ctx.textAlign='center'; ctx.textBaseline='top';
-    labels.forEach(([n,r,al])=>{ ctx.globalAlpha=al; ctx.fillStyle=_dark?'#e4e4e7':'#27272a'; ctx.fillText(n.label||'',n.x,n.y+r+3/zoom); });
+    labels.sort((p,q)=>(highlightIds.has(q[0].id)-highlightIds.has(p[0].id))||(q[1]-p[1]));
+    const placed=new Map(), cell=120;
+    const hits=(x0,y0,x1,y1)=>{
+      for(let gx=Math.floor(x0/cell);gx<=Math.floor(x1/cell);gx++) for(let gy=Math.floor(y0/cell);gy<=Math.floor(y1/cell);gy++){
+        const arr=placed.get(gx+','+gy); if(arr) for(const b of arr) if(x0<b[2]&&x1>b[0]&&y0<b[3]&&y1>b[1]) return true;
+      }
+      return false;
+    };
+    const put=b=>{ for(let gx=Math.floor(b[0]/cell);gx<=Math.floor(b[2]/cell);gx++) for(let gy=Math.floor(b[1]/cell);gy<=Math.floor(b[3]/cell);gy++){ const k=gx+','+gy; if(!placed.has(k)) placed.set(k,[]); placed.get(k).push(b);} };
+    let shown=0;
+    for(const [n,r,al] of labels){
+      if(shown>400) break;
+      const txt=n.label||''; if(!txt) continue;
+      const sx=n.x*zoom+panX, sy=(n.y+r)*zoom+panY+3;
+      const w=ctx.measureText(txt).width*zoom;
+      const box=[sx-w/2-2,sy-1,sx+w/2+2,sy+14];
+      if(!highlightIds.has(n.id)&&hits(...box)) continue;
+      put(box); shown++;
+      ctx.globalAlpha=al; ctx.fillStyle=_dark?'#e4e4e7':'#27272a'; ctx.fillText(txt,n.x,n.y+r+3/zoom);
+    }
   }
   ctx.restore(); ctx.globalAlpha=1;
 }
@@ -4710,6 +4730,37 @@ function resolveIconId(text){
   return icon?icon.id:null;
 }
 
+// Arrange freshly imported nodes so connected ones sit together, then pin them in place.
+function layoutImportedNodes(newNodes){
+  if(!newNodes.length||typeof d3==='undefined') return;
+  const total=nodes.length;
+  const simpleAfter=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&total>=SIMPLE_THRESHOLD);
+  const isNew=new Set(newNodes.map(n=>n.id));
+  const rad=n=>simpleAfter?_simpleR(n)+6:(nodeDims(n).r||40)+18;
+  const simNodes=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:rad(n),fx:isNew.has(n.id)?null:n.x,fy:isNew.has(n.id)?null:n.y}));
+  const byId=new Map(simNodes.map(d=>[d.id,d]));
+  const links=[];
+  edges.forEach(e=>{
+    const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target;
+    if(byId.has(a)&&byId.has(b)&&(isNew.has(a)||isNew.has(b))) links.push({source:a,target:b});
+  });
+  const dist=simpleAfter?34:150;
+  const fs=d3.forceSimulation(simNodes)
+    .force('link',d3.forceLink(links).id(d=>d.id).distance(dist).strength(0.7))
+    .force('charge',d3.forceManyBody().strength(simpleAfter?-40:-400).distanceMax(simpleAfter?400:1500))
+    .force('collide',d3.forceCollide(d=>d.r))
+    .force('x',d3.forceX((W/2-panX)/zoom).strength(0.04))
+    .force('y',d3.forceY((H/2-panY)/zoom).strength(0.04))
+    .stop();
+  const ticks=newNodes.length>800?220:300;
+  for(let i=0;i<ticks;i++) fs.tick();
+  simNodes.forEach(d=>{
+    if(!isNew.has(d.id)) return;
+    const n=nodes.find(x=>x.id===d.id); if(!n) return;
+    n.x=d.x; n.y=d.y; n.fx=d.x; n.fy=d.y; n.pinned=true; n.vx=0; n.vy=0;
+  });
+}
+
 // ── Commit import ─────────────────────────────────────────────────────────────
 function confirmImport(){
   if(!importPlan) return;
@@ -4809,6 +4860,7 @@ function confirmImport(){
   const mergedNodeCount=toUpdate.filter(u=>u.isMerge).length;
   if(mergedNodeCount) parts.push(`${mergedNodeCount} node${mergedNodeCount!==1?'s':''} identified as same`);
   const msg=parts.length?parts.join(', ')+'.':'Nothing new to import.';
+  if(added) layoutImportedNodes(nodes.slice(nodes.length-added));
   if(added||connsAdded||mergedCount||mergedNodeCount){
     addLog(`imported: ${msg}`);
     buildSim();if(typeof forceOn!=='undefined'&&forceOn&&sim) sim.alpha(0.4).restart();
@@ -4816,6 +4868,7 @@ function confirmImport(){
     if(typeof rebuildCatFilter==='function') rebuildCatFilter();
     if(typeof updateColourLegend==='function') updateColourLegend();
     saveState();markUnsaved();draw();
+    if(added&&typeof fitAll==='function') fitAll();
   }
   showStatus(msg);
   importPlan=null;importRows=[];
