@@ -1583,7 +1583,7 @@ body.share-mode #present-exit{display:none !important;}
     <div style="background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 8px 32px rgba(0,0,0,0.10);border:1px solid rgba(0,0,0,0.08);width:100%;">
       <div style="font-size:14px;font-weight:700;color:#18181b;margin-bottom:5px;letter-spacing:-0.02em;">Name your project</div>
       <p style="font-size:12px;color:#71717a;margin:0 0 14px;">Give your map a name to get started.</p>
-      <input type="text" id="project-name-input" name="puddl-map-title" data-lpignore="true" data-1p-ignore
+      <input type="text" id="project-name-input" name="puddl-map-title" data-lpignore="true" data-1p-ignore readonly onfocus="this.removeAttribute('readonly')"
         placeholder="e.g. Community Network 2026"
         style="width:100%;height:44px;font-size:14px;border-radius:9px;border:1.5px solid rgba(0,0,0,0.14);background:#fafafa;color:#18181b;padding:0 14px;font-family:inherit;letter-spacing:-0.01em;outline:none;box-sizing:border-box;transition:border-color .15s;"
         autocomplete="off" spellcheck="false"
@@ -1619,7 +1619,7 @@ window.addEventListener('load', function runSplash(){
     phaseB.style.pointerEvents = 'auto';
     setTimeout(() => {
       const inp = document.getElementById('project-name-input');
-      if(inp) inp.focus();
+      if(inp){ if(/@/.test(inp.value)) inp.value=''; inp.focus(); }
     }, 150);
   }, 2400);
 });
