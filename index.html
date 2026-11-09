@@ -1095,6 +1095,14 @@ body.share-mode #present-exit{display:none !important;}
 </div>
 <input type="file" id="bg-upload-input" accept="image/jpeg,image/png" style="display:none" onchange="handleBgImageUpload(event)">
 <input type="file" id="node-img-upload-input" accept="image/jpeg,image/png" style="display:none" onchange="handleNodeImageUpload(event)">
+<div id="video-link-pop" style="display:none;position:fixed;z-index:9000;width:320px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-xl);padding:12px;font-family:'DM Sans',sans-serif;">
+  <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:6px;">Video link</div>
+  <input type="text" id="video-link-input" placeholder="YouTube, Vimeo or .mp4 link" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();saveVideoLinkPop();}else if(event.key==='Escape'){event.stopPropagation();closeVideoLinkPop();}" style="width:100%;height:32px;font-size:12px;padding:0 9px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;">
+  <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:8px;">
+    <button onclick="closeVideoLinkPop()" style="height:28px;font-size:12px;padding:0 10px;">Cancel</button>
+    <button onclick="saveVideoLinkPop()" style="height:28px;font-size:12px;padding:0 12px;background:var(--ink);color:var(--surf);border-color:var(--ink);">Save</button>
+  </div>
+</div>
 <div id="node-ctx-menu">
   <button id="ctx-btn-reposition" onclick="ctxReposition()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
@@ -1112,6 +1120,14 @@ body.share-mode #present-exit{display:none !important;}
   <button id="ctx-btn-outline" onclick="ctxToggleOutline()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/></svg>
     Outline mode
+  </button>
+  <button id="ctx-btn-video" onclick="ctxVideoLink()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="15" height="14" rx="2"/><path d="M17 10l5-3v10l-5-3z"/></svg>
+    <span id="ctx-video-label">Add video link…</span>
+  </button>
+  <button id="ctx-btn-video-remove" onclick="ctxRemoveVideo()" class="ctx-danger" style="display:none;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    Remove video link
   </button>
   <button id="ctx-btn-remove-img" onclick="ctxRemoveImage()" class="ctx-danger" style="display:none;">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -1482,11 +1498,6 @@ body.share-mode #present-exit{display:none !important;}
         <button id="modal-field-add-btn" onclick="modalAddFieldStart()" style="margin-top:8px;border:none;background:none;padding:0;font-size:12px;font-weight:600;color:var(--ink-m);cursor:pointer;">+ Add field</button>
       </div>
 
-      <!-- Video link -->
-      <div>
-        <div style="font-size:11px;color:var(--txt-m);margin-bottom:4px;">Video link <span style="color:var(--txt-h);font-weight:400;">(optional)</span></div>
-        <input type="text" id="modal-video" placeholder="e.g. https://youtu.be/… or a Vimeo or .mp4 link" autocomplete="off" style="font-family:'DM Sans',sans-serif;width:100%;height:32px;font-size:13px;padding:0 10px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;">
-      </div>
 
     </div><!-- end scroll -->
     </div><!-- end modal-edit-panel -->
@@ -5396,7 +5407,6 @@ function confirmModal(){
   const nameInp=document.getElementById('modal-name');
   const name=(nameInp?nameInp.value.trim():'');
   const notes=document.getElementById('modal-notes')?.value.trim()||'';
-  const videoUrl=normaliseVideoUrl(document.getElementById('modal-video')?.value||'');
   const customFields=readModalFields();
   const colour=selectedModalColour;
   const shape=selectedModalShape;
@@ -5411,7 +5421,7 @@ function confirmModal(){
     const newNode={
       id:++idCtr, x:cx, y:cy,
       fx:cx, fy:cy, pinned:true,
-      label:name, colour, shape, nodeSize, titleSize, notes, videoUrl, customFields,
+      label:name, colour, shape, nodeSize, titleSize, notes, videoUrl:'', customFields,
       type:'process'
     };
     nodes.push(newNode);
@@ -5432,7 +5442,6 @@ function confirmModal(){
       n.nodeSize=nodeSize;
       n.titleSize=titleSize;
       n.notes=notes;
-      n.videoUrl=videoUrl;
       n.customFields=customFields;
       if(n.type==='centre') centralEventLabel=n.label;
       addLog('edited node "'+n.label+'"');
@@ -8019,6 +8028,8 @@ canvas.addEventListener('contextmenu',e=>{
   const btnRemImg=document.getElementById('ctx-btn-remove-img');
   if(btnRepos) btnRepos.style.display='none';
   if(btnRemImg) btnRemImg.style.display=n.nodeImg?'flex':'none';
+  const vl=document.getElementById('ctx-video-label'); if(vl) vl.textContent=n.videoUrl?'Edit video link…':'Add video link…';
+  const vr=document.getElementById('ctx-btn-video-remove'); if(vr) vr.style.display=n.videoUrl?'flex':'none';
   const menu=document.getElementById('node-ctx-menu');
   if(!menu) return;
   menu.style.display='block';
@@ -8029,6 +8040,35 @@ canvas.addEventListener('contextmenu',e=>{
 });
 document.addEventListener('click',()=>closeNodeCtxMenu());
 document.addEventListener('contextmenu',e=>{ if(e.target!==canvas) closeNodeCtxMenu(); });
+let _videoPopNodeId=null;
+function ctxVideoLink(){
+  const id=ctxMenuNodeId; closeNodeCtxMenu();
+  const n=nodes.find(x=>x.id===id); if(!n) return;
+  _videoPopNodeId=id;
+  const pop=document.getElementById('video-link-pop'), inp=document.getElementById('video-link-input');
+  inp.value=n.videoUrl||'';
+  pop.style.display='block';
+  const vw=window.innerWidth,vh=window.innerHeight;
+  pop.style.left=Math.max(8,Math.min(_ctxClientX,vw-336))+'px';
+  pop.style.top=Math.max(8,Math.min(_ctxClientY,vh-130))+'px';
+  setTimeout(()=>{ inp.focus(); inp.select(); },0);
+}
+function closeVideoLinkPop(){ document.getElementById('video-link-pop').style.display='none'; _videoPopNodeId=null; }
+function saveVideoLinkPop(){
+  const n=nodes.find(x=>x.id===_videoPopNodeId); if(!n){ closeVideoLinkPop(); return; }
+  const raw=document.getElementById('video-link-input').value.trim();
+  const url=raw?normaliseVideoUrl(raw):'';
+  if(raw&&!url){ showStatus('That does not look like a web link. It needs to start with https://'); return; }
+  n.videoUrl=url; closeVideoLinkPop();
+  addLog((url?'set':'removed')+' video link on "'+n.label+'"');
+  saveState(); markUnsaved(); draw();
+  if(url) showStatus('Video link saved. Click the play badge on the node to watch.');
+}
+function ctxRemoveVideo(){
+  const n=nodes.find(x=>x.id===ctxMenuNodeId); closeNodeCtxMenu(); if(!n) return;
+  n.videoUrl=''; addLog('removed video link on "'+n.label+'"'); saveState(); markUnsaved(); draw();
+}
+document.addEventListener('mousedown',e=>{ const pop=document.getElementById('video-link-pop'); if(pop&&pop.style.display==='block'&&!pop.contains(e.target)) closeVideoLinkPop(); });
 function closeNodeCtxMenu(){
   const m=document.getElementById('node-ctx-menu');
   if(m) m.style.display='none';
