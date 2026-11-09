@@ -4408,7 +4408,10 @@ function buildColumnMapper(resetOnly=false){
     inp.setAttribute('list','imp-field-names');
     inp.style.cssText='width:100%;height:32px;font-size:12px;border-radius:var(--radius);border:1.5px solid var(--bdr-m);padding:0 8px;background:var(--surf);color:var(--ink);box-sizing:border-box;font-family:"DM Sans",sans-serif;';
     inp.addEventListener('input',()=>_importRefreshRow(i));
-    const tag=document.createElement('div'); tag.id='imp-ftag-'+i; tag.style.cssText='font-size:10px;margin-top:2px;';
+    inp.style.paddingRight='92px';
+    const tag=document.createElement('div'); tag.id='imp-ftag-'+i;
+    tag.style.cssText='position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:600;pointer-events:none;white-space:nowrap;';
+    c3.style.position='relative';
     c3.appendChild(inp); c3.appendChild(tag); grid.appendChild(c3);
   });
   let dlist=document.getElementById('imp-field-names');
