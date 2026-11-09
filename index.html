@@ -1597,32 +1597,104 @@ body.share-mode #present-exit{display:none !important;}
 
 <script>
 // ── Splash animation sequence ─────────────────────────────────────────────────
-window.addEventListener('load', function runSplash(){
-  const phaseA = document.getElementById('splash-phase-a');
-  const phaseB = document.getElementById('splash-phase-b');
-  const logo   = document.getElementById('splash-logo');
-  const quote  = document.getElementById('splash-quote');
-
-  // Step 1: reveal container, trigger logo drop+bounce animation
-  phaseA.style.opacity = '1';
-  setTimeout(() => { logo.classList.add('drop'); }, 80);
-
-  // Step 2: quote rises in after logo lands (~700ms drop + 150ms pause)
-  setTimeout(() => { quote.classList.add('rise'); }, 950);
-
-  // Step 3: hold then fade phase-a out
-  setTimeout(() => { phaseA.style.opacity = '0'; phaseA.style.pointerEvents = 'none'; }, 2200);
-
-  // Step 4: fade phase-b (project name card) in with slight overlap
-  setTimeout(() => {
-    phaseB.style.opacity = '1';
-    phaseB.style.pointerEvents = 'auto';
-    setTimeout(() => {
-      const inp = document.getElementById('project-name-input');
+// ── Splash: retro 8-bit drop, played once the person is signed in ─────────
+let _splashStarted=false;
+function startSplash(){
+  if(_splashStarted) return;
+  const bg=document.getElementById('who-modal-bg');
+  if(!bg||getComputedStyle(bg).display==='none') return;
+  const auth=document.getElementById('auth-modal');
+  if(auth&&getComputedStyle(auth).display!=='none') return;   // wait until sign-in is done
+  _splashStarted=true;
+  const phaseA=document.getElementById('splash-phase-a');
+  const logo=document.getElementById('splash-logo');
+  phaseA.style.opacity='1';
+  const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce){ logo.style.opacity='1'; _splashAfterLand(); return; }
+  _retroDrop(logo,phaseA,bg);
+}
+function _splashAfterLand(){
+  const phaseA=document.getElementById('splash-phase-a');
+  const phaseB=document.getElementById('splash-phase-b');
+  const quote=document.getElementById('splash-quote');
+  setTimeout(()=>{ quote.classList.add('rise'); },170);
+  setTimeout(()=>{ phaseA.style.opacity='0'; phaseA.style.pointerEvents='none'; },1420);
+  setTimeout(()=>{
+    phaseB.style.opacity='1'; phaseB.style.pointerEvents='auto';
+    setTimeout(()=>{
+      const inp=document.getElementById('project-name-input');
       if(inp){ if(/@/.test(inp.value)) inp.value=''; inp.focus(); }
-    }, 150);
-  }, 2400);
-});
+    },150);
+  },1620);
+}
+function _retroDrop(logo,phaseA,bg){
+  const FRAME=1000/12;                         // 12 frames a second: the choppy, old-console feel
+  const r=logo.getBoundingClientRect();
+  const fall=Math.round(r.bottom+60);          // start fully above the top of the screen
+  const h1=Math.min(70,fall*0.14), h2=h1*0.35;
+  const T1=620, T2=300, T3=190;                // fall, first bounce, second bounce (ms)
+  const yAt=t=>{
+    if(t<T1){ const k=t/T1; return -fall*(1-k*k); }
+    t-=T1; if(t<T2){ const k=t/T2; return -h1*4*k*(1-k); }
+    t-=T2; if(t<T3){ const k=t/T3; return -h2*4*k*(1-k); }
+    return 0;
+  };
+  const snap=v=>Math.round(v/4)*4;            // move in 4px steps, like big pixels
+  // pixel shadow on the floor
+  const shadow=document.createElement('div');
+  const sw=Math.round(r.width*0.72);
+  shadow.style.cssText='position:absolute;left:50%;height:12px;width:'+sw+'px;margin-left:'+(-sw/2)+'px;background:#18181b;pointer-events:none;'+
+    'clip-path:polygon(15% 0,85% 0,85% 34%,100% 34%,100% 67%,85% 67%,85% 100%,15% 100%,15% 67%,0 67%,0 34%,15% 34%);opacity:0;transform:scaleX(0.2);';
+  const pr=phaseA.getBoundingClientRect();
+  shadow.style.top=Math.round(r.bottom-pr.top-6)+'px';
+  phaseA.appendChild(shadow);
+  logo.style.transformOrigin='50% 100%';
+  logo.style.opacity='1';
+  let dust=[], done=false, last=-1;
+  const t0=performance.now();
+  const impacts=[{t:T1,big:true},{t:T1+T2,big:false}];
+  const puff=(big)=>{
+    const n=big?8:4, baseY=r.bottom-pr.top-6;
+    for(let i=0;i<n;i++){
+      const d=document.createElement('div'), side=i%2?1:-1, sz=big?8:6;
+      d.style.cssText='position:absolute;width:'+sz+'px;height:'+sz+'px;background:#a1a1aa;pointer-events:none;';
+      phaseA.appendChild(d);
+      dust.push({el:d,x:pr.width/2+side*(r.width*0.32+Math.random()*10),y:baseY,vx:side*(12+Math.random()*16),vy:-(8+Math.random()*14),life:big?5:4});
+    }
+  };
+  const finish=()=>{
+    if(done) return; done=true; clearInterval(timer); bg.removeEventListener('click',skip);
+    logo.style.transform=''; phaseA.style.transform=''; shadow.remove(); dust.forEach(d=>d.el.remove());
+    _splashAfterLand();
+  };
+  const skip=()=>finish();
+  bg.addEventListener('click',skip);
+  const timer=setInterval(()=>{
+    const t=performance.now()-t0;
+    const f=Math.floor(t/FRAME); if(f===last) return; last=f;
+    const y=snap(yAt(t));
+    // squash on landing frames
+    let sx=1, sy=1;
+    impacts.forEach(im=>{ const df=Math.floor((t-im.t)/FRAME);
+      if(df===0||df===1){ sx=im.big?1.22:1.1; sy=im.big?0.74:0.86; }
+      else if(df===2&&im.big){ sx=0.94; sy=1.08; }
+      if(df===0&&!im.fired){ im.fired=true; puff(im.big); } });
+    logo.style.transform='translateY('+y+'px) scale('+sx+','+sy+')';
+    // screen jolt on the big landing
+    const dfBig=Math.floor((t-T1)/FRAME);
+    phaseA.style.transform=dfBig===0?'translate(4px,2px)':dfBig===1?'translate(-4px,-2px)':'';
+    // shadow grows as the logo gets close
+    const near=Math.max(0,1-Math.abs(yAt(t))/fall);
+    const steps=Math.round(near*6)/6;
+    shadow.style.opacity=String((0.04+0.16*steps).toFixed(2));
+    shadow.style.transform='scaleX('+(0.2+0.8*steps).toFixed(2)+')';
+    // dust
+    dust=dust.filter(d=>{ d.life--; if(d.life<0){ d.el.remove(); return false; }
+      d.x+=d.vx; d.y+=d.vy; d.vy+=6; d.el.style.left=snap(d.x)+'px'; d.el.style.top=snap(d.y)+'px'; d.el.style.opacity=String(Math.min(1,d.life/3)); return true; });
+    if(t>T1+T2+T3+FRAME*2&&!dust.length) finish();
+  },FRAME/2);
+}
+window.addEventListener('load',()=>{ setTimeout(startSplash,60); });
 </script>
 
 <!-- Activity log panel -->
@@ -10938,6 +11010,7 @@ function showAuthModal() {
 function hideAuthModal() {
   document.getElementById('auth-modal').style.display = 'none';
   document.getElementById('canvas-area').style.display = 'block';
+  if(typeof startSplash==='function') setTimeout(startSplash,60);
 }
 
 // Add logout button to header
