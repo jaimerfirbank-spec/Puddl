@@ -1035,6 +1035,20 @@ body.share-mode #present-exit{display:none !important;}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg>
           Import from Puddl map
         </button>
+        <div style="height:1px;background:var(--bdr);margin:4px 0;"></div>
+        <button onclick="spreadNodes(1.25);closeSettings()" title="Move every node further apart">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          Spread out
+        </button>
+        <button onclick="spreadNodes(0.8);closeSettings()" title="Move every node closer together">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>
+          Pull in
+        </button>
+        <button onclick="tidyLayout();closeSettings()" title="Re-arrange the whole map so connected nodes sit together">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l2 8M16.5 10l-5 6"/></svg>
+          Tidy layout
+        </button>
+        <div style="height:1px;background:var(--bdr);margin:4px 0;"></div>
         <button onclick="exportPNGSnapshot();closeSettings()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           Export image
@@ -1076,7 +1090,7 @@ body.share-mode #present-exit{display:none !important;}
     <button id="btn-undo" onclick="undo()" disabled title="Undo" style="width:38px;height:38px;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center;">↩</button>
     <button id="btn-redo" onclick="redo()" disabled title="Redo" style="width:38px;height:38px;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center;">↪</button>
     <div class="sep"></div>
-    <button class="active" id="btn-move" onclick="setMode('move')">↖ Move</button>
+    <button class="active" id="btn-move" onclick="setMode('move')" title="Drag nodes to move them. Hold Shift while dragging to bring its connected nodes too.">↖ Move</button>
     <button id="btn-connect" onclick="setMode('connect')">⟶ Connect</button>
     <button id="btn-delconn" onclick="setMode('delconn')">✕ Edit link</button>
     <button id="btn-loop" onclick="setMode('loop')" title="Create a feedback loop by clicking nodes in sequence">⟳ Loop</button>
@@ -2289,6 +2303,7 @@ let loopNodes=[],loopDirection='cw',loopAddingNode=false;
 let selectedLoopId=null;
 let dragLoopId=null,dragLoopInitPos={},dragLoopStartSX=0,dragLoopStartSY=0,dragLoopInitCx=0,dragLoopInitCy=0;
 let dragNode=null,dragMoving=false,dragStartSX=0,dragStartSY=0;
+let dragGroupInit=null;   // Shift-drag: {id:{x,y}} for the node and its direct connections
 let panDragging=false,panSX=0,panSY=0,panPX=0,panPY=0;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
@@ -4733,6 +4748,55 @@ function resolveIconId(text){
   return icon?icon.id:null;
 }
 
+// ── Spacing tools ──────────────────────────────────────────────────────────
+function _collR(n){
+  if(n.type==='centre') return 70;
+  if(_simpleNow) return _simpleR(n)*1.42+3;      // square: half-diagonal
+  const r=nodeDims(n).r||40;
+  return n.shape==='pill'?r*1.45:r;
+}
+// Push apart any nodes that overlap. Nodes that don't overlap don't move.
+function resolveOverlaps(opts){
+  if(typeof d3==='undefined'||nodes.length<2) return 0;
+  _degCache=null; _fieldStatCache={};
+  _simpleNow=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&nodes.length>=SIMPLE_THRESHOLD);
+  const gap=_simpleNow?3:10;
+  const sn=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:_collR(n)+gap/2}));
+  const overlapping=()=>{ const q=d3.quadtree(sn,d=>d.x,d=>d.y); let hit=0; const maxR=Math.max(...sn.map(d=>d.r));
+    sn.forEach(a=>{ q.visit((nd,x0,y0,x1,y1)=>{ if(!nd.length){ let d=nd; do{ const b=d.data; if(b!==a&&b.id>a.id){ const dx=a.x-b.x,dy=a.y-b.y,rr=a.r+b.r; if(dx*dx+dy*dy<rr*rr*0.995) hit++; } }while(d=d.next); }
+      return x0>a.x+a.r+maxR||x1<a.x-a.r-maxR||y0>a.y+a.r+maxR||y1<a.y-a.r-maxR; }); });
+    return hit; };
+  if(!overlapping()) return 0;
+  const fs=d3.forceSimulation(sn).force('collide',d3.forceCollide(d=>d.r).strength(1).iterations(3)).velocityDecay(0.6).stop();
+  for(let i=0;i<200;i++){ fs.tick(); if(i%20===19&&!overlapping()) break; }
+  const byId=new Map(sn.map(d=>[d.id,d]));
+  let moved=0;
+  nodes.forEach(n=>{ const d=byId.get(n.id); if(!d) return; if(Math.abs(d.x-n.x)>0.5||Math.abs(d.y-n.y)>0.5) moved++; n.x=n.fx=d.x; n.y=n.fy=d.y; n.vx=0; n.vy=0; });
+  // keep loop circles following their nodes
+  loops.forEach(lp=>{ const ln=(lp.nodeIds||[]).map(id=>nodes.find(n=>n.id===id)).filter(Boolean); if(ln.length&&lp.cx!==undefined){ lp.cx=ln.reduce((a,n)=>a+n.x,0)/ln.length; lp.cy=ln.reduce((a,n)=>a+n.y,0)/ln.length; } });
+  if(!opts||!opts.silent){ draw(); }
+  return moved;
+}
+function spreadNodes(factor){
+  if(!nodes.length) return;
+  const cx=nodes.reduce((a,n)=>a+n.x,0)/nodes.length, cy=nodes.reduce((a,n)=>a+n.y,0)/nodes.length;
+  nodes.forEach(n=>{ n.x=n.fx=cx+(n.x-cx)*factor; n.y=n.fy=cy+(n.y-cy)*factor; n.pinned=true; });
+  loops.forEach(lp=>{ if(lp.cx!==undefined){ lp.cx=cx+(lp.cx-cx)*factor; lp.cy=cy+(lp.cy-cy)*factor; if(lp.radius) lp.radius*=factor; } });
+  if(factor<1) resolveOverlaps({silent:true});
+  addLog(factor>1?'spread nodes out':'pulled nodes in');
+  saveState(); markUnsaved(); draw();
+  showStatus(factor>1?'Spread out. Undo puts it back.':'Pulled in. Undo puts it back.');
+}
+function tidyLayout(){
+  if(nodes.length<2) return;
+  layoutImportedNodes(nodes.slice());
+  resolveOverlaps({silent:true});
+  addLog('tidied layout');
+  saveState(); markUnsaved(); draw();
+  if(typeof fitAll==='function') fitAll();
+  showStatus('Layout tidied. Not what you wanted? Press Undo.');
+}
+
 // Arrange freshly imported nodes so connected ones sit together, then pin them in place.
 function layoutImportedNodes(newNodes){
   if(!newNodes.length||typeof d3==='undefined') return;
@@ -4863,7 +4927,7 @@ function confirmImport(){
   const mergedNodeCount=toUpdate.filter(u=>u.isMerge).length;
   if(mergedNodeCount) parts.push(`${mergedNodeCount} node${mergedNodeCount!==1?'s':''} identified as same`);
   const msg=parts.length?parts.join(', ')+'.':'Nothing new to import.';
-  if(added) layoutImportedNodes(nodes.slice(nodes.length-added));
+  if(added){ layoutImportedNodes(nodes.slice(nodes.length-added)); resolveOverlaps({silent:true}); }
   if(added||connsAdded||mergedCount||mergedNodeCount){
     addLog(`imported: ${msg}`);
     buildSim();if(typeof forceOn!=='undefined'&&forceOn&&sim) sim.alpha(0.4).restart();
@@ -5590,7 +5654,7 @@ function confirmModal(){
   }
   closeModal();
   if(COLOUR_BY) updateColourLegend();
-  if(SIZE_BY) _afterSizeChange();
+  if(SIZE_BY) _afterSizeChange(); else resolveOverlaps({silent:true});
   saveState(); markUnsaved(); draw();
 }
 
@@ -5666,6 +5730,15 @@ canvas.addEventListener('mousedown',e=>{
       } else {
         dragLoopId=null;
         if(sim) sim.alphaTarget(0);
+        dragGroupInit=null;
+        if(e.shiftKey){
+          dragGroupInit={}; dragGroupInit[n.id]={x:n.x,y:n.y};
+          edges.forEach(ed=>{
+            const a=typeof ed.source==='object'?ed.source.id:ed.source, b=typeof ed.target==='object'?ed.target.id:ed.target;
+            const o=a===n.id?b:(b===n.id?a:null); if(o==null) return;
+            const on=nodes.find(m=>m.id===o); if(on) dragGroupInit[o]={x:on.x,y:on.y};
+          });
+        }
       }
     } else {
       // Check if clicking on a loop outline → select it.
@@ -5709,12 +5782,17 @@ canvas.addEventListener('mousemove',e=>{
           loop.cy=dragLoopInitCy+ddy;
         }
         draw();
+      } else if(dragGroupInit){
+        // Shift-drag: the node and everything directly connected to it move together
+        const ddx=(e.offsetX-dragStartSX)/zoom, ddy=(e.offsetY-dragStartSY)/zoom;
+        Object.entries(dragGroupInit).forEach(([id,p0])=>{ const nd=nodes.find(m=>m.id===+id); if(nd){ nd.x=nd.fx=p0.x+ddx; nd.y=nd.fy=p0.y+ddy; nd.pinned=true; } });
+        draw();
       } else {
         // Project the desired movement so any component pointing into another node
         // is stripped — leaves only the tangential (sliding) component.
         // Proven safe: if current position is valid, projected position is always valid.
         const cx=(e.offsetX-panX)/zoom, cy=(e.offsetY-panY)/zoom;
-        const dr=(nodeDims(dragNode).r||40);
+        const dr=_collR(dragNode);
         const px=dragNode.x, py=dragNode.y; // current valid position
         let dx=cx-px, dy=cy-py;             // desired movement toward cursor
 
@@ -5722,7 +5800,7 @@ canvas.addEventListener('mousemove',e=>{
           let changed=false;
           nodes.forEach(o=>{
             if(o===dragNode) return;
-            const minD=dr+(nodeDims(o).r||40)+8;
+            const minD=dr+_collR(o)+(_simpleNow?3:8);
             // Would the proposed position enter this node?
             const npx=px+dx-o.x, npy=py+dy-o.y;
             if(npx*npx+npy*npy < minD*minD){
@@ -5782,12 +5860,15 @@ canvas.addEventListener('mouseup',e=>{
       if(dragLoopId){
         // Loop group drag complete — positions already updated in mousemove
         saveState(); markUnsaved();
+      } else if(dragGroupInit){
+        resolveOverlaps({silent:true});
+        saveState(); markUnsaved(); draw();
       } else {
         dragNode.pinned=true;
         saveState();
       }
     }
-    dragNode=null; dragLoopId=null; dragMoving=false;
+    dragNode=null; dragLoopId=null; dragMoving=false; dragGroupInit=null;
     canvas.style.cursor=mode==='move'?'default':'crosshair';
   } else if(panDragging){
     panDragging=false;canvas.style.cursor='default';
@@ -9564,6 +9645,7 @@ function syncSizeByConnButtons(){
 function _afterSizeChange(){
   _degCache=null; _fieldStatCache={};
   _sizeSigEdges=SIZE_BY?edges.length:-1;
+  resolveOverlaps({silent:true});
   if(typeof sim!=='undefined'&&sim){ refreshCollisionRadii(); if(forceOn) sim.alpha(0.6).restart(); }
 }
 function setSizeBy(val){
