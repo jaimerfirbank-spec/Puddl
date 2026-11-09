@@ -13,7 +13,7 @@
   /* Core */
   --ink:#18181b;
   --ink-m:#52525b;
-  --ink-h:#a1a1aa;
+  --ink-h:#71717a;
   --surf:#ffffff;
   --surf-2:#fafafa;
   --surf-3:#f4f4f5;
@@ -43,7 +43,7 @@
   --coral-l:#fff0f0;
   --txt:#18181b;
   --txt-m:#52525b;
-  --txt-h:#a1a1aa;
+  --txt-h:#71717a;
 
   /* Shadows — softer, warm-tinted */
   --shadow-sm:0 1px 3px rgba(0,0,0,0.07),0 1px 2px rgba(0,0,0,0.04);
@@ -58,13 +58,17 @@
 
   /* Pushed down under #demo-banner when demo mode is active (set via JS to banner height) */
   --demo-banner-offset:0px;
+  --on-ink:#ffffff;
+  --coral-t:#C93C3C;
 }
 
 /* ── Dark mode overrides ──────────────────────────────────────────────────── */
 [data-theme="dark"]{
+  --coral-t:#FF8C8C;
   --ink:#f4f4f5;
-  --ink-m:#a1a1aa;
-  --ink-h:#71717a;
+  --ink-m:#b4b4bd;
+  --ink-h:#9a9aa6;
+  --on-ink:#16161f;
   --surf:#1e1e27;
   --surf-2:#252532;
   --surf-3:#2e2e3e;
@@ -77,8 +81,8 @@
   --teal-l:#2e2e3e;
   --teal-ll:#252532;
   --txt:#f4f4f5;
-  --txt-m:#a1a1aa;
-  --txt-h:#71717a;
+  --txt-m:#b4b4bd;
+  --txt-h:#9a9aa6;
   --shadow-sm:0 1px 3px rgba(0,0,0,0.4),0 1px 2px rgba(0,0,0,0.3);
   --shadow-md:0 4px 12px rgba(0,0,0,0.4),0 2px 6px rgba(0,0,0,0.3);
   --shadow-lg:0 12px 32px rgba(0,0,0,0.5),0 4px 12px rgba(0,0,0,0.4);
@@ -86,6 +90,7 @@
 }
 [data-theme="dark"] #main-header{background:var(--surf)!important;border-bottom-color:var(--bdr)!important;}
 [data-theme="dark"] #main-header *{color:var(--ink)!important;}
+[data-theme="dark"] #main-header #btn-pres-mode{color:var(--on-ink)!important;}
 [data-theme="dark"] #main-header .h-sub{color:var(--ink-h)!important;}
 [data-theme="dark"] #header-project-name{color:var(--ink)!important;}
 [data-theme="dark"] button{background:var(--surf-2);border-color:var(--bdr-m);color:var(--ink);}
@@ -305,7 +310,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 
 /* ── Tooltip ──────────────────────────────────────────────────────────────── */
 #tooltip{
-  position:absolute;background:var(--ink);color:#fff;
+  position:absolute;background:var(--ink);color:var(--on-ink);
   font-size:11px;padding:6px 11px;border-radius:var(--radius);
   pointer-events:none;display:none;z-index:100;
   max-width:230px;line-height:1.5;
@@ -328,7 +333,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   flex-shrink:0;
 }
 .zoom-btns button:hover:not(:disabled){
-  background:var(--ink);color:#fff;border-color:var(--ink);
+  background:var(--ink);color:var(--on-ink);border-color:var(--ink);
 }
 
 /* ── Search toggle (top-left, like legend) ───────────────────────────────── */
@@ -454,7 +459,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 }
 .ms-chip:hover{ background:var(--surf);border-color:rgba(0,0,0,0.3);color:var(--ink); }
 .ms-chip.selected{
-  background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600;
+  background:var(--ink);color:var(--on-ink);border-color:var(--ink);font-weight:600;
 }
 
 /* ── Tag chips ────────────────────────────────────────────────────────────── */
@@ -552,6 +557,9 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 /* ── Map info bar ─────────────────────────────────────────────────────────── */
 #map-info-bar{
   background:rgba(255,255,255,0.96) !important;
+}
+[data-theme="dark"] #map-info-bar{background:rgba(30,30,39,0.96) !important;}
+#map-info-bar{
   backdrop-filter:blur(8px);
   border-top:1px solid var(--bdr) !important;
   font-family:'DM Sans',sans-serif;
@@ -711,7 +719,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 .anim-btn:hover{background:var(--teal);color:#fff;border-color:var(--teal);}
 .anim-btn.primary{background:var(--navy);color:#fff;border-color:var(--navy);}
 .anim-btn.primary:hover{background:#0f2540;}
-.anim-btn.exit-btn{background:var(--coral-l);color:var(--coral);border-color:var(--coral);}
+.anim-btn.exit-btn{background:var(--coral-l);color:var(--coral-t);border-color:var(--coral-t);}
 
 /* ── Presentation Mode ─────────────────────────────────────────────────────── */
 #present-overlay{
@@ -777,9 +785,9 @@ body.share-mode #present-exit{display:none !important;}
   border:1.5px solid var(--bdr-m);background:var(--surf);
   color:var(--ink-m);transition:all .13s;font-family:'DM Sans',sans-serif;
 }
-.present-nav-btn:hover:not(:disabled){background:var(--ink);color:#fff;border-color:var(--ink);}
+.present-nav-btn:hover:not(:disabled){background:var(--ink);color:var(--on-ink);border-color:var(--ink);}
 .present-nav-btn:disabled{opacity:.3;cursor:default;}
-.present-nav-btn.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+.present-nav-btn.primary{background:var(--ink);color:var(--on-ink);border-color:var(--ink);}
 .present-nav-btn.primary:hover:not(:disabled){background:#3f3f46;border-color:#3f3f46;}
 #present-play-row{
   display:flex;align-items:center;gap:10px;
@@ -801,7 +809,7 @@ body.share-mode #present-exit{display:none !important;}
   font-size:11px;height:26px;padding:0 10px;border-radius:6px;cursor:pointer;
   border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink-m);font-weight:600;
 }
-.pres-mini-btn:hover{background:var(--ink);color:#fff;border-color:var(--ink);}
+.pres-mini-btn:hover{background:var(--ink);color:var(--on-ink);border-color:var(--ink);}
 #present-badge{
   position:absolute;bottom:112px;left:56px;
   font-size:10px;font-weight:600;letter-spacing:0.06em;
@@ -1353,7 +1361,7 @@ body.share-mode #present-exit{display:none !important;}
       <button onclick="exitPresentationEditMode()" style="width:24px;height:24px;padding:0;font-size:14px;border:none;background:transparent;color:var(--ink-h);cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:4px;" title="Close panel">✕</button>
     </div>
     <label id="pres-maponly-row" style="display:flex;align-items:center;gap:8px;padding:10px 14px 0;font-size:12px;color:var(--ink-m);cursor:pointer;">
-      <input type="checkbox" id="pres-maponly-chk" onchange="presSetMapOnly(this.checked)" style="width:auto;margin:0;">
+      <input type="checkbox" id="pres-maponly-chk" onchange="presSetMapOnly(this.checked)" style="width:auto;margin:0;accent-color:var(--ink);">
       <span><strong>Map only</strong> (no notes on screen)</span>
     </label>
     <div id="pres-editor" style="display:none;">
@@ -1391,7 +1399,7 @@ body.share-mode #present-exit{display:none !important;}
     </div>
     <div id="pres-edit-footer">
       <button onclick="capturePresStop()" style="width:100%;font-size:12px;height:34px;background:var(--surf-2);border:1.5px dashed var(--bdr-m);color:var(--ink-m);font-weight:600;" title="Save current pan/zoom as a new stop">+ Capture current view</button>
-      <button id="btn-start-presentation" onclick="enterPresentationMode()" disabled style="width:100%;font-size:12px;height:34px;background:var(--ink);border-color:var(--ink);color:#fff;font-weight:700;">▶ Start Presentation</button>
+      <button id="btn-start-presentation" onclick="enterPresentationMode()" disabled style="width:100%;font-size:12px;height:34px;background:var(--ink);border-color:var(--ink);color:var(--on-ink);font-weight:700;">▶ Start Presentation</button>
     </div>
     </div>
   </div>
@@ -1426,7 +1434,7 @@ body.share-mode #present-exit{display:none !important;}
       <button onclick="scaleLoop(selectedLoopId,0.85)" style="flex:1;font-size:13px;padding:4px 2px;height:28px;" title="Scale down">⊖</button>
       <button onclick="scaleLoop(selectedLoopId,1.175)" style="flex:1;font-size:13px;padding:4px 2px;height:28px;" title="Scale up">⊕</button>
     </div>
-    <button onclick="deleteLoop(selectedLoopId)" style="width:100%;font-size:11px;padding:4px 6px;height:28px;background:var(--coral);color:#fff;border-color:var(--coral);">✕ Remove loop</button>
+    <button onclick="deleteLoop(selectedLoopId)" style="width:100%;font-size:11px;padding:4px 6px;height:28px;background:var(--coral);color:#fff;border-color:var(--coral-t);">✕ Remove loop</button>
   </div>
 
   <!-- ── Loop builder panel ───────────────────────────────────────────────── -->
@@ -1436,7 +1444,7 @@ body.share-mode #present-exit{display:none !important;}
     <button onclick="loopRemoveLast()" id="btn-loop-back" title="Remove last node" style="font-size:11px;padding:0 8px;height:26px;opacity:0.5;" disabled>⌫</button>
     <button onclick="toggleLoopDir()" id="btn-loop-dir" style="font-size:11px;padding:0 10px;height:26px;white-space:nowrap;">↻ Clockwise</button>
     <button onclick="cancelLoop()" style="font-size:11px;padding:0 10px;height:26px;">✕ Cancel</button>
-    <button onclick="confirmLoop()" id="btn-confirm-loop" style="font-size:11px;padding:0 14px;height:26px;background:var(--ink);color:#fff;border-color:var(--ink);font-weight:600;" disabled>✓ Create loop</button>
+    <button onclick="confirmLoop()" id="btn-confirm-loop" style="font-size:11px;padding:0 14px;height:26px;background:var(--ink);color:var(--on-ink);border-color:var(--ink);font-weight:600;" disabled>✓ Create loop</button>
   </div>
 </div>
 
@@ -1521,7 +1529,7 @@ body.share-mode #present-exit{display:none !important;}
     <div style="display:flex;gap:8px;justify-content:flex-end;padding-top:10px;margin-top:8px;border-top:1px solid var(--bdr);flex-shrink:0;">
       <!-- View mode buttons -->
       <div id="footer-view-btns" style="display:none;width:100%;display:flex;gap:8px;justify-content:space-between;align-items:center;">
-        <button onclick="deleteModalNode()" id="del-node-btn" style="border-color:var(--coral);color:var(--coral);">Delete node</button>
+        <button onclick="deleteModalNode()" id="del-node-btn" style="border-color:var(--coral-t);color:var(--coral-t);">Delete node</button>
         <div style="display:flex;gap:8px;">
           <button onclick="closeModal()">Close</button>
           <button class="teal" onclick="switchToEditMode()">Edit</button>
@@ -1775,7 +1783,7 @@ function selectConnColour(col){
 <!-- Delete node modal -->
 <div class="modal-bg hidden" id="del-node-modal-bg">
   <div class="modal" style="width:320px;">
-    <h3 style="color:var(--coral);">⚠ Delete node</h3>
+    <h3 style="color:var(--coral-t);">⚠ Delete node</h3>
     <div style="background:#fff0f0;border:1.5px solid var(--coral);border-radius:var(--radius);padding:10px 12px;margin:8px 0 12px;">
       <div style="font-size:12px;font-weight:700;color:#b91c1c;margin-bottom:4px;">This cannot be undone.</div>
       <p style="font-size:11px;color:#7a2222;margin:0;">The node and all its connections will be permanently removed from the map. Enter the password to confirm.</p>
@@ -1788,7 +1796,7 @@ function selectConnColour(col){
     <div id="del-node-error" style="font-size:11px;color:#E8736A;margin-top:4px;min-height:16px;"></div>
     <div class="modal-btns">
       <button onclick="document.getElementById('del-node-modal-bg').classList.add('hidden')">Cancel</button>
-      <button onclick="confirmDeleteNode()" style="border-color:var(--coral);color:var(--coral);">Delete</button>
+      <button onclick="confirmDeleteNode()" style="border-color:var(--coral-t);color:var(--coral-t);">Delete</button>
     </div>
   </div>
 </div>
@@ -1799,7 +1807,7 @@ function selectConnColour(col){
 
     <!-- Phase 1: Warning + type confirmation -->
     <div id="reset-phase-1">
-      <h3 style="color:var(--coral);display:flex;align-items:center;gap:8px;">
+      <h3 style="color:var(--coral-t);display:flex;align-items:center;gap:8px;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
         Reset map
       </h3>
@@ -1818,7 +1826,7 @@ function selectConnColour(col){
       </div>
 
       <!-- Type-to-confirm -->
-      <label for="reset-confirm-input" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);margin-bottom:6px;">Type <span style="color:var(--coral);font-family:monospace;letter-spacing:0.1em;">DELETE</span> to enable the reset button</label>
+      <label for="reset-confirm-input" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);margin-bottom:6px;">Type <span style="color:var(--coral-t);font-family:monospace;letter-spacing:0.1em;">DELETE</span> to enable the reset button</label>
       <input id="reset-confirm-input" type="text" autocomplete="off" spellcheck="false"
         placeholder="Type DELETE here…"
         oninput="_onResetInput(this.value)"
@@ -1829,7 +1837,7 @@ function selectConnColour(col){
         <button onclick="closeResetModal()">Cancel</button>
         <button id="reset-execute-btn" disabled
           onclick="_resetStep2()"
-          style="border-color:var(--coral);color:var(--coral);opacity:0.38;cursor:not-allowed;transition:opacity .15s,cursor .15s;">
+          style="border-color:var(--coral-t);color:var(--coral-t);opacity:0.38;cursor:not-allowed;transition:opacity .15s,cursor .15s;">
           Reset map
         </button>
       </div>
@@ -1837,12 +1845,12 @@ function selectConnColour(col){
 
     <!-- Phase 2: Final "are you absolutely sure?" -->
     <div id="reset-phase-2" style="display:none;">
-      <h3 style="color:var(--coral);">Are you absolutely sure?</h3>
+      <h3 style="color:var(--coral-t);">Are you absolutely sure?</h3>
       <p style="font-size:13px;color:var(--ink);margin-bottom:20px;line-height:1.6;">Every node and connection will be permanently deleted. This is your last chance to cancel.</p>
       <div class="modal-btns">
         <button onclick="closeResetModal()" style="font-weight:600;">← Cancel</button>
         <button onclick="_executeReset()"
-          style="background:var(--coral);border-color:var(--coral);color:#fff;font-weight:700;">
+          style="background:var(--coral);border-color:var(--coral-t);color:#fff;font-weight:700;">
           Yes, delete everything
         </button>
       </div>
@@ -1903,7 +1911,7 @@ function selectConnColour(col){
   </div>
   <div style="display:flex;gap:6px;">
     <button onclick="closeEdgeEditPopup()" style="flex:1;font-size:12px;">Cancel</button>
-    <button onclick="deleteCurrentEdge()" style="flex:1;font-size:12px;color:var(--coral);border-color:var(--coral);">✕ Delete</button>
+    <button onclick="deleteCurrentEdge()" style="flex:1;font-size:12px;color:var(--coral-t);border-color:var(--coral-t);">✕ Delete</button>
   </div>
 </div>
 
@@ -2222,9 +2230,9 @@ function selectConnColour(col){
           </div>
         </div>
         <div style="margin-bottom:8px;padding-top:18px;border-top:1px solid var(--bdr);">
-          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--coral);">Reset map</h4>
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--coral-t);">Reset map</h4>
           <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Clear every node and connection and start again. You will be asked to confirm.</p>
-          <button onclick="saveAndCloseCustomizePanel();openResetModal()" style="padding:7px 16px;font-size:12px;font-weight:600;color:var(--coral);border-color:var(--coral);">Reset map…</button>
+          <button onclick="saveAndCloseCustomizePanel();openResetModal()" style="padding:7px 16px;font-size:12px;font-weight:600;color:var(--coral-t);border-color:var(--coral-t);">Reset map…</button>
         </div>
       </div>
       <div id="customize-content-connections" style="display:none;">
@@ -3712,7 +3720,7 @@ function toggleLegend(){
   const open=panel.style.display==='none';
   panel.style.display=open?'block':'none';
   if(lbl) lbl.textContent=open?'Hide legend':'Legend';
-  if(btn){ btn.style.background=open?'var(--ink)':'var(--surf)'; btn.style.color=open?'#fff':'var(--ink-m)'; }
+  if(btn){ btn.style.background=open?'var(--ink)':'var(--surf)'; btn.style.color=open?'var(--on-ink)':'var(--ink-m)'; }
 }
 function toggleSearchPanel(){
   const panel=document.getElementById('search-panel');
@@ -3721,7 +3729,7 @@ function toggleSearchPanel(){
   panel.style.display=open?'block':'none';
   if(btn){
     btn.style.background=open?'var(--ink)':'var(--surf)';
-    btn.style.color=open?'#fff':'var(--ink-m)';
+    btn.style.color=open?'var(--on-ink)':'var(--ink-m)';
     btn.style.borderColor=open?'var(--ink)':'var(--bdr)';
   }
   if(open) setTimeout(()=>document.getElementById('search-input').focus(),50);
@@ -5688,7 +5696,7 @@ function renderSettingsFields(){
     row.innerHTML='<input type="text" style="flex:1;padding:6px 8px;border:1px solid var(--bdr);border-radius:4px;font-size:12px;background:var(--surf);color:var(--ink);">'+
       '<button title="Move up" style="padding:4px 8px;font-size:11px;"'+(i===0?' disabled':'')+'>↑</button>'+
       '<button title="Move down" style="padding:4px 8px;font-size:11px;"'+(i===FIELD_DEFS.length-1?' disabled':'')+'>↓</button>'+
-      '<button title="Remove" style="padding:4px 9px;font-size:11px;color:var(--coral);border-color:var(--coral);">✕</button>';
+      '<button title="Remove" style="padding:4px 9px;font-size:11px;color:var(--coral-t);border-color:var(--coral-t);">✕</button>';
     const [inp,up,down,del]=row.querySelectorAll('input,button');
     inp.value=f.name;
     inp.onchange=()=>{ if(renameFieldDef(f.id,inp.value)) _fieldsChanged(); else inp.value=f.name; };
@@ -6248,7 +6256,7 @@ function renderCatEditList(){
         <option value="org" ${cat.type==='org'?'selected':''}>Organisation</option>
         <option value="person" ${cat.type==='person'?'selected':''}>Individual</option>
       </select>
-      <button onclick="deleteCategory(${i})" style="padding:4px 8px;border-color:var(--coral);color:var(--coral);flex-shrink:0;">✕</button>
+      <button onclick="deleteCategory(${i})" style="padding:4px 8px;border-color:var(--coral-t);color:var(--coral-t);flex-shrink:0;">✕</button>
     `;
     el.appendChild(row);
   });
@@ -6329,7 +6337,7 @@ function addGrantRow(data){
     <div style="display:grid;grid-template-columns:1fr 24px;gap:4px;align-items:center;">
       <input class="g-date" type="date" value="${dateVal}" ${warnAttr}
         style="height:28px;padding:0 6px;font-size:11px;border-radius:6px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--txt);outline:none;font-family:inherit;width:100%;">
-      <button type="button" onclick="${isExisting?'deleteGrantWithPassword':'deleteGrantRow'}(this)" style="padding:0;width:24px;height:24px;border-color:var(--coral);color:var(--coral);font-size:14px;border-radius:50%;flex-shrink:0;">×</button>
+      <button type="button" onclick="${isExisting?'deleteGrantWithPassword':'deleteGrantRow'}(this)" style="padding:0;width:24px;height:24px;border-color:var(--coral-t);color:var(--coral-t);font-size:14px;border-radius:50%;flex-shrink:0;">×</button>
     </div>
   `;
   document.getElementById('grants-list').appendChild(row);
@@ -6367,7 +6375,7 @@ function addContactRow(data){
         <option ${roleVal==='Manager'?'selected':''}>Manager</option>
         <option ${roleVal==='Volunteer'?'selected':''}>Volunteer</option>
       </select>
-      <button type="button" onclick="this.closest('.contact-row').remove();document.getElementById('add-contact-btn').style.display='';" style="padding:0;width:24px;height:24px;border-color:var(--coral);color:var(--coral);font-size:14px;border-radius:50%;">×</button>
+      <button type="button" onclick="this.closest('.contact-row').remove();document.getElementById('add-contact-btn').style.display='';" style="padding:0;width:24px;height:24px;border-color:var(--coral-t);color:var(--coral-t);font-size:14px;border-radius:50%;">×</button>
     </div>
     <input class="c-phone" type="tel" placeholder="Contact number" value="${c.phone||''}" style="height:28px;font-size:11px;border-radius:6px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--txt);outline:none;padding:0 8px;width:100%;">
   `;
@@ -6847,7 +6855,7 @@ function buildStrengthReport(){
       html+=`<div class="report-row">
         <div class="report-node-dot" style="background:${col};"></div>
         <span style="flex:1;">${n.label}</span>
-        <span style="font-size:11px;color:var(--coral);">No connections</span>
+        <span style="font-size:11px;color:var(--coral-t);">No connections</span>
       </div>`;
     });
     html+=`</div>`;
@@ -6913,7 +6921,7 @@ function buildChangeReport(){
   }
   if(removed.length){
     html+=`<div class="report-section"><h4>Nodes removed</h4>`;
-    removed.forEach(n=>{ html+=`<div class="report-row" style="color:var(--coral);">− ${n.label}</div>`; });
+    removed.forEach(n=>{ html+=`<div class="report-row" style="color:var(--coral-t);">− ${n.label}</div>`; });
     html+=`</div>`;
   }
   if(changed.length){
@@ -6934,7 +6942,7 @@ function buildChangeReport(){
   if(addedEdges.length||removedEdges.length){
     html+=`<div class="report-section"><h4>Connection changes</h4>`;
     addedEdges.forEach(e=>{ html+=`<div class="report-row" style="color:#085041;">+ ${nodeLabel(e.from||e.source,v2)} ↔ ${nodeLabel(e.to||e.target,v2)}</div>`; });
-    removedEdges.forEach(e=>{ html+=`<div class="report-row" style="color:var(--coral);">− ${nodeLabel(e.from||e.source,v1)} ↔ ${nodeLabel(e.to||e.target,v1)}</div>`; });
+    removedEdges.forEach(e=>{ html+=`<div class="report-row" style="color:var(--coral-t);">− ${nodeLabel(e.from||e.source,v1)} ↔ ${nodeLabel(e.to||e.target,v1)}</div>`; });
     html+=`</div>`;
   }
   if(!added.length&&!removed.length&&!changed.length&&!addedEdges.length&&!removedEdges.length){
@@ -6980,7 +6988,7 @@ function openVersionsModal(){
           <div style="font-size:11px;color:var(--txt-h);">${v.date}</div>
         </div>
         <button onclick="restoreVersion(${i})" style="font-size:11px;padding:4px 10px;border:1.5px solid var(--teal);color:var(--teal);background:none;border-radius:6px;cursor:pointer;">Restore</button>
-        <button onclick="deleteVersion(${i})" style="font-size:11px;padding:4px 8px;border:1.5px solid var(--coral);color:var(--coral);background:none;border-radius:6px;cursor:pointer;">✕</button>
+        <button onclick="deleteVersion(${i})" style="font-size:11px;padding:4px 8px;border:1.5px solid var(--coral);color:var(--coral-t);background:none;border-radius:6px;cursor:pointer;">✕</button>
       </div>`).join('');
   }
   document.getElementById('versions-modal-bg').classList.remove('hidden');
@@ -9615,7 +9623,7 @@ function renderCategoriesList(){
           <option value="org" ${cat.type === 'org' ? 'selected' : ''}>Organisation</option>
         </select>
       </div>
-      <button onclick="deleteCategory(${index})" style="padding:6px 12px;background:var(--coral);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;flex-shrink:0;">Delete</button>
+      <button onclick="deleteCategory(${index})" style="padding:6px 12px;background:#D9534F;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;flex-shrink:0;">Delete</button>
     </div>
   `).join('');
   cats.forEach(cat=>buildCategoryIconGrid(cat.id));
@@ -9630,7 +9638,7 @@ function renderFieldsConfig(){
         ${FUNDING_SOURCES.map((source, index) => `
           <div style="display:flex;align-items:center;gap:8px;">
             <input type="text" value="${source}" onchange="updateFundingSource(${index}, this.value)" style="flex:1;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;">
-            <button onclick="deleteFundingSource(${index})" style="padding:4px 8px;background:var(--coral);color:white;border:none;border-radius:4px;font-size:10px;cursor:pointer;">×</button>
+            <button onclick="deleteFundingSource(${index})" style="padding:4px 8px;background:#D9534F;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;">×</button>
           </div>
         `).join('')}
         <button onclick="addFundingSource()" style="padding:6px 12px;background:var(--accent-2);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;margin-top:8px;">+ Add Grant name</button>
@@ -9642,7 +9650,7 @@ function renderFieldsConfig(){
         ${GROUP_STATUSES.map((status, index) => `
           <div style="display:flex;align-items:center;gap:8px;">
             <input type="text" value="${status}" onchange="updateGroupStatusOption(${index}, this.value)" style="flex:1;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;">
-            <button onclick="deleteGroupStatusOption(${index})" style="padding:4px 8px;background:var(--coral);color:white;border:none;border-radius:4px;font-size:10px;cursor:pointer;">×</button>
+            <button onclick="deleteGroupStatusOption(${index})" style="padding:4px 8px;background:#D9534F;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;">×</button>
           </div>
         `).join('')}
         <button onclick="addGroupStatusOption()" style="padding:6px 12px;background:var(--accent-2);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;margin-top:8px;">+ Add Group Status</button>
@@ -9654,7 +9662,7 @@ function renderFieldsConfig(){
         ${PROTECTED_CHARACTERISTICS.map((opt, index) => `
           <div style="display:flex;align-items:center;gap:8px;">
             <input type="text" value="${opt}" onchange="updateProtectedCharOption(${index}, this.value)" style="flex:1;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;">
-            <button onclick="deleteProtectedCharOption(${index})" style="padding:4px 8px;background:var(--coral);color:white;border:none;border-radius:4px;font-size:10px;cursor:pointer;">×</button>
+            <button onclick="deleteProtectedCharOption(${index})" style="padding:4px 8px;background:#D9534F;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;">×</button>
           </div>
         `).join('')}
         <button onclick="addProtectedCharOption()" style="padding:6px 12px;background:var(--accent-2);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;margin-top:8px;">+ Add Characteristic</button>
@@ -9673,7 +9681,7 @@ function renderConnectionStylesList(){
           oninput="draftUpdateLabel('${style.id}',this.value)"
           style="flex:1;padding:6px 8px;border:1px solid var(--bdr);border-radius:4px;font-size:12px;background:var(--surf);color:var(--ink);">
         <button onclick="draftDeleteStyle(${index})"
-          style="padding:6px 10px;background:var(--coral);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;"${styles.length<=1?' disabled':''}>Delete</button>
+          style="padding:6px 10px;background:#D9534F;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;"${styles.length<=1?' disabled':''}>Delete</button>
       </div>
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
         <div id="conn-colour-trigger-${style.id}" onclick="openSwatchPicker(this,'${hexFromColour(style.colour)}','conn','${style.id}')" style="width:28px;height:28px;background:${hexFromColour(style.colour)};border-radius:4px;cursor:pointer;border:1px solid var(--bdr);flex-shrink:0;"></div>
@@ -9839,7 +9847,7 @@ function renderAreasList(){
       <input type="text" value="${area.replace(/"/g,'&quot;')}"
         onchange="updateAreaLabel(${i}, this.value)"
         style="flex:1;padding:6px 8px;border:1px solid var(--bdr);border-radius:4px;font-size:12px;background:var(--surf);color:var(--ink);">
-      <button onclick="deleteArea(${i})" style="padding:5px 10px;background:var(--coral);color:white;border:none;border-radius:4px;font-size:11px;cursor:pointer;"${AREAS.length<=1?' disabled':''}">Delete</button>
+      <button onclick="deleteArea(${i})" style="padding:5px 10px;background:#D9534F;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;"${AREAS.length<=1?' disabled':''}">Delete</button>
     </div>
   `).join('');
 }
@@ -10734,7 +10742,7 @@ function openEditConnectionPanel(){
           }).join('')}
         </div>
       </div>
-      <button onclick="deleteEdge(${idx})" style="width:100%;height:28px;font-size:11px;color:var(--coral);border-color:var(--coral);background:transparent;margin-top:6px;">✕ Delete connection</button>
+      <button onclick="deleteEdge(${idx})" style="width:100%;height:28px;font-size:11px;color:var(--coral-t);border-color:var(--coral-t);background:transparent;margin-top:6px;">✕ Delete connection</button>
     </div>`;
   });
   html+=`<button onclick="renderHoverPanel(nodes.find(nd=>nd.id===hoverPanelNodeId))" style="width:100%;font-size:11px;height:28px;margin-top:4px;">← Back</button>`;
@@ -10827,7 +10835,7 @@ function openHoverPanelDelete(){
       <div style="font-size:11px;color:#7a2222;">This will remove the node and all its connections. This cannot be undone.</div>
     </div>
     <div style="display:flex;gap:6px;">
-      <button onclick="confirmHoverDelete()" style="flex:1;background:var(--coral);border-color:var(--coral);color:#fff;font-size:11px;height:30px;font-weight:700;">Yes, delete</button>
+      <button onclick="confirmHoverDelete()" style="flex:1;background:var(--coral);border-color:var(--coral-t);color:#fff;font-size:11px;height:30px;font-weight:700;">Yes, delete</button>
       <button onclick="renderHoverPanel(nodes.find(nd=>nd.id===hoverPanelNodeId))" style="flex:1;font-size:11px;height:30px;">Cancel</button>
     </div>`;
 }
