@@ -2048,12 +2048,14 @@ function selectConnColour(col){
           </div>
         </div>
         <div style="margin-bottom:24px;">
-          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Size nodes by connections</h4>
-          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Nodes start at the size you pick and grow as they gain connections, so the busiest ones stand out.</p>
-          <div style="display:flex;gap:8px;">
-            <button id="btn-sizeconn-off" onclick="setSizeByConnections(false)" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Off</button>
-            <button id="btn-sizeconn-on" onclick="setSizeByConnections(true)" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">On</button>
-          </div>
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Size nodes by</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Nodes start at the size you picked and grow with the value, so the biggest stand out. Fields only appear here if they hold numbers.</p>
+          <select id="settings-size-by" onchange="setSizeBy(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);"></select>
+        </div>
+        <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Colour nodes by</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Number fields and connections use a pale to dark scale. Text fields give each value its own colour. The Legend fills in automatically. Turn it off to get each node's own colour back.</p>
+          <select id="settings-colour-by" onchange="setColourBy(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);"></select>
         </div>
         <div style="margin-bottom:24px;">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Map fields</h4>
@@ -2255,7 +2257,9 @@ let panDragging=false,panSX=0,panSY=0,panPX=0,panPY=0;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
 let FIELD_DEFS=[];              // map's own node fields: [{id,name}] — values live in node.customFields[id]
-let SIZE_BY_CONNECTIONS=false;   // when true, nodes grow with their number of connections
+let SIZE_BY_CONNECTIONS=false;   // true whenever SIZE_BY is set (kept for the radius refresh logic)
+let SIZE_BY='';                  // '' | 'connections' | 'field:<id>'
+let COLOUR_BY='';                // '' | 'connections' | 'field:<id>'
 let _degCache=null;             // node id -> connection count, rebuilt each frame
 let showNodeLabels=true;
 let DEFAULT_NODE_OUTLINE=false; // false=filled, true=outline
@@ -2408,7 +2412,7 @@ function nodeDims(n){
   const areaW=n.area?ctx.measureText(n.area).width:0;
   const maxTW=Math.max(lw,catW,areaW);
   let r = n.nodeSize==='small' ? 28 : n.nodeSize==='large' ? 60 : n.nodeSize==='xl' ? 120 : n.nodeSize==='xxl' ? 240 : 40;
-  if(SIZE_BY_CONNECTIONS){ r = Math.round(r * connectionScale(n)); }
+  if(SIZE_BY_CONNECTIONS){ r = Math.round(r * sizeScale(n)); }
   return {w:r*2, h:r*2, r, tagText:'', FS};
 }
 
@@ -2506,7 +2510,9 @@ function snap(){
     fieldDefs:FIELD_DEFS,
     areas:AREAS,
     nodeLabelPosition:NODE_LABEL_POSITION,
-    sizeByConnections:SIZE_BY_CONNECTIONS,
+    sizeByConnections:SIZE_BY==='connections',
+    sizeBy:SIZE_BY,
+    colourBy:COLOUR_BY,
     defaultNodeStyle:DEFAULT_NODE_OUTLINE?'outline':'filled',
   });
 }
@@ -2554,7 +2560,9 @@ function restoreSnap(s){
   FIELD_DEFS=Array.isArray(d.fieldDefs)?d.fieldDefs:[];
   if(d.areas&&Array.isArray(d.areas)&&d.areas.length) AREAS=d.areas;
   if(d.nodeLabelPosition) NODE_LABEL_POSITION=d.nodeLabelPosition;
-  SIZE_BY_CONNECTIONS=!!d.sizeByConnections;
+  SIZE_BY=typeof d.sizeBy==='string'?d.sizeBy:(d.sizeByConnections?'connections':'');
+  COLOUR_BY=typeof d.colourBy==='string'?d.colourBy:'';
+  SIZE_BY_CONNECTIONS=!!SIZE_BY;
   if(d.defaultNodeStyle) DEFAULT_NODE_OUTLINE=d.defaultNodeStyle==='outline';
   if(inPresentationEditMode) rebuildPresStopList();
   const mtd=document.getElementById('map-title-display');
@@ -2604,7 +2612,7 @@ function adaptColourForDark(col){
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function draw(){
-  _degCache=null;
+  _degCache=null; _fieldStatCache={};
   if(SIZE_BY_CONNECTIONS&&sim&&edges.length!==_sizeSigEdges){
     _sizeSigEdges=edges.length;
     refreshCollisionRadii();
@@ -3034,7 +3042,7 @@ function draw(){
     // ── Node body — shape-aware fill ─────────────────────────────────────────
     if(isHl){ctx.shadowColor='rgba(0,0,0,0.18)';ctx.shadowBlur=18/zoom;}
     drawNodeShape(ctx,n.x,n.y,r,n.shape,zoom);
-    const nodeCol=n.colour||'#C5E86C';
+    const nodeCol=nodeFill(n);
     if(n.outline){
       ctx.fillStyle='rgba(0,0,0,0)';
       ctx.fill();
@@ -4820,6 +4828,28 @@ function updateColourLegend(){
   const el=document.getElementById('colour-legend');
   if(!el) return;
   el.innerHTML='';
+  if(COLOUR_BY){
+    _fieldStatCache={}; _degCache=null;
+    const fid=COLOUR_BY.startsWith('field:')?COLOUR_BY.slice(6):null;
+    const fdef=fid?FIELD_DEFS.find(f=>f.id===fid):null;
+    if(COLOUR_BY==='connections'||fdef){
+      const title=COLOUR_BY==='connections'?'Connections':fdef.name;
+      const st=fdef?fieldStats(fid):null;
+      let h='<div style="font-size:11px;font-weight:700;color:var(--ink-m);margin-bottom:6px;">'+escHtml(title)+'</div>';
+      if(COLOUR_BY==='connections'||st.numeric){
+        const lo=COLOUR_BY==='connections'?0:st.min, hi=COLOUR_BY==='connections'?maxConnections():st.max;
+        const fmt=v=>isFinite(v)?(Math.round(v*100)/100).toLocaleString('en-GB'):'–';
+        h+='<div style="height:10px;border-radius:5px;background:linear-gradient(90deg,'+HEAT_STOPS.join(',')+');"></div>'+
+           '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--ink-h);margin-top:3px;"><span>'+fmt(lo)+'</span><span>'+fmt(hi)+'</span></div>';
+      } else {
+        st.values.slice(0,CAT_PALETTE.length).forEach((v,i)=>{ h+='<div class="l-row"><div class="l-dot" style="background:'+CAT_PALETTE[i]+';"></div> '+escHtml(v)+'</div>'; });
+        if(st.values.length>CAT_PALETTE.length) h+='<div class="l-row"><div class="l-dot" style="background:#A1A1AA;"></div> Other ('+(st.values.length-CAT_PALETTE.length)+')</div>';
+      }
+      if(nodes.some(n=>n.type!=='centre'&&nodeFill(n)===NO_VALUE_COLOUR)) h+='<div class="l-row"><div class="l-dot" style="background:'+NO_VALUE_COLOUR+';"></div> No value</div>';
+      el.innerHTML=h;
+      return;
+    }
+  }
   // Build legend from nodes actually on the map — not just recently added ones
   const seen=new Map(); // label → colour
   nodes.forEach(n=>{
@@ -5258,10 +5288,12 @@ function deleteFieldDef(id){
   const used=nodes.filter(n=>n.customFields&&String(n.customFields[id]||'').trim()!=='').length;
   if(!confirm('Remove the field "'+f.name+'"?'+(used?' It has values on '+used+' node'+(used!==1?'s':'')+', and they will be removed too.':''))) return false;
   FIELD_DEFS=FIELD_DEFS.filter(x=>x.id!==id);
+  if(SIZE_BY==='field:'+id){ SIZE_BY=''; SIZE_BY_CONNECTIONS=false; }
+  if(COLOUR_BY==='field:'+id) COLOUR_BY='';
   nodes.forEach(n=>{ if(n.customFields) delete n.customFields[id]; });
   return true;
 }
-function _fieldsChanged(){ saveState(); markUnsaved(); renderSettingsFields(); if(hoverPanelNodeId!=null){ const n=nodes.find(x=>x.id===hoverPanelNodeId); if(n) renderHoverPanel(n); } }
+function _fieldsChanged(){ _fieldStatCache={}; syncSizeByConnButtons(); updateColourLegend(); saveState(); markUnsaved(); renderSettingsFields(); draw(); if(hoverPanelNodeId!=null){ const n=nodes.find(x=>x.id===hoverPanelNodeId); if(n) renderHoverPanel(n); } }
 
 // Add/Edit node box
 function readModalFields(){
@@ -5391,6 +5423,8 @@ function confirmModal(){
     }
   }
   closeModal();
+  if(COLOUR_BY) updateColourLegend();
+  if(SIZE_BY) _afterSizeChange();
   saveState(); markUnsaved(); draw();
 }
 
@@ -9316,17 +9350,90 @@ function syncNodeStyleButtons(){
 }
 
 function syncSizeByConnButtons(){
-  const off=document.getElementById('btn-sizeconn-off'), on=document.getElementById('btn-sizeconn-on');
-  if(off){ off.style.background=!SIZE_BY_CONNECTIONS?'var(--ink)':''; off.style.color=!SIZE_BY_CONNECTIONS?'var(--surf)':''; }
-  if(on){ on.style.background=SIZE_BY_CONNECTIONS?'var(--ink)':''; on.style.color=SIZE_BY_CONNECTIONS?'var(--surf)':''; }
+  const ss=document.getElementById('settings-size-by'), cs=document.getElementById('settings-colour-by');
+  const opt=(v,t,sel)=>'<option value="'+escHtml(v)+'"'+(v===sel?' selected':'')+'>'+escHtml(t)+'</option>';
+  if(ss){
+    let h=opt('','Off (use each node\'s own size)',SIZE_BY)+opt('connections','Number of connections',SIZE_BY);
+    FIELD_DEFS.filter(f=>fieldIsNumeric(f.id)).forEach(f=>{ h+=opt('field:'+f.id,f.name,SIZE_BY); });
+    ss.innerHTML=h;
+  }
+  if(cs){
+    let h=opt('','Off (use each node\'s own colour)',COLOUR_BY)+opt('connections','Number of connections (heat scale)',COLOUR_BY);
+    FIELD_DEFS.forEach(f=>{ h+=opt('field:'+f.id,f.name+(fieldIsNumeric(f.id)?' (scale)':''),COLOUR_BY); });
+    cs.innerHTML=h;
+  }
 }
-function setSizeByConnections(val){
-  SIZE_BY_CONNECTIONS=!!val;
-  syncSizeByConnButtons();
-  _degCache=null;
-  _sizeSigEdges=val?edges.length:-1;
+function _afterSizeChange(){
+  _degCache=null; _fieldStatCache={};
+  _sizeSigEdges=SIZE_BY?edges.length:-1;
   if(typeof sim!=='undefined'&&sim){ refreshCollisionRadii(); if(forceOn) sim.alpha(0.6).restart(); }
+}
+function setSizeBy(val){
+  SIZE_BY=val||''; SIZE_BY_CONNECTIONS=!!SIZE_BY;
+  syncSizeByConnButtons(); _afterSizeChange();
   saveState(); markUnsaved(); draw();
+}
+function setSizeByConnections(val){ setSizeBy(val?'connections':''); }   // older callers
+function setColourBy(val){
+  COLOUR_BY=val||'';
+  syncSizeByConnButtons(); _fieldStatCache={};
+  updateColourLegend();
+  if(COLOUR_BY){ const lp=document.getElementById('legend-panel-inner'); if(lp&&lp.style.display==='none'&&typeof toggleLegend==='function') toggleLegend(); }
+  saveState(); markUnsaved(); draw();
+}
+
+// ── Size / colour by data ─────────────────────────────────────────────────
+let _fieldStatCache={};
+function _num(v){ if(v===undefined||v===null) return NaN; const t=String(v).replace(/[£$€,%\s]/g,''); return t===''?NaN:Number(t); }
+function fieldStats(id){
+  if(_fieldStatCache[id]) return _fieldStatCache[id];
+  let min=Infinity,max=-Infinity,count=0,numeric=true;
+  const freq=new Map();
+  nodes.forEach(n=>{
+    if(n.type==='centre') return;
+    const raw=n.customFields&&n.customFields[id]; const v=raw==null?'':String(raw).trim();
+    if(!v) return;
+    count++; freq.set(v,(freq.get(v)||0)+1);
+    const x=_num(v); if(isNaN(x)) numeric=false; else { if(x<min) min=x; if(x>max) max=x; }
+  });
+  const st={min,max,count,numeric:numeric&&count>0,values:[...freq.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).map(e=>e[0])};
+  _fieldStatCache[id]=st; return st;
+}
+function fieldIsNumeric(id){ return fieldStats(id).numeric; }
+function maxConnections(){ let m=0; nodes.forEach(n=>{ if(n.type!=='centre') m=Math.max(m,connectionCount(n)); }); return m; }
+// 0..1 position of a node on the current measure, or null when it has no value
+function _measure(n,key){
+  if(key==='connections'){ const m=maxConnections(); return m?connectionCount(n)/m:0; }
+  if(key&&key.startsWith('field:')){
+    const id=key.slice(6), st=fieldStats(id); if(!st.numeric) return null;
+    const x=_num(n.customFields&&n.customFields[id]); if(isNaN(x)) return null;
+    return st.max>st.min?(x-st.min)/(st.max-st.min):1;
+  }
+  return null;
+}
+function sizeScale(n){
+  if(SIZE_BY==='connections') return connectionScale(n);
+  const t=_measure(n,SIZE_BY); return t===null?1:1+1.6*t;
+}
+const HEAT_STOPS=['#FDE7D3','#FDBE85','#F68D4E','#D9531E','#9A2F0C'];
+const CAT_PALETTE=['#7FB3E6','#F4A261','#8BD3A6','#F28B9B','#B39DDB','#F6D06F','#6CC5C0','#D4A373','#9AA8BC','#E78AC3'];
+function _lerpHex(a,b,t){ const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)); const A=p(a),B=p(b); return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join(''); }
+function heatColour(t){ t=Math.max(0,Math.min(1,t)); const seg=t*(HEAT_STOPS.length-1), i=Math.min(Math.floor(seg),HEAT_STOPS.length-2); return _lerpHex(HEAT_STOPS[i],HEAT_STOPS[i+1],seg-i); }
+const NO_VALUE_COLOUR='#D4D4D8';
+function nodeFill(n){
+  if(!COLOUR_BY) return n.colour||'#C5E86C';
+  if(COLOUR_BY==='connections') return heatColour(_measure(n,'connections'));
+  if(COLOUR_BY.startsWith('field:')){
+    const id=COLOUR_BY.slice(6);
+    if(!FIELD_DEFS.some(f=>f.id===id)) return n.colour||'#C5E86C';
+    const st=fieldStats(id);
+    if(st.numeric){ const t=_measure(n,COLOUR_BY); return t===null?NO_VALUE_COLOUR:heatColour(t); }
+    const v=n.customFields&&n.customFields[id]?String(n.customFields[id]).trim():'';
+    if(!v) return NO_VALUE_COLOUR;
+    const i=st.values.indexOf(v);
+    return i>=0&&i<CAT_PALETTE.length?CAT_PALETTE[i]:'#A1A1AA';
+  }
+  return n.colour||'#C5E86C';
 }
 
 function renderCustomizePanel(){
@@ -9820,7 +9927,7 @@ function resetCustomizations(){
     // Reset areas
     AREAS = [];
 
-    SIZE_BY_CONNECTIONS = false;
+    SIZE_BY_CONNECTIONS = false; SIZE_BY=''; COLOUR_BY='';
 
     // Reset connection styles
     CONNECTION_STYLES = [
