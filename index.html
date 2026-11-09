@@ -232,6 +232,25 @@ button#btn-addnode:hover:not(:disabled){
 #settings-dropdown button.active{color:var(--ink);font-weight:600;}
 #settings-dropdown .dd-sep{height:1px;background:var(--bdr);margin:4px 0;}
 
+/* ── Header / toolbar menus ── */
+.dd-wrap{position:relative;display:inline-flex;}
+.dd-menu{
+  position:absolute;top:calc(100% + 8px);right:0;left:auto;
+  background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-xl);padding:5px;min-width:200px;
+  display:none;flex-direction:column;gap:2px;z-index:300;
+  max-height:calc(100vh - 80px);overflow-y:auto;
+}
+.toolbar-centre .dd-menu{left:0;right:auto;}
+.dd-menu.open{display:flex;}
+.dd-menu button{
+  display:flex;align-items:center;gap:9px;text-align:left;
+  padding:7px 11px;border-radius:var(--radius);font-size:12px;
+  border:none;background:none;color:var(--ink-m);cursor:pointer;transition:background .1s;
+  font-weight:500;height:34px;width:100%;white-space:nowrap;
+}
+.dd-menu button:hover{background:var(--surf-3);color:var(--ink);box-shadow:none;transform:none;}
+.dd-menu .dd-sep{height:1px;background:var(--bdr);margin:4px 0;}
 /* ── Inputs ───────────────────────────────────────────────────────────────── */
 select{
   cursor:pointer !important;
@@ -1023,62 +1042,38 @@ body.share-mode #present-exit{display:none !important;}
   </div>
   <!-- Header actions -->
   <div style="flex:1;display:flex;justify-content:flex-end;align-items:center;gap:6px;">
-<button onclick="openCustomizePanel()" title="Customize nodes &amp; connections" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;">Settings</button>
-    <div class="settings-wrap">
-      <button id="btn-settings" onclick="toggleSettings(event)" title="Tools" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;">Tools ▾</button>
-      <div id="settings-dropdown">
-        <button onclick="openImportModal();closeSettings()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Import from spreadsheet
-        </button>
-        <button onclick="openPuddlImportModal();closeSettings()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg>
-          Import from Puddl map
-        </button>
-        <div style="height:1px;background:var(--bdr);margin:4px 0;"></div>
-        <button onclick="spreadNodes(1.25);closeSettings()" title="Move every node further apart">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-          Spread out
-        </button>
-        <button onclick="spreadNodes(0.8);closeSettings()" title="Move every node closer together">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>
-          Pull in
-        </button>
-        <button onclick="tidyLayout();closeSettings()" title="Re-arrange the whole map so connected nodes sit together">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l2 8M16.5 10l-5 6"/></svg>
-          Tidy layout
-        </button>
-        <div style="height:1px;background:var(--bdr);margin:4px 0;"></div>
-        <button onclick="exportPNGSnapshot();closeSettings()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          Export image
-        </button>
-        <button onclick="openLog();closeSettings()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
-          Activity log
-        </button>
+    <div class="dd-wrap">
+      <button id="btn-menu-import" onclick="toggleMenu('menu-import',event)" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-m);">Import ▾</button>
+      <div class="dd-menu" id="menu-import">
+        <button onclick="openImportModal();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg> Spreadsheet</button>
+        <button onclick="openPuddlImportModal();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg> Puddl map</button>
         <div class="dd-sep"></div>
-        <button onclick="uploadBgImage();closeSettings()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-          Upload background image
-        </button>
-        <button id="btn-settings-remove-bg" onclick="removeBgImage();closeSettings()" style="display:none;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          Remove background image
-        </button>
-        <div class="dd-sep"></div>
-        <button onclick="openResetModal()" style="color:var(--coral);">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
-          Reset map
-        </button>
+        <button onclick="downloadImportTemplate();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 12v6M9 15l3 3 3-3"/></svg> Download template</button>
       </div>
     </div>
-    <button onclick="saveFile()" title="Save HTML file" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;">↓ Save file</button>
-    <button onclick="saveShareFile()" title="Save a view-only copy to email or put on a website. Opens straight into the presentation, no login, no editing." style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;">✉ Save for sharing</button>
+    <div class="dd-wrap">
+      <button id="btn-menu-share" onclick="toggleMenu('menu-share',event)" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-m);">Share ▾</button>
+      <div class="dd-menu" id="menu-share">
+        <button onclick="saveFile();closeMenus()" title="Download the full, editable map"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Save file</button>
+        <button onclick="saveShareFile();closeMenus()" title="A view-only copy to email or put on a website. Opens straight into the presentation, no login, no editing."><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6l-10 7L2 6"/></svg> Save for sharing</button>
+        <button onclick="exportPNGSnapshot();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Export image</button>
+      </div>
+    </div>
     <div id="demo-save-btn" style="display:none;align-items:center;gap:6px;padding:0 14px;height:28px;border-radius:var(--radius);border:1px solid var(--bdr);background:var(--surf-3);color:var(--ink-h);font-size:11px;font-weight:600;cursor:default;" title="Save (inactive in demo)">⬇ Save file</div>
+    <button id="btn-open-settings" onclick="openCustomizePanel()" title="Map settings" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-m);">Settings</button>
     <div style="width:1px;height:20px;background:var(--bdr);margin:0 4px;"></div>
-    <button id="btn-pres-mode" onclick="togglePresentationEditMode()" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;" title="Set up and run a presentation">▶ Present</button>
-    <button id="btn-demo" onclick="toggleDemo()" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-h);border-style:dashed;" title="Load demo map">Demo</button>
+    <button id="btn-pres-mode" onclick="togglePresentationEditMode()" style="font-size:11px;height:28px;padding:0 14px;font-weight:700;background:var(--ink);color:var(--surf);border-color:var(--ink);" title="Set up and run a presentation">▶ Present</button>
+    <div class="dd-wrap" id="account-wrap">
+      <button id="btn-account" onclick="toggleMenu('menu-account',event)" title="Account" style="width:30px;height:30px;padding:0;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-left:4px;">?</button>
+      <div class="dd-menu" id="menu-account" style="min-width:220px;">
+        <div id="account-email" style="padding:8px 11px 6px;font-size:11px;color:var(--ink-h);word-break:break-all;">Not signed in</div>
+        <div class="dd-sep"></div>
+        <button onclick="openLog();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Activity log</button>
+        <button id="btn-demo" onclick="toggleDemo();closeMenus()" title="Load the demo map and tour"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg> <span id="btn-demo-label">Demo tour</span></button>
+        <div class="dd-sep"></div>
+        <button id="btn-logout" onclick="closeMenus();logout()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Sign out</button>
+      </div>
+    </div>
   </div>
 </header>
 <div class="toolbar">
@@ -1094,6 +1089,16 @@ body.share-mode #present-exit{display:none !important;}
     <button id="btn-connect" onclick="setMode('connect')">⟶ Connect</button>
     <button id="btn-delconn" onclick="setMode('delconn')">✕ Edit link</button>
     <button id="btn-loop" onclick="setMode('loop')" title="Create a feedback loop by clicking nodes in sequence">⟳ Loop</button>
+    <div class="dd-wrap">
+      <button id="btn-menu-layout" onclick="toggleMenu('menu-layout',event)" title="Spacing and arranging">Layout ▾</button>
+      <div class="dd-menu" id="menu-layout">
+        <button onclick="spreadNodes(1.25);closeMenus()" title="Move every node further apart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg> Spread out</button>
+        <button onclick="spreadNodes(0.8);closeMenus()" title="Move every node closer together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg> Pull in</button>
+        <button onclick="tidyLayout();closeMenus()" title="Re-arrange the whole map so connected nodes sit together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l2 8M16.5 10l-5 6"/></svg> Tidy layout</button>
+        <div class="dd-sep"></div>
+        <div style="padding:4px 11px 6px;font-size:10.5px;color:var(--ink-h);line-height:1.4;white-space:normal;">Tip: hold Shift while dragging a node to move its connections with it.</div>
+      </div>
+    </div>
     <div class="sep"></div>
     <button id="btn-addnode" onclick="openAddModal()">+ Add node</button>
     <button id="btn-undo-separate" onclick="undo()" title="Undo last separate" style="display:none;border-color:var(--bdr-m);">↩ Undo spread</button>
@@ -1101,10 +1106,6 @@ body.share-mode #present-exit{display:none !important;}
 
   <!-- RIGHT: theme toggle + spacer -->
   <div class="toolbar-right" style="flex:1;justify-content:flex-end;">
-    <button id="btn-theme" onclick="toggleDarkMode()" title="Toggle dark mode" style="width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;">
-      <svg id="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-      <svg id="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-    </button>
   </div>
 </div>
 <input type="file" id="bg-upload-input" accept="image/jpeg,image/png" style="display:none" onchange="handleBgImageUpload(event)">
@@ -1582,7 +1583,7 @@ body.share-mode #present-exit{display:none !important;}
     <div style="background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 8px 32px rgba(0,0,0,0.10);border:1px solid rgba(0,0,0,0.08);width:100%;">
       <div style="font-size:14px;font-weight:700;color:#18181b;margin-bottom:5px;letter-spacing:-0.02em;">Name your project</div>
       <p style="font-size:12px;color:#71717a;margin:0 0 14px;">Give your map a name to get started.</p>
-      <input type="text" id="project-name-input"
+      <input type="text" id="project-name-input" name="puddl-map-title" data-lpignore="true" data-1p-ignore
         placeholder="e.g. Community Network 2026"
         style="width:100%;height:44px;font-size:14px;border-radius:9px;border:1.5px solid rgba(0,0,0,0.14);background:#fafafa;color:#18181b;padding:0 14px;font-family:inherit;letter-spacing:-0.01em;outline:none;box-sizing:border-box;transition:border-color .15s;"
         autocomplete="off" spellcheck="false"
@@ -2058,7 +2059,7 @@ function selectConnColour(col){
 <div class="modal-bg hidden" id="customize-modal-bg">
   <div class="modal" style="width:800px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--bdr);flex-shrink:0;">
-      <h3 style="margin:0;font-size:18px;font-weight:700;color:var(--ink);">Customize Nodes & Connections</h3>
+      <h3 style="margin:0;font-size:18px;font-weight:700;color:var(--ink);">Settings</h3>
       <button onclick="closeCustomizePanel()" style="background:none;border:none;color:var(--ink-h);cursor:pointer;font-size:24px;line-height:1;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;" title="Close">&times;</button>
     </div>
     
@@ -2066,6 +2067,7 @@ function selectConnColour(col){
     <div style="display:flex;background:var(--surf-2);border-bottom:1px solid var(--bdr);flex-shrink:0;">
       <button id="customize-tab-nodes" onclick="switchCustomizeTab('nodes')" style="flex:1;padding:12px 20px;background:var(--surf);border:none;border-bottom:2px solid var(--accent-2);color:var(--ink);font-weight:600;font-size:13px;cursor:pointer;">Nodes</button>
       <button id="customize-tab-connections" onclick="switchCustomizeTab('connections')" style="flex:1;padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--ink-m);font-weight:500;font-size:13px;cursor:pointer;">Connections</button>
+      <button id="customize-tab-map" onclick="switchCustomizeTab('map')" style="flex:1;padding:12px 20px;background:none;border:none;border-bottom:2px solid transparent;color:var(--ink-m);font-weight:500;font-size:13px;cursor:pointer;">Map</button>
     </div>
     
     <!-- Content Area -->
@@ -2130,6 +2132,29 @@ function selectConnColour(col){
       </div>
       
       <!-- Connections Tab -->
+      <div id="customize-content-map" style="display:none;">
+        <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Appearance</h4>
+          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Switch between light and dark. This is remembered on this computer.</p>
+          <button id="btn-theme" onclick="toggleDarkMode()" title="Toggle dark mode" style="height:34px;padding:0 14px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;">
+      <svg id="theme-icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+      <svg id="theme-icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    <span id="theme-btn-label">Dark mode</span></button>
+        </div>
+        <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Background image</h4>
+          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Put a picture behind the map, like a street map or a logo. JPG or PNG.</p>
+          <div style="display:flex;gap:8px;">
+            <button onclick="uploadBgImage()" style="padding:7px 16px;font-size:12px;font-weight:600;">Upload image</button>
+            <button id="btn-settings-remove-bg" onclick="removeBgImage()" style="display:none;padding:7px 16px;font-size:12px;">Remove image</button>
+          </div>
+        </div>
+        <div style="margin-bottom:8px;padding-top:18px;border-top:1px solid var(--bdr);">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--coral);">Reset map</h4>
+          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Clear every node and connection and start again. You will be asked to confirm.</p>
+          <button onclick="saveAndCloseCustomizePanel();openResetModal()" style="padding:7px 16px;font-size:12px;font-weight:600;color:var(--coral);border-color:var(--coral);">Reset map…</button>
+        </div>
+      </div>
       <div id="customize-content-connections" style="display:none;">
         <!-- Loop Connection Style -->
         <div style="margin-bottom:28px;">
@@ -7920,6 +7945,13 @@ function confirmWho(){
     if(err) err.textContent='Please enter a project name.';
     return;
   }
+  // Browsers sometimes autofill the sign-in email here; don't let that become the map name
+  if(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(name)){
+    const err=document.getElementById('who-error');
+    if(err) err.textContent='That looks like an email address. Give your map a name, like "Community Network 2026".';
+    if(input){ input.value=''; input.focus(); }
+    return;
+  }
   mapTitle=name;
   const hdr=document.getElementById('header-project-name');
   if(hdr) hdr.textContent=name;
@@ -8486,6 +8518,7 @@ function setTheme(theme){
   if(sun) sun.style.display=theme==='dark'?'block':'none';
   const btn=document.getElementById('btn-theme');
   if(btn) btn.title=theme==='dark'?'Switch to light mode':'Switch to dark mode';
+  const tl=document.getElementById('theme-btn-label'); if(tl) tl.textContent=theme==='dark'?'Light mode':'Dark mode';
   draw();
 }
 (function(){
@@ -9309,15 +9342,16 @@ window.addEventListener('load', ()=>{
 
 
 // ── Settings dropdown ─────────────────────────────────────────────────────────
-function toggleSettings(e){
-  e.stopPropagation();
-  const dd=document.getElementById('settings-dropdown');
-  dd.classList.toggle('open');
-  if(dd.classList.contains('open')) updateSettingsUI();
+function toggleMenu(id,e){
+  if(e) e.stopPropagation();
+  const m=document.getElementById(id); if(!m) return;
+  const was=m.classList.contains('open');
+  closeMenus();
+  if(!was) m.classList.add('open');
 }
-function closeSettings(){
-  document.getElementById('settings-dropdown').classList.remove('open');
-}
+function closeMenus(){ document.querySelectorAll('.dd-menu.open').forEach(m=>m.classList.remove('open')); }
+function toggleSettings(e){ toggleMenu('menu-import',e); }   // older callers
+function closeSettings(){ closeMenus(); }
 // ── Reset map (new flow) ──────────────────────────────────────────────────────
 function openResetModal(){
   // Reset both phases and input each time it's opened
@@ -9431,7 +9465,8 @@ function switchCustomizeTab(tab){
   // Show/hide content
   document.getElementById('customize-content-nodes').style.display = tab === 'nodes' ? 'block' : 'none';
   document.getElementById('customize-content-connections').style.display = tab === 'connections' ? 'block' : 'none';
-  
+  document.getElementById('customize-content-map').style.display = tab === 'map' ? 'block' : 'none';
+  if (tab === 'map') { const rb=document.getElementById('btn-settings-remove-bg'); if(rb) rb.style.display=bgImg?'':'none'; return; }
   if (tab === 'nodes') {
     renderSettingsFields();
     renderCategoriesList();
@@ -10850,7 +10885,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
       return;
     }
 
-    _authUser = data.user;
+    _authUser = data.user; if(typeof updateAccountMenu==="function") updateAccountMenu();
     hideAuthModal();
     document.getElementById('auth-form').reset();
     loadingDiv.style.display = 'none';
@@ -10883,7 +10918,7 @@ async function initAuth() {
   try {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (user) {
-      _authUser = user;
+      _authUser = user; if(typeof updateAccountMenu==="function") updateAccountMenu();
       hideAuthModal();
     } else {
       showAuthModal();
@@ -10908,17 +10943,16 @@ function hideAuthModal() {
 // Add logout button to header
 function addLogoutButton() {
   if (IS_SHARE_VIEW) return;
-  const header = document.getElementById('main-header');
-  if (header && !document.getElementById('btn-logout')) {
-    const logoutBtn = document.createElement('button');
-    logoutBtn.id = 'btn-logout';
-    logoutBtn.textContent = 'Sign Out';
-    logoutBtn.style.cssText = 'margin-left:auto;padding:6px 12px;background:var(--surf-2);border:1px solid var(--bdr);border-radius:var(--radius);cursor:pointer;font-size:12px;font-family:DM Sans,sans-serif;color:var(--txt-m);';
-    logoutBtn.onclick = logout;
-    header.appendChild(logoutBtn);
-  }
+  updateAccountMenu();
 }
 
+function updateAccountMenu(){
+  const email=(typeof _authUser!=='undefined'&&_authUser&&_authUser.email)||'';
+  const em=document.getElementById('account-email'); if(em) em.textContent=email?('Signed in as '+email):'Not signed in';
+  const b=document.getElementById('btn-account');
+  if(b){ const base=(email.split('@')[0]||'').replace(/[^a-zA-Z]+/g,' ').trim(); const parts=base.split(' ').filter(Boolean);
+    b.textContent=parts.length>1?(parts[0][0]+parts[1][0]).toUpperCase():(base.slice(0,1).toUpperCase()||'?'); }
+}
 async function logout() {
   try {
     await supabaseClient.auth.signOut();
