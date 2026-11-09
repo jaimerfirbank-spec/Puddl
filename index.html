@@ -2085,6 +2085,15 @@ function selectConnColour(col){
           <select id="settings-colour-by" onchange="setColourBy(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);"></select>
         </div>
         <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Big maps</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Simple drawing uses small squares and straight lines so very large maps stay smooth. Names show once you zoom in far enough to read them.</p>
+          <select id="settings-simple-mode" onchange="setSimpleMode(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);">
+            <option value="auto">Automatic (simple from 600 nodes)</option>
+            <option value="on">Always simple</option>
+            <option value="off">Always detailed</option>
+          </select>
+        </div>
+        <div style="margin-bottom:24px;">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Map fields</h4>
           <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Extra boxes every node on this map has, like Area or Type. They show in the Add/Edit node box and the info panel. Importing a spreadsheet can add them too.</p>
           <div id="settings-fields-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
@@ -2285,6 +2294,9 @@ let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
 let FIELD_DEFS=[];              // map's own node fields: [{id,name}] — values live in node.customFields[id]
 let SIZE_BY_CONNECTIONS=false;   // true whenever SIZE_BY is set (kept for the radius refresh logic)
+let SIMPLE_MODE='auto';          // 'auto' | 'on' | 'off' — fast square drawing for big maps
+const SIMPLE_THRESHOLD=600;      // nodes at which 'auto' switches to simple drawing
+let _simpleNow=false;
 let SIZE_BY='';                  // '' | 'connections' | 'field:<id>'
 let COLOUR_BY='';                // '' | 'connections' | 'field:<id>'
 let _degCache=null;             // node id -> connection count, rebuilt each frame
@@ -2479,6 +2491,9 @@ function nodeAt(sx,sy){
     const n=nodes[i];
     if(n.type==='centre'){
       if(wx>=n.x-65&&wx<=n.x+65&&wy>=n.y-31&&wy<=n.y+31) return n;
+    } else if(_simpleNow){
+      const r=_simpleR(n)+3/zoom;
+      if(Math.abs(wx-n.x)<=r&&Math.abs(wy-n.y)<=r) return n;
     } else {
       if(nodeHit(n,wx,wy)) return n;
     }
@@ -2539,6 +2554,7 @@ function snap(){
     nodeLabelPosition:NODE_LABEL_POSITION,
     sizeByConnections:SIZE_BY==='connections',
     sizeBy:SIZE_BY,
+    simpleMode:SIMPLE_MODE,
     colourBy:COLOUR_BY,
     defaultNodeStyle:DEFAULT_NODE_OUTLINE?'outline':'filled',
   });
@@ -2589,6 +2605,7 @@ function restoreSnap(s){
   if(d.nodeLabelPosition) NODE_LABEL_POSITION=d.nodeLabelPosition;
   SIZE_BY=typeof d.sizeBy==='string'?d.sizeBy:(d.sizeByConnections?'connections':'');
   COLOUR_BY=typeof d.colourBy==='string'?d.colourBy:'';
+  SIMPLE_MODE=['auto','on','off'].includes(d.simpleMode)?d.simpleMode:'auto';
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
   if(d.defaultNodeStyle) DEFAULT_NODE_OUTLINE=d.defaultNodeStyle==='outline';
   if(inPresentationEditMode) rebuildPresStopList();
@@ -2637,9 +2654,73 @@ function adaptColourForDark(col){
   return `#${[r,g,b].map(v=>Math.round(v*255).toString(16).padStart(2,'0')).join('')}`;
 }
 
+// ── Simple drawing for big maps: squares, straight lines, labels only when readable ──
+function _simpleR(n){
+  let r=n.nodeSize==='small'?5:n.nodeSize==='large'?8:n.nodeSize==='xl'?11:n.nodeSize==='xxl'?15:6.5;
+  if(SIZE_BY) r=r*sizeScale(n);
+  return r;
+}
+function _viewBounds(pad){
+  return {x0:(-panX)/zoom-pad, y0:(-panY)/zoom-pad, x1:(W-panX)/zoom+pad, y1:(H-panY)/zoom+pad};
+}
+function drawSimpleEdges(hasHL,_dark){
+  const byId=new Map(); nodes.forEach(n=>byId.set(n.id,n));
+  const vb=_viewBounds(0);
+  const groups=new Map();
+  edges.forEach((e,i)=>{
+    const a=typeof e.source==='object'?e.source:byId.get(e.source);
+    const b=typeof e.target==='object'?e.target:byId.get(e.target);
+    if(!a||!b) return;
+    if(Math.max(a.x,b.x)<vb.x0||Math.min(a.x,b.x)>vb.x1||Math.max(a.y,b.y)<vb.y0||Math.min(a.y,b.y)>vb.y1) return;
+    const isHl=highlightEdges.has(i);
+    const style=CONNECTION_STYLES.find(s=>s.id===(e.strength||'moderate'))||CONNECTION_STYLES[1];
+    let col=isHl?'#FF8C8C':(e.colour||style.colour);
+    if(_dark&&!isHl) col=adaptColourForDark(col);
+    const alpha=hasHL&&!isHl?0.06:1;
+    const key=col+'|'+alpha+'|'+(isHl?1:0);
+    let g=groups.get(key); if(!g){ g={col,alpha,hl:isHl,segs:[]}; groups.set(key,g); }
+    g.segs.push(a.x,a.y,b.x,b.y);
+  });
+  ctx.save(); ctx.setLineDash([]);
+  groups.forEach(g=>{
+    ctx.globalAlpha=g.alpha; ctx.strokeStyle=g.col; ctx.lineWidth=(g.hl?2:1)/zoom;
+    ctx.beginPath();
+    for(let k=0;k<g.segs.length;k+=4){ ctx.moveTo(g.segs[k],g.segs[k+1]); ctx.lineTo(g.segs[k+2],g.segs[k+3]); }
+    ctx.stroke();
+  });
+  ctx.restore(); ctx.globalAlpha=1;
+}
+function drawSimpleNodes(hasHL,_dark){
+  const vb=_viewBounds(60);
+  const labels=[];
+  ctx.save();
+  nodes.forEach(n=>{
+    if(n.x<vb.x0||n.x>vb.x1||n.y<vb.y0||n.y>vb.y1) return;
+    const isHl=highlightIds.has(n.id), isSec=secondaryIds.has(n.id)&&!isHl;
+    ctx.globalAlpha=hasHL&&!isHl&&!isSec?0.10:isSec?0.45:1;
+    const r=_simpleR(n);
+    ctx.fillStyle=nodeFill(n);
+    ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
+    if(isHl){ ctx.strokeStyle=_dark?'#fff':'#18181b'; ctx.lineWidth=2/zoom; ctx.strokeRect(n.x-r,n.y-r,r*2,r*2); }
+    if(showNodeLabels&&(zoom>=0.9||isHl||isSec)) labels.push([n,r,ctx.globalAlpha]);
+  });
+  if(labels.length){
+    ctx.font=`600 ${11/zoom}px 'DM Sans',sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='top';
+    labels.forEach(([n,r,al])=>{ ctx.globalAlpha=al; ctx.fillStyle=_dark?'#e4e4e7':'#27272a'; ctx.fillText(n.label||'',n.x,n.y+r+3/zoom); });
+  }
+  ctx.restore(); ctx.globalAlpha=1;
+}
+function setSimpleMode(v){
+  SIMPLE_MODE=['auto','on','off'].includes(v)?v:'auto';
+  const sel=document.getElementById('settings-simple-mode'); if(sel) sel.value=SIMPLE_MODE;
+  saveState(); markUnsaved(); draw();
+}
+
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function draw(){
   _degCache=null; _fieldStatCache={};
+  _simpleNow=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&nodes.length>=SIMPLE_THRESHOLD);
   if(SIZE_BY_CONNECTIONS&&sim&&edges.length!==_sizeSigEdges){
     _sizeSigEdges=edges.length;
     refreshCollisionRadii();
@@ -2749,7 +2830,9 @@ function draw(){
   });
 
   // Edges — start/end at node border, clip through intermediate nodes
+  if(_simpleNow) drawSimpleEdges(hasHL,_dark);
   edges.forEach((e,i)=>{
+    if(_simpleNow) return;
     const a=typeof e.source==='object'?e.source:nodes.find(n=>n.id===e.source);
     const b=typeof e.target==='object'?e.target:nodes.find(n=>n.id===e.target);
     if(!a||!b) return;
@@ -2985,7 +3068,9 @@ function draw(){
   });
 
   // Nodes
+  if(_simpleNow) drawSimpleNodes(hasHL,_dark);
   nodes.forEach(n=>{
+    if(_simpleNow) return;
     const isHl=highlightIds.has(n.id);
     const isSecondary=secondaryIds.has(n.id)&&!highlightIds.has(n.id)||false;
     const dimmed=hasHL&&!isHl&&!isSecondary;
@@ -9406,6 +9491,7 @@ function syncNodeStyleButtons(){
 }
 
 function syncSizeByConnButtons(){
+  { const sm=document.getElementById('settings-simple-mode'); if(sm) sm.value=SIMPLE_MODE; }
   const ss=document.getElementById('settings-size-by'), cs=document.getElementById('settings-colour-by');
   const opt=(v,t,sel)=>'<option value="'+escHtml(v)+'"'+(v===sel?' selected':'')+'>'+escHtml(t)+'</option>';
   if(ss){
