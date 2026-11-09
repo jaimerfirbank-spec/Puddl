@@ -1801,7 +1801,7 @@ function selectConnColour(col){
     <div style="padding:18px 22px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
       <div>
         <div style="font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-0.02em;">📥 Import from spreadsheet</div>
-        <div style="font-size:11px;color:var(--ink-h);margin-top:2px;">Upload an Excel (.xlsx) or CSV file — any column names, we'll map them</div>
+        <div style="font-size:11px;color:var(--ink-h);margin-top:2px;">Upload an Excel or CSV file. One node per row, any column names.</div>
       </div>
       <button onclick="closeImportModal()" style="font-size:18px;line-height:1;padding:2px 8px;border:none;background:none;color:var(--ink-m);cursor:pointer;">✕</button>
     </div>
@@ -1818,6 +1818,7 @@ function selectConnColour(col){
           <div style="font-size:11px;color:var(--ink-h);">Excel (.xlsx, .xls) or CSV (.csv, .tsv)</div>
           <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv,.tsv" style="display:none;" onchange="handleImportFile(this.files[0])">
         </label>
+        <div style="margin-top:8px;font-size:11px;color:var(--ink-h);">Starting from scratch? <a href="#" onclick="event.preventDefault();downloadImportTemplate()" style="color:var(--ink);font-weight:600;">Download a template</a> with this map's column headings.</div>
         <div id="import-file-name" style="display:none;margin-top:8px;font-size:12px;color:var(--ink-m);padding:6px 10px;background:var(--surf-3);border-radius:var(--radius);"></div>
         <!-- Import mode toggle -->
         <div id="import-mode-row" style="margin-top:12px;display:flex;gap:8px;">
@@ -1851,10 +1852,10 @@ function selectConnColour(col){
         <div id="import-template-picker" style="display:none;margin-bottom:10px;">
           <select id="import-template-select" onchange="applyImportTemplate(decodeURIComponent(this.value))" style="width:100%;height:32px;font-size:12px;border-radius:var(--radius);border:1px solid var(--bdr-m);padding:0 8px;background:var(--surf);color:var(--ink);font-family:'DM Sans',sans-serif;outline:none;"></select>
         </div>
-        <div style="font-size:11px;color:var(--ink-h);margin-bottom:12px;">Tell Puddl which column contains which information. Columns highlighted in blue were auto-detected.</div>
+        <div style="font-size:11px;color:var(--ink-h);margin-bottom:12px;">Puddl has guessed what each column is. Any column set to <strong>Field</strong> becomes a box on every node, using the name on the right. Rename it here if you like.</div>
         <div id="import-mapper-grid" style="display:grid;grid-template-columns:1fr 20px 1fr;gap:6px 8px;align-items:center;"></div>
         <div style="margin-top:12px;padding:10px 12px;background:#fff8e6;border:1px solid #E09000;border-radius:var(--radius);font-size:11px;color:#7a4e00;">
-          <strong>Tip:</strong> Multiple grants or connections per node? Use separate rows with the same node name — Puddl will merge them.
+          <strong>Tip:</strong> Several connections for one node? Separate the names with commas in one cell, or use extra rows with the same node name. Names must match the Node name column exactly.
         </div>
         <!-- Main node selector (shown when file is loaded) -->
         <div id="import-main-node-row" style="display:none;margin-top:12px;padding:12px 14px;background:var(--surf-2);border:1px solid var(--bdr);border-radius:var(--radius);">
@@ -4184,6 +4185,45 @@ function parseCSVImport(text){
   buildColumnMapper();
 }
 
+const IMPORT_ROLES=[
+  {id:'name',     label:'Node name'},
+  {id:'connto',   label:'Connected to'},
+  {id:'conntype', label:'Connection type'},
+  {id:'notes',    label:'Notes'},
+  {id:'colour',   label:'Node colour'},
+  {id:'mainconn', label:'Connected to main node (Yes/No)'},
+  {id:'field',    label:'Field'},
+  {id:'skip',     label:"Don't import"},
+];
+function _importGuessRole(h,nameTaken){
+  const k=_fieldKey(h);
+  if(!nameTaken&&/^(name|nodename|organisation|organization|organisationname|organizationname|orgname|label|title|node)$/.test(k)) return 'name';
+  if(/main/.test(k)&&/(connect|link)/.test(k)) return 'mainconn';
+  if(/^(connectiontype|conntype|linktype|relationshiptype|relationship|strength|type ?of ?connection|typeofconnection)$/.test(k)) return 'conntype';
+  if(/^(connections?|connectedto|connto|linkedto|links?|linkto|connectsto)$/.test(k)) return 'connto';
+  if(/^(notes?|description|comments?)$/.test(k)) return 'notes';
+  if(/^(colou?r|nodecolou?r|hex)$/.test(k)) return 'colour';
+  return 'field';
+}
+function _importRowState(i){
+  const roleSel=document.getElementById('imp-role-'+i), nameInp=document.getElementById('imp-fname-'+i);
+  return {role:roleSel?roleSel.value:'skip', fname:nameInp?nameInp.value.trim():''};
+}
+function _importRefreshRow(i){
+  const st=_importRowState(i);
+  const nameInp=document.getElementById('imp-fname-'+i), tag=document.getElementById('imp-ftag-'+i);
+  if(!nameInp||!tag) return;
+  const isField=st.role==='field';
+  nameInp.style.display=isField?'block':'none';
+  tag.style.display=isField?'block':'none';
+  if(isField){
+    const ex=findFieldByName(st.fname);
+    tag.textContent=!st.fname?'needs a name':(ex?'existing field':'new field');
+    tag.style.color=!st.fname?'var(--coral)':(ex?'var(--ink-h)':'#2A7A4B');
+  }
+  const anyMain=importHeaders.some((_,j)=>_importRowState(j).role==='mainconn');
+  const mr=document.getElementById('import-main-node-row'); if(mr) mr.style.display=anyMain?'block':'none';
+}
 function buildColumnMapper(resetOnly=false){
   if(!importHeaders.length) return;
   document.getElementById('import-step-mapper').style.display='block';
@@ -4196,105 +4236,68 @@ function buildColumnMapper(resetOnly=false){
   document.getElementById('import-status-text').textContent=`${importRawRows.length} data row${importRawRows.length!==1?'s':''} found`;
   _importStep='mapper';
 
-  // Auto-detect mapping by fuzzy matching header names
-  const autoMap=h=>{
-    const hl=h.toLowerCase().replace(/[^a-z0-9]/g,'');
-    if(/^name$|orgname|nodename|organisation|organization|centre|center/.test(hl)) return 'name';
-    if(/categ|type$|sector|kind/.test(hl)) return 'category';
-    if(/^colour$|^color$|hex|rgb/.test(hl)) return 'colour';
-    if(/^area$|ward|district|location|region/.test(hl)) return 'area';
-    if(/groupsize|members|size/.test(hl)) return 'groupsize';
-    if(/^notes?$|description|detail|info|comment/.test(hl)) return 'notes';
-    if(/^tags?$|label|keyword/.test(hl)) return 'tags';
-    if(/grantamt|grantval|amount|value|£|funding$|award/.test(hl)) return 'grantamt';
-    if(/grantsrc|funder|source|donor|grantor/.test(hl)) return 'grantsrc';
-    if(/grantdate|awarddate|date/.test(hl)) return 'grantdate';
-    if(/connto|connect|linkedto|link/.test(hl)) return 'connto';
-    if(/conntype|linktype|strength|relationship/.test(hl)) return 'conntype';
-    if(/connmain|mainconn|connectedtomain|tomain|linkedtomain/.test(hl)) return 'mainconn';
-    if(/^nodeicon$|^icon$|icontype|nodetype/.test(hl)) return 'nodeicon';
-    return 'ignore';
-  };
-
   const grid=document.getElementById('import-mapper-grid');
   grid.innerHTML='';
-  const addCell=(html,style='')=>{
-    const d=document.createElement('div');
-    d.style.cssText=style;d.innerHTML=html;grid.appendChild(d);
-  };
-  addCell('<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);">Your column</span>');
-  addCell('');
-  addCell('<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);">Puddl field</span>');
+  grid.style.gridTemplateColumns='minmax(0,1.1fr) minmax(0,1fr) minmax(0,1.1fr)';
+  const head=t=>{ const d=document.createElement('div'); d.innerHTML='<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);">'+t+'</span>'; grid.appendChild(d); };
+  head('Your column'); head('What it is'); head('Field name');
 
-  const autoMappings={};
-  importHeaders.forEach((h,i)=>{ autoMappings[i]=autoMap(h); });
-
+  let nameTaken=false;
   importHeaders.forEach((h,i)=>{
-    const auto=autoMappings[i];
-    const isAutoDetected=(auto!=='ignore');
-    const sample=importRawRows[0]&&importRawRows[0][i]?String(importRawRows[0][i]).slice(0,40):'';
+    const header=String(h||'').trim()||('Column '+(i+1));
+    let role=_importGuessRole(header,nameTaken);
+    if(role==='name') nameTaken=true;
+    const sample=(importRawRows.find(r=>String(r[i]||'').trim())||[])[i];
 
-    addCell(`<div style="background:var(--surf-3);border:1px solid var(--bdr);border-radius:var(--radius);padding:5px 8px;font-size:12px;">
-      <div style="font-weight:600;color:var(--ink);">${h}</div>
-      ${sample?`<div style="font-size:10px;color:var(--ink-h);margin-top:1px;">e.g. ${sample}</div>`:''}
-    </div>`);
-    addCell('<div style="text-align:center;color:var(--ink-h);font-size:14px;">→</div>');
+    const c1=document.createElement('div');
+    c1.innerHTML='<div style="background:var(--surf-3);border:1px solid var(--bdr);border-radius:var(--radius);padding:5px 8px;font-size:12px;min-width:0;"><div class="imp-h" style="font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div><div class="imp-s" style="font-size:10px;color:var(--ink-h);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div></div>';
+    c1.querySelector('.imp-h').textContent=header;
+    c1.querySelector('.imp-s').textContent=sample!==undefined&&String(sample).trim()?'e.g. '+String(sample).slice(0,40):'(empty)';
+    grid.appendChild(c1);
 
-    const wrap=document.createElement('div');
-    const sel=document.createElement('select');
-    sel.id=`col-map-${i}`;
-    // Blue border on auto-detected fields, normal border on "ignore"
-    sel.style.cssText=`width:100%;height:32px;font-size:12px;border-radius:var(--radius);border:1.5px solid ${isAutoDetected?'var(--acc)':'var(--bdr-m)'};padding:0 8px;background:var(--surf);color:var(--ink);font-family:"DM Sans",sans-serif;outline:none;`;
-    sel.addEventListener('change',()=>{ sel.style.borderColor='var(--bdr-m)'; });
-    PUDDL_FIELDS.forEach(f=>{
-      const opt=document.createElement('option');
-      opt.value=f.id;opt.textContent=f.label;
-      if(f.id===auto) opt.selected=true;
-      sel.appendChild(opt);
-    });
-    const hint=document.createElement('div');
-    hint.style.cssText='display:none;margin-top:3px;font-size:10px;color:var(--ink-2);align-items:center;gap:4px;';
-    hint.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg> e.g. person, group, building`;
-    const showHint=()=>{ hint.style.display=sel.value==='nodeicon'?'flex':'none'; };
-    sel.addEventListener('change', showHint);
-    if(auto==='nodeicon') hint.style.display='flex';
-    wrap.appendChild(sel);
-    wrap.appendChild(hint);
-    grid.appendChild(wrap);
+    const c2=document.createElement('div');
+    const sel=document.createElement('select'); sel.id='imp-role-'+i;
+    sel.style.cssText='width:100%;height:32px;font-size:12px;border-radius:var(--radius);border:1.5px solid var(--bdr-m);padding:0 8px;background:var(--surf);color:var(--ink);font-family:"DM Sans",sans-serif;outline:none;';
+    IMPORT_ROLES.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=r.label; if(r.id===role) o.selected=true; sel.appendChild(o); });
+    sel.addEventListener('change',()=>_importRefreshRow(i));
+    c2.appendChild(sel); grid.appendChild(c2);
+
+    const c3=document.createElement('div');
+    const inp=document.createElement('input'); inp.type='text'; inp.id='imp-fname-'+i; inp.autocomplete='off';
+    const ex=findFieldByName(header); inp.value=ex?ex.name:header;
+    inp.setAttribute('list','imp-field-names');
+    inp.style.cssText='width:100%;height:32px;font-size:12px;border-radius:var(--radius);border:1.5px solid var(--bdr-m);padding:0 8px;background:var(--surf);color:var(--ink);box-sizing:border-box;font-family:"DM Sans",sans-serif;';
+    inp.addEventListener('input',()=>_importRefreshRow(i));
+    const tag=document.createElement('div'); tag.id='imp-ftag-'+i; tag.style.cssText='font-size:10px;margin-top:2px;';
+    c3.appendChild(inp); c3.appendChild(tag); grid.appendChild(c3);
   });
+  let dlist=document.getElementById('imp-field-names');
+  if(!dlist){ dlist=document.createElement('datalist'); dlist.id='imp-field-names'; document.body.appendChild(dlist); }
+  dlist.innerHTML=FIELD_DEFS.map(f=>'<option value="'+escHtml(f.name)+'">').join('');
+  importHeaders.forEach((_,i)=>_importRefreshRow(i));
 
-  // Populate main node datalist from the auto-detected (or first) name column
-  const nameAutoIdx=importHeaders.findIndex((_,i)=>autoMappings[i]==='name');
-  const nameColIdx=nameAutoIdx>=0?nameAutoIdx:0;
-  const nodeNamesFromFile=[...new Set(importRawRows.map(r=>String(r[nameColIdx]||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  // Main node suggestions from the name column
+  const nameIdx=importHeaders.findIndex((_,i)=>_importRowState(i).role==='name');
+  const ni=nameIdx>=0?nameIdx:0;
+  const names=[...new Set(importRawRows.map(r=>String(r[ni]||'').trim()).filter(Boolean))].sort((x,y)=>x.localeCompare(y));
   const dl=document.getElementById('import-main-node-list');
-  if(dl) dl.innerHTML=nodeNamesFromFile.map(n=>`<option value="${n.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">`).join('');
-  const mainNodeRow=document.getElementById('import-main-node-row');
-  if(mainNodeRow) mainNodeRow.style.display='block';
-  // Pre-fill with the existing centre node if present and field is empty
-  const mainNodeInp=document.getElementById('import-main-node-input');
-  if(mainNodeInp&&!mainNodeInp.value.trim()){
-    const centreNode=nodes.find(n=>n.type==='centre');
-    if(centreNode) mainNodeInp.value=centreNode.label;
-  }
+  if(dl) dl.innerHTML=names.map(n=>'<option value="'+escHtml(n)+'">').join('');
+}
 
-  if(resetOnly) return; // Don't show template suggestions when clearing
-
-  // Show saved-template suggestions
-  const templates=getImportTemplates();
-  const tplNames=Object.keys(templates);
-  const match=findMatchingTemplate();
-  if(match){
-    // Auto-apply best match
-    applyImportTemplate(match.name);
-  } else if(tplNames.length>0){
-    // Show manual picker
-    const picker=document.getElementById('import-template-picker');
-    const sel=document.getElementById('import-template-select');
-    sel.innerHTML='<option value="">— Apply a saved template… —</option>'+
-      tplNames.map(n=>`<option value="${encodeURIComponent(n)}">${n}</option>`).join('');
-    picker.style.display='block';
+// ── Download a blank spreadsheet with this map's headings ──────────────────
+function downloadImportTemplate(){
+  const heads=['Name','Connected to','Connection type','Notes',...FIELD_DEFS.map(f=>f.name)];
+  const slug=((mapTitle||'puddl').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'puddl')+'-template';
+  if(typeof XLSX!=='undefined'){
+    const ws=XLSX.utils.aoa_to_sheet([heads]);
+    ws['!cols']=heads.map(h=>({wch:Math.max(14,h.length+4)}));
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Nodes');
+    XLSX.writeFile(wb,slug+'.xlsx');
+  } else {
+    const csv=heads.map(h=>'"'+h.replace(/"/g,'""')+'"').join(',')+'\n';
+    const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=slug+'.csv'; a.click();
   }
+  showStatus('Template downloaded. Put one node per row; separate several connections with commas.');
 }
 
 // ── Colour inference from category ───────────────────────────────────────────
@@ -4313,75 +4316,52 @@ function _inferCatFromText(text){
 
 // ── Build the import plan (nodes + edges) from current mapping ────────────────
 function runImportMapper(){
-  // Snapshot current mapping for template saving
-  _importCurrentMapping={};
-  importHeaders.forEach((h,i)=>{
-    const sel=document.getElementById(`col-map-${i}`);
-    if(sel&&sel.value&&sel.value!=='ignore') _importCurrentMapping[sel.value]=i;
-  });
-
-  if(_importCurrentMapping.name===undefined){
-    document.getElementById('import-status-text').textContent='⚠ Please map a column to "Node name" before continuing.';
+  const status=document.getElementById('import-status-text');
+  const cols=importHeaders.map((_,i)=>_importRowState(i));
+  const nameCols=cols.map((c,i)=>c.role==='name'?i:-1).filter(i=>i>=0);
+  if(nameCols.length!==1){
+    status.textContent=nameCols.length?'⚠ Only one column can be "Node name". Change the others.':'⚠ Choose which column is "Node name" before continuing.';
     return;
   }
+  const seen={};
+  for(let i=0;i<cols.length;i++){
+    const c=cols[i]; if(c.role!=='field') continue;
+    if(!c.fname){ status.textContent='⚠ Column "'+(importHeaders[i]||('Column '+(i+1)))+'" needs a field name.'; return; }
+    const k=_fieldKey(c.fname);
+    if(seen[k]!==undefined){ status.textContent='⚠ Two columns are both going into the field "'+c.fname+'". Rename one.'; return; }
+    seen[k]=i;
+  }
+  _importCurrentMapping={cols};
+  const nameIdx=nameCols[0];
+  const val=(row,i)=>String(row[i]==null?'':row[i]).trim();
+  const connTypeOf=raw=>{
+    const t=String(raw||'').trim().toLowerCase(); if(!t) return 'moderate';
+    const st=CONNECTION_STYLES.find(x=>x.id.toLowerCase()===t||String(x.label||'').toLowerCase()===t);
+    return st?st.id:'moderate';
+  };
 
-  const mapping=_importCurrentMapping;
-  const get=(row,field)=>mapping[field]!==undefined?String(row[mapping[field]]||'').trim():'';
-
-  // Group rows by exact name (case-insensitive), merging grants from repeated rows
-  const nodeMap=new Map(); // nameLower → data
+  const nodeMap=new Map();
   let skipped=0;
   importRawRows.forEach(row=>{
-    const name=get(row,'name');
-    if(!name){skipped++;return;}
+    const name=val(row,nameIdx);
+    if(!name){ skipped++; return; }
     const nl=name.toLowerCase();
-    if(!nodeMap.has(nl)){
-      nodeMap.set(nl,{
-        name,
-        category:get(row,'category'),
-        colour:get(row,'colour'),
-        area:get(row,'area'),
-        groupsize:get(row,'groupsize'),
-        notes:get(row,'notes'),
-        tags:get(row,'tags').split(/[,;]/).map(t=>t.trim().toLowerCase()).filter(Boolean),
-        nodeicon:get(row,'nodeicon'),
-        grants:[],
-        connToRaw:[], // [{to,type}]
-        connToMain:false,
-      });
-    }
-    const entry=nodeMap.get(nl);
-    // Track "Connected to main node" flag — any row with Yes sets it
-    const mainconnVal=get(row,'mainconn').toLowerCase();
-    if(mainconnVal==='yes'||mainconnVal==='y'||mainconnVal==='true'||mainconnVal==='1') entry.connToMain=true;
-    // Merge grants
-    const amt=get(row,'grantamt');
-    const src=get(row,'grantsrc');
-    const dt=get(row,'grantdate');
-    if(amt||src||dt){
-      const rawNum=parseFloat(amt.replace(/[^0-9.]/g,''));
-      const amount=isNaN(rawNum)?'':rawNum.toFixed(2);
-      entry.grants.push({
-        amount:amount?'£'+Number(amount).toLocaleString('en-GB',{minimumFractionDigits:2}):'',
-        rawAmount:amount,source:src,date:dt
-      });
-    }
-    // Collect connections
-    const connTo=get(row,'connto');
-    const connTypeRaw=(get(row,'conntype')||'').toLowerCase().trim();
-    const connType=['strong','moderate','weak','dashed','double'].includes(connTypeRaw)?connTypeRaw:'moderate';
-    if(connTo){
-      connTo.split(/[,;]/).map(t=>t.trim()).filter(Boolean).forEach(tName=>{
-        entry.connToRaw.push({to:tName,type:connType});
-      });
-    }
+    if(!nodeMap.has(nl)) nodeMap.set(nl,{name,notes:'',colour:'',fields:{},connToRaw:[],connToMain:false,grants:[],tags:[]});
+    const e=nodeMap.get(nl);
+    let ctype='moderate';
+    cols.forEach((c,i)=>{ if(c.role==='conntype'&&val(row,i)) ctype=connTypeOf(val(row,i)); });
+    cols.forEach((c,i)=>{
+      const v=val(row,i); if(!v) return;
+      if(c.role==='notes') e.notes=e.notes?(e.notes.includes(v)?e.notes:e.notes+'\n'+v):v;
+      else if(c.role==='colour'&&!e.colour) e.colour=v;
+      else if(c.role==='field'&&!e.fields[c.fname]) e.fields[c.fname]=v;
+      else if(c.role==='mainconn'&&/^(yes|y|true|1)$/i.test(v)) e.connToMain=true;
+      else if(c.role==='connto') v.split(/[,;\n]/).map(t=>t.trim()).filter(Boolean).forEach(t=>e.connToRaw.push({to:t,type:ctype}));
+    });
   });
 
   const incoming=[...nodeMap.values()];
-  if(!incoming.length){
-    document.getElementById('import-status-text').textContent='No valid rows found — check your Name column mapping.';
-    return;
-  }
+  if(!incoming.length){ status.textContent='No rows with a node name were found.'; return; }
 
   // In replace mode, skip dupe detection (canvas will be cleared on import)
   const toAdd=[], toUpdate=[], dupeCandidates=[];
@@ -4430,7 +4410,10 @@ function runImportMapper(){
     });
   }
 
-  importPlan={toAdd,toUpdate,dupeCandidates,toAddEdges,skipped,mainNodeName,mainConnCount};
+  const known=new Set(incoming.map(r=>r.name.toLowerCase()));
+  if(_importMode!=='replace') nodes.forEach(n=>known.add(String(n.label||'').trim().toLowerCase()));
+  const unmatched=toAddEdges.filter(e=>!known.has(String(e.toName).trim().toLowerCase()));
+  importPlan={toAdd,toUpdate,dupeCandidates,toAddEdges,skipped,mainNodeName,mainConnCount,unmatched};
 
   if(dupeCandidates.length>0){
     _showImportDupesScreen(importPlan);
@@ -4554,14 +4537,27 @@ function _showImportSummaryScreen(plan){
       'All connections from both will be combined. Node gets a merge indicator.');
   if(updateCount)
     html+=row('🔄',`${updateCount} existing node${updateCount!==1?'s':''} will be updated`,
-      'Grants and data will be merged');
-  const normalEdgeCount=plan.toAddEdges.filter(e=>!e.isMainConn).length;
+      'Empty fields and notes will be filled in from the file');
+  const unm=new Set(plan.unmatched||[]);
+  const normalEdgeCount=plan.toAddEdges.filter(e=>!e.isMainConn&&!unm.has(e)).length;
   if(normalEdgeCount)
     html+=row('🔗',`Up to ${normalEdgeCount} connection${normalEdgeCount!==1?'s':''} will be added`,
       'Duplicate connections are skipped');
   if(plan.mainConnCount>0)
     html+=row('🎯',`${plan.mainConnCount} node${plan.mainConnCount!==1?'s':''} will connect to "${plan.mainNodeName}"`,
       'Based on "Connected to main node" column');
+  const fieldCols=(_importCurrentMapping.cols||[]).filter(c=>c.role==='field');
+  if(fieldCols.length){
+    const newF=fieldCols.filter(c=>!findFieldByName(c.fname)).map(c=>c.fname);
+    const oldF=fieldCols.filter(c=>findFieldByName(c.fname)).map(c=>findFieldByName(c.fname).name);
+    html+=row('🏷️',`${fieldCols.length} field${fieldCols.length!==1?'s':''} will be filled in`,
+      [newF.length?'New: '+newF.map(escHtml).join(', '):'',oldF.length?'Existing: '+oldF.map(escHtml).join(', '):''].filter(Boolean).join(' · '));
+  }
+  if(plan.unmatched&&plan.unmatched.length){
+    const list=plan.unmatched.slice(0,8).map(e=>`"${escHtml(e.toName)}" (from ${escHtml(e.fromName)})`).join(', ')+(plan.unmatched.length>8?`, +${plan.unmatched.length-8} more`:'');
+    html+=row('⚠️',`${plan.unmatched.length} connection${plan.unmatched.length!==1?'s':''} can't be matched and will be skipped`,
+      'No node with this name: '+list+'. Check spelling matches the Name column exactly.');
+  }
   if(plan.skipped)
     html+=row('⚠️',`${plan.skipped} row${plan.skipped!==1?'s':''} skipped`,'No node name found');
   if(!plan.toAdd.length&&!plan.toUpdate.length)
@@ -4571,7 +4567,7 @@ function _showImportSummaryScreen(plan){
   document.getElementById('import-status-text').textContent='Review and click Import to proceed.';
 
   // Show save-template row if any field was meaningfully mapped (not all ignore)
-  const hasNonIgnore=Object.values(_importCurrentMapping).some(v=>v!=='ignore');
+  const hasNonIgnore=false; // saved mapping templates retired: map fields + Download template do this job
   const saveRow=document.getElementById('import-save-template-row');
   if(hasNonIgnore){
     saveRow.style.display='flex';
@@ -4637,11 +4633,9 @@ function confirmImport(){
       lastUpdated:Date.now(),
       history:[{ts:Date.now(),text:'Imported from spreadsheet'}]
     };
-    if(r.grants.length) node.grants=r.grants.slice();
-    const importedIconId=resolveIconId(r.nodeicon);
-    if(importedIconId){ node.iconId=importedIconId; node.shape='circle'; }
+    node.customFields={};
+    Object.entries(r.fields||{}).forEach(([fname,v])=>{ const f=addFieldDef(fname); if(f) node.customFields[f.id]=v; });
     nodes.push(node);
-    if(importedIconId) loadNodeIconWithColour(node);
     added++;
   });
 
@@ -4654,6 +4648,8 @@ function confirmImport(){
     });
     if(!n.area&&r.area) n.area=r.area;
     if(!n.notes&&r.notes) n.notes=r.notes;
+    if(!n.customFields) n.customFields={};
+    Object.entries(r.fields||{}).forEach(([fname,v])=>{ const f=addFieldDef(fname); if(f&&!String(n.customFields[f.id]||'').trim()){ n.customFields[f.id]=v; mergedCount++; } });
     if(r.tags&&r.tags.length){
       if(!n.tags) n.tags=[];
       r.tags.forEach(t=>{if(!n.tags.includes(t)) n.tags.push(t);});
@@ -4688,7 +4684,7 @@ function confirmImport(){
   closeImportModal();
   const parts=[];
   if(added) parts.push(`${added} node${added!==1?'s':''} added`);
-  if(mergedCount) parts.push(`${mergedCount} grant${mergedCount!==1?'s':''} merged`);
+  if(mergedCount) parts.push(`${mergedCount} empty field${mergedCount!==1?'s':''} filled`);
   if(connsAdded) parts.push(`${connsAdded} connection${connsAdded!==1?'s':''}`);
   const mergedNodeCount=toUpdate.filter(u=>u.isMerge).length;
   if(mergedNodeCount) parts.push(`${mergedNodeCount} node${mergedNodeCount!==1?'s':''} identified as same`);
