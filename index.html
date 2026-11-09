@@ -494,6 +494,16 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   background:var(--surf-2);
 }
 
+#modal-fields-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;}
+#modal-fields-grid:empty{display:none;}
+.mf-cell{min-width:0;}
+.mf-head{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--txt-m);margin-bottom:3px;min-height:16px;}
+.mf-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.mf-act{opacity:0;border:none;background:none;padding:0 2px;height:16px;font-size:11px;line-height:1;cursor:pointer;color:var(--ink-h);}
+.mf-cell:hover .mf-act,.mf-act:focus{opacity:1;}
+.mf-act:hover{color:var(--ink);background:none;}
+.mf-input{width:100%;height:30px;font-size:12px;padding:0 9px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;font-family:'DM Sans',sans-serif;}
+.mf-rename{width:100%;height:18px;font-size:11px;padding:0 4px;border-radius:4px;border:1px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;}
 /* ── Side panel fields ────────────────────────────────────────────────────── */
 .sp-field{margin-bottom:7px;}
 .sp-label{
@@ -1444,6 +1454,18 @@ body.share-mode #present-exit{display:none !important;}
         <textarea id="modal-notes" placeholder="e.g. Anything relevant…" style="font-family:'DM Sans',sans-serif;width:100%;height:80px;padding:8px 10px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);font-size:12px;outline:none;resize:none;line-height:1.5;box-sizing:border-box;"></textarea>
       </div>
 
+      <!-- Additional fields (named per map) -->
+      <div id="modal-fields-section">
+        <div style="border-top:1px solid var(--bdr);margin:4px 0 10px;"></div>
+        <div style="font-size:11px;font-weight:700;color:var(--ink-m);margin-bottom:8px;letter-spacing:0.02em;">Additional fields</div>
+        <div id="modal-fields-grid"></div>
+        <div id="modal-field-add-row" style="display:none;gap:6px;margin-top:8px;">
+          <input type="text" id="modal-field-new-name" placeholder="Field name, e.g. Area" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();modalAddFieldCommit();}else if(event.key==='Escape'){event.stopPropagation();modalAddFieldCancel();}" style="flex:1;height:30px;font-size:12px;padding:0 9px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;">
+          <button onclick="modalAddFieldCommit()" style="height:30px;font-size:12px;padding:0 12px;">Add</button>
+        </div>
+        <button id="modal-field-add-btn" onclick="modalAddFieldStart()" style="margin-top:8px;border:none;background:none;padding:0;font-size:12px;font-weight:600;color:var(--ink-m);cursor:pointer;">+ Add field</button>
+      </div>
+
       <!-- Video link -->
       <div>
         <div style="font-size:11px;color:var(--txt-m);margin-bottom:4px;">Video link <span style="color:var(--txt-h);font-weight:400;">(optional)</span></div>
@@ -2032,6 +2054,15 @@ function selectConnColour(col){
             <button id="btn-sizeconn-on" onclick="setSizeByConnections(true)" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">On</button>
           </div>
         </div>
+        <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Map fields</h4>
+          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Extra boxes every node on this map has, like Area or Type. They show in the Add/Edit node box and the info panel. Importing a spreadsheet can add them too.</p>
+          <div id="settings-fields-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px;"></div>
+          <div style="display:flex;gap:6px;">
+            <input type="text" id="settings-field-new" placeholder="New field name" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();settingsAddField();}" style="flex:1;padding:6px 8px;border:1px solid var(--bdr);border-radius:4px;font-size:12px;background:var(--surf);color:var(--ink);">
+            <button onclick="settingsAddField()" style="padding:6px 12px;font-size:12px;">+ Add field</button>
+          </div>
+        </div>
         <div style="margin-bottom:24px;display:none;" id="settings-node-categories">
           <h4 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:var(--ink);">Node Categories</h4>
           <p style="margin:0 0 16px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Add, remove, or customize node categories. Changes apply immediately to all existing nodes.</p>
@@ -2222,6 +2253,7 @@ let dragNode=null,dragMoving=false,dragStartSX=0,dragStartSY=0;
 let panDragging=false,panSX=0,panSY=0,panPX=0,panPY=0;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
+let FIELD_DEFS=[];              // map's own node fields: [{id,name}] — values live in node.customFields[id]
 let SIZE_BY_CONNECTIONS=false;   // when true, nodes grow with their number of connections
 let _degCache=null;             // node id -> connection count, rebuilt each frame
 let showNodeLabels=true;
@@ -2470,6 +2502,7 @@ function snap(){
     connectionStyles:CONNECTION_STYLES,
     presentationStops:presentationStops||[],
     presMapOnly:!!presMapOnly,
+    fieldDefs:FIELD_DEFS,
     areas:AREAS,
     nodeLabelPosition:NODE_LABEL_POSITION,
     sizeByConnections:SIZE_BY_CONNECTIONS,
@@ -2517,6 +2550,7 @@ function restoreSnap(s){
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
   presentationStops=d.presentationStops||[];
   presMapOnly=!!d.presMapOnly;
+  FIELD_DEFS=Array.isArray(d.fieldDefs)?d.fieldDefs:[];
   if(d.areas&&Array.isArray(d.areas)&&d.areas.length) AREAS=d.areas;
   if(d.nodeLabelPosition) NODE_LABEL_POSITION=d.nodeLabelPosition;
   SIZE_BY_CONNECTIONS=!!d.sizeByConnections;
@@ -3343,7 +3377,7 @@ function applyFilters(){
   const anyNodeFilter=q||cats.length||areas.length||members.length||tags.length;
   nodes.forEach(n=>{
     if(n.type==='centre') return;
-    const matchQ=!q||n.label.toLowerCase().includes(q)||(n.notes&&n.notes.toLowerCase().includes(q))||(n.pTopic&&n.pTopic.toLowerCase().includes(q));
+    const matchQ=!q||n.label.toLowerCase().includes(q)||(n.notes&&n.notes.toLowerCase().includes(q))||(n.pTopic&&n.pTopic.toLowerCase().includes(q))||(n.customFields&&Object.values(n.customFields).some(v=>String(v||'').toLowerCase().includes(q)));
     const matchCat=!cats.length||(n.colourLabel&&cats.includes(n.colourLabel));
     const matchArea=!areas.length||areas.includes(n.area);
     const matchMember=!members.length||(n.owners&&n.owners.some(o=>members.includes(o)));
@@ -5094,6 +5128,7 @@ function openAddModal(){
   document.getElementById('modal-name').value='';
   document.getElementById('modal-notes').value='';
   { const v=document.getElementById('modal-video'); if(v) v.value=''; }
+  renderModalFields({});
   selectedModalColour='#FFB3C8';
   selectedModalShape='circle';
   selectedModalSize='medium';
@@ -5165,6 +5200,7 @@ function switchToEditMode(){
   document.getElementById('modal-name').value=n.label||'';
   document.getElementById('modal-notes').value=n.notes||'';
   { const v=document.getElementById('modal-video'); if(v) v.value=n.videoUrl||''; }
+  renderModalFields(n.customFields||{});
   selectedModalColour=n.colour||'#FFB3C8';
   selectedModalShape=n.shape||'circle';
   selectedModalSize=n.nodeSize||'medium';
@@ -5203,11 +5239,121 @@ function deleteModalNode(){
   saveState(); markUnsaved(); draw();
 }
 
+// ── Map fields: user-named extra boxes on every node ────────────────────────
+function escHtml(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function _fieldKey(name){ return String(name||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function findFieldByName(name){ const k=_fieldKey(name); return k?FIELD_DEFS.find(f=>_fieldKey(f.name)===k)||null:null; }
+function addFieldDef(name){
+  name=String(name||'').trim().slice(0,60);
+  if(!name) return null;
+  const ex=findFieldByName(name); if(ex) return ex;
+  const f={id:'f'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),name};
+  FIELD_DEFS.push(f);
+  return f;
+}
+function renameFieldDef(id,name){
+  name=String(name||'').trim().slice(0,60);
+  const f=FIELD_DEFS.find(x=>x.id===id); if(!f||!name||name===f.name) return false;
+  const clash=findFieldByName(name); if(clash&&clash.id!==id){ showStatus('There is already a field called "'+clash.name+'".'); return false; }
+  f.name=name; return true;
+}
+function deleteFieldDef(id){
+  const f=FIELD_DEFS.find(x=>x.id===id); if(!f) return false;
+  const used=nodes.filter(n=>n.customFields&&String(n.customFields[id]||'').trim()!=='').length;
+  if(!confirm('Remove the field "'+f.name+'"?'+(used?' It has values on '+used+' node'+(used!==1?'s':'')+', and they will be removed too.':''))) return false;
+  FIELD_DEFS=FIELD_DEFS.filter(x=>x.id!==id);
+  nodes.forEach(n=>{ if(n.customFields) delete n.customFields[id]; });
+  return true;
+}
+function _fieldsChanged(){ saveState(); markUnsaved(); renderSettingsFields(); if(hoverPanelNodeId!=null){ const n=nodes.find(x=>x.id===hoverPanelNodeId); if(n) renderHoverPanel(n); } }
+
+// Add/Edit node box
+function readModalFields(){
+  const out={};
+  FIELD_DEFS.forEach(f=>{ const el=document.getElementById('modal-field-'+f.id); const v=el?el.value.trim():''; if(v) out[f.id]=v; });
+  return out;
+}
+function renderModalFields(values){
+  const grid=document.getElementById('modal-fields-grid'); if(!grid) return;
+  grid.innerHTML='';
+  FIELD_DEFS.forEach(f=>{
+    const cell=document.createElement('div'); cell.className='mf-cell';
+    cell.innerHTML='<div class="mf-head"><span class="mf-name"></span><button type="button" class="mf-act" title="Rename field">✎</button><button type="button" class="mf-act" title="Remove field">✕</button></div>'+
+      '<input type="text" class="mf-input" autocomplete="off">';
+    cell.querySelector('.mf-name').textContent=f.name;
+    cell.querySelector('.mf-name').title=f.name;
+    const inp=cell.querySelector('.mf-input'); inp.id='modal-field-'+f.id; inp.value=(values&&values[f.id])||'';
+    const [renBtn,delBtn]=cell.querySelectorAll('.mf-act');
+    renBtn.onclick=()=>modalRenameFieldStart(f.id,cell);
+    delBtn.onclick=()=>{ const cur=readModalFields(); if(deleteFieldDef(f.id)){ delete cur[f.id]; renderModalFields(cur); _fieldsChanged(); } };
+    grid.appendChild(cell);
+  });
+  modalAddFieldCancel();
+}
+function modalRenameFieldStart(id,cell){
+  const f=FIELD_DEFS.find(x=>x.id===id); if(!f) return;
+  const head=cell.querySelector('.mf-head');
+  head.innerHTML='<input type="text" class="mf-rename">';
+  const r=head.querySelector('input'); r.value=f.name; r.focus(); r.select();
+  let done=false;
+  const finish=save=>{ if(done) return; done=true; const cur=readModalFields(); if(save&&renameFieldDef(id,r.value)) _fieldsChanged(); renderModalFields(cur); };
+  r.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); finish(true);} else if(e.key==='Escape'){ e.preventDefault(); e.stopPropagation(); finish(false);} };
+  r.onblur=()=>finish(true);
+}
+function modalAddFieldStart(){
+  const row=document.getElementById('modal-field-add-row'), btn=document.getElementById('modal-field-add-btn');
+  if(row) row.style.display='flex'; if(btn) btn.style.display='none';
+  const inp=document.getElementById('modal-field-new-name'); if(inp){ inp.value=''; inp.focus(); }
+}
+function modalAddFieldCancel(){
+  const row=document.getElementById('modal-field-add-row'), btn=document.getElementById('modal-field-add-btn');
+  if(row) row.style.display='none'; if(btn) btn.style.display='inline-block';
+}
+function modalAddFieldCommit(){
+  const inp=document.getElementById('modal-field-new-name'); if(!inp) return;
+  const name=inp.value.trim(); if(!name){ modalAddFieldCancel(); return; }
+  const cur=readModalFields();
+  const existed=!!findFieldByName(name);
+  const f=addFieldDef(name);
+  renderModalFields(cur);
+  if(!existed) _fieldsChanged(); else showStatus('"'+f.name+'" is already a field.');
+  const el=document.getElementById('modal-field-'+f.id); if(el) el.focus();
+}
+
+// Settings > Nodes > Map fields
+function renderSettingsFields(){
+  const list=document.getElementById('settings-fields-list'); if(!list) return;
+  list.innerHTML='';
+  if(!FIELD_DEFS.length){ list.innerHTML='<div style="font-size:12px;color:var(--ink-h);">No fields yet.</div>'; return; }
+  FIELD_DEFS.forEach((f,i)=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:6px;';
+    row.innerHTML='<input type="text" style="flex:1;padding:6px 8px;border:1px solid var(--bdr);border-radius:4px;font-size:12px;background:var(--surf);color:var(--ink);">'+
+      '<button title="Move up" style="padding:4px 8px;font-size:11px;"'+(i===0?' disabled':'')+'>↑</button>'+
+      '<button title="Move down" style="padding:4px 8px;font-size:11px;"'+(i===FIELD_DEFS.length-1?' disabled':'')+'>↓</button>'+
+      '<button title="Remove" style="padding:4px 9px;font-size:11px;color:var(--coral);border-color:var(--coral);">✕</button>';
+    const [inp,up,down,del]=row.querySelectorAll('input,button');
+    inp.value=f.name;
+    inp.onchange=()=>{ if(renameFieldDef(f.id,inp.value)) _fieldsChanged(); else inp.value=f.name; };
+    up.onclick=()=>{ FIELD_DEFS.splice(i-1,0,FIELD_DEFS.splice(i,1)[0]); _fieldsChanged(); };
+    down.onclick=()=>{ FIELD_DEFS.splice(i+1,0,FIELD_DEFS.splice(i,1)[0]); _fieldsChanged(); };
+    del.onclick=()=>{ if(deleteFieldDef(f.id)) _fieldsChanged(); };
+    list.appendChild(row);
+  });
+}
+function settingsAddField(){
+  const inp=document.getElementById('settings-field-new'); if(!inp) return;
+  const name=inp.value.trim(); if(!name) return;
+  if(findFieldByName(name)){ showStatus('There is already a field called "'+findFieldByName(name).name+'".'); return; }
+  addFieldDef(name); inp.value=''; _fieldsChanged();
+}
+
 function confirmModal(){
   const nameInp=document.getElementById('modal-name');
   const name=(nameInp?nameInp.value.trim():'');
   const notes=document.getElementById('modal-notes')?.value.trim()||'';
   const videoUrl=normaliseVideoUrl(document.getElementById('modal-video')?.value||'');
+  const customFields=readModalFields();
   const colour=selectedModalColour;
   const shape=selectedModalShape;
   const nodeSize=selectedModalSize;
@@ -5221,7 +5367,7 @@ function confirmModal(){
     const newNode={
       id:++idCtr, x:cx, y:cy,
       fx:cx, fy:cy, pinned:true,
-      label:name, colour, shape, nodeSize, titleSize, notes, videoUrl,
+      label:name, colour, shape, nodeSize, titleSize, notes, videoUrl, customFields,
       type:'process'
     };
     nodes.push(newNode);
@@ -5243,6 +5389,7 @@ function confirmModal(){
       n.titleSize=titleSize;
       n.notes=notes;
       n.videoUrl=videoUrl;
+      n.customFields=customFields;
       if(n.type==='centre') centralEventLabel=n.label;
       addLog('edited node "'+n.label+'"');
     }
@@ -7352,6 +7499,7 @@ function switchToTeamMap(){
     edges=d.edges.map(e=>({source:e.from,target:e.to,strength:e.strength||'moderate'}));
     colourLegendMap=d.colourLegendMap||{};
     if(d.categories) CATEGORIES=d.categories;
+    if(Array.isArray(d.fieldDefs)) FIELD_DEFS=d.fieldDefs;
     if(d.centralEventLabel) centralEventLabel=d.centralEventLabel;
     if(d.activityLog) activityLog=d.activityLog;
     // DO NOT overwrite personalMaps from snap — keep the live in-memory version
@@ -8060,6 +8208,8 @@ function toggleDemo(){
       edges=d.edges.map(e=>({source:e.from,target:e.to,strength:e.strength||'moderate',colour:e.colour||'',note:e.note||''}));
       colourLegendMap=d.colourLegendMap||{};
       if(d.categories) CATEGORIES=d.categories;
+    if(Array.isArray(d.fieldDefs)) FIELD_DEFS=d.fieldDefs;
+      if(Array.isArray(d.fieldDefs)) FIELD_DEFS=d.fieldDefs;
       if(d.centralEventLabel) centralEventLabel=d.centralEventLabel;
       if(d.activityLog) activityLog=d.activityLog;
       if(d.personalMaps) personalMaps=d.personalMaps;
@@ -8778,6 +8928,8 @@ function exitCombinedMap(){
       edges=d.edges.map(e=>({source:e.from,target:e.to,strength:e.strength||'moderate'}));
       colourLegendMap=d.colourLegendMap||{};
       if(d.categories) CATEGORIES=d.categories;
+    if(Array.isArray(d.fieldDefs)) FIELD_DEFS=d.fieldDefs;
+      if(Array.isArray(d.fieldDefs)) FIELD_DEFS=d.fieldDefs;
       if(d.centralEventLabel) centralEventLabel=d.centralEventLabel;
       if(d.activityLog) activityLog=d.activityLog;
       if(d.personalMaps) personalMaps=d.personalMaps;
@@ -8973,6 +9125,7 @@ function switchCustomizeTab(tab){
   document.getElementById('customize-content-connections').style.display = tab === 'connections' ? 'block' : 'none';
   
   if (tab === 'nodes') {
+    renderSettingsFields();
     renderCategoriesList();
   } else {
     initLoopStyleDraft();
@@ -9889,6 +10042,13 @@ function renderHoverPanel(n){
   }
 
   let html='';
+
+  // Map fields (named by the user)
+  FIELD_DEFS.forEach(f=>{
+    const v=n.customFields&&n.customFields[f.id];
+    if(v!==undefined&&v!==null&&String(v).trim()!=='')
+      html+=`<div class="sp-field"><div class="sp-label">${escHtml(f.name)}</div><div class="sp-value" style="white-space:pre-wrap;">${escHtml(v)}</div></div>`;
+  });
 
   if(!isCentre){
     // Category — stacked pill
