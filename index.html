@@ -461,8 +461,8 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 /* ── Hover info panel ─────────────────────────────────────────────────────── */
 #hover-panel{
   position:absolute;
-  top:12px;right:12px;
-  width:220px;max-height:52vh;
+  top:12px;right:66px;
+  width:340px;max-width:calc(100% - 90px);max-height:calc(100% - 70px);
   background:var(--surf);
   border:1px solid var(--bdr);
   border-radius:var(--radius-lg);
@@ -474,6 +474,20 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   font-family:'DM Sans',sans-serif;
 }
 #hover-panel.visible{opacity:1;pointer-events:auto;}
+#hover-panel .sp-value{word-break:break-word;}
+#hover-panel.docked{
+  opacity:1;pointer-events:auto;top:0;right:0;bottom:42px;
+  width:clamp(320px,33vw,520px);max-width:none;max-height:none;
+  border-radius:0;border-top:none;border-right:none;box-shadow:var(--shadow-xl);
+}
+#hover-panel.docked #hover-panel-title{font-size:15px;}
+#hover-panel.docked #hover-panel-body{padding:14px 16px 10px;}
+.zoom-btns{transition:right .2s ease;}
+#canvas-area.hp-docked .zoom-btns{right:calc(clamp(320px,33vw,520px) + 14px);}
+.hp-hdr-btn{border:none;background:none;padding:2px 6px;height:24px;font-size:13px;line-height:1;cursor:pointer;color:var(--ink-h);border-radius:5px;flex-shrink:0;}
+.hp-hdr-btn:hover{background:var(--surf-3);color:var(--ink);}
+#hp-close-btn{display:none;}
+#hover-panel.docked #hp-close-btn{display:inline-block;}
 #hover-panel-footer button{pointer-events:auto;cursor:pointer;}
 #hover-panel-header{
   display:flex;align-items:center;justify-content:space-between;
@@ -1148,6 +1162,8 @@ body.share-mode #present-exit{display:none !important;}
   <div id="hover-panel">
     <div id="hover-panel-header">
       <div id="hover-panel-title">Node</div>
+      <button class="hp-hdr-btn" id="hp-dock-btn" onclick="toggleHoverDock()" title="Dock this panel to the side">⤢</button>
+      <button class="hp-hdr-btn" id="hp-close-btn" onclick="toggleHoverDock(false)" title="Close">✕</button>
     </div>
     <div id="hover-panel-body">
       <div id="hover-panel-content"></div>
@@ -10091,6 +10107,24 @@ function showHoverPanel(id){
   panel.classList.add('visible');
 }
 
+function toggleHoverDock(force){
+  const hp=document.getElementById('hover-panel'), area=document.getElementById('canvas-area');
+  if(!hp) return;
+  const dock=force===undefined?!hp.classList.contains('docked'):!!force;
+  hp.classList.toggle('docked',dock);
+  if(area) area.classList.toggle('hp-docked',dock);
+  const b=document.getElementById('hp-dock-btn');
+  if(b){ b.textContent=dock?'⤡':'⤢'; b.title=dock?'Back to a floating card':'Dock this panel to the side'; }
+  if(dock){
+    if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
+    if(!document.getElementById('hover-panel-content').innerHTML.trim()){
+      document.getElementById('hover-panel-title').textContent='Node details';
+      document.getElementById('hover-panel-content').innerHTML='<div style="color:var(--ink-h);font-size:12px;">Hover over a node to see its details here.</div>';
+    }
+  } else {
+    hp.classList.remove('visible'); hoverPanelNodeId=null;
+  }
+}
 function hideHoverPanel(immediate){
   if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
   // Clear highlight immediately
