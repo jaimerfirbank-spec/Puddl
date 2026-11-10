@@ -1993,8 +1993,13 @@ function selectConnColour(col){
   <div style="font-size:10px;color:var(--ink-h);margin-bottom:12px;">Click a style to apply instantly</div>
   <div id="edge-style-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;"></div>
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-top:8px;border-top:1px solid var(--bdr);">
-    <label for="edge-twoway-toggle" style="font-size:12px;color:var(--ink);flex:1;cursor:pointer;">Two-way arrow</label>
-    <input type="checkbox" id="edge-twoway-toggle" onchange="toggleEdgeTwoWay(this.checked)" style="width:16px;height:16px;cursor:pointer;">
+    <span style="font-size:12px;color:var(--ink);flex:1;">Arrow</span>
+    <div id="edge-arrow-btns" style="display:flex;gap:4px;">
+      <button data-arrow="none" onclick="setEdgeArrow('none')" title="Plain line" style="width:32px;height:28px;font-size:14px;padding:0;">—</button>
+      <button data-arrow="forward" onclick="setEdgeArrow('forward')" title="Arrow to the other person" style="width:32px;height:28px;font-size:14px;padding:0;">→</button>
+      <button data-arrow="backward" onclick="setEdgeArrow('backward')" title="Arrow back to this person" style="width:32px;height:28px;font-size:14px;padding:0;">←</button>
+      <button data-arrow="both" onclick="setEdgeArrow('both')" title="Arrows both ways" style="width:32px;height:28px;font-size:14px;padding:0;">↔</button>
+    </div>
   </div>
   <div style="display:flex;gap:6px;">
     <button onclick="closeEdgeEditPopup()" style="flex:1;font-size:12px;">Cancel</button>
@@ -2489,6 +2494,13 @@ wdLogoImg.onload=()=>{ if(nodes.length) draw(); };
 let W=0,H=0;
 let nodes=[],edges=[],loops=[];
 let KNOCK=null; // ripple state, see ctxKnockOn
+// Arrows: 'none' (plain line, the default for new connections), 'forward' (arrowhead at the target),
+// 'backward' (arrowhead at the source) or 'both'. Older saved connections have no arrow field:
+// they keep their old look (twoWay means both, otherwise forward).
+function arrowOf(e){
+  if(e.arrow) return e.arrow;
+  return e.twoWay?'both':'forward';
+}
 let zoom=1,panX=0,panY=0;
 let mode='move';
 let connectFrom=null;
@@ -2751,7 +2763,7 @@ function snap(){
   }
   return JSON.stringify({
     nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||''})),
-    edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,date:e.date||''})),
+    edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||''})),
     colourLegendMap,
     categories:CATEGORIES,
     centralEventLabel,
@@ -2801,8 +2813,8 @@ function restoreSnap(s){
       note: e.note||'',
       colour: e.colour||(style?style.colour:'#888888'),
       isLoop: isLoop||false,
-      twoWay: e.twoWay||false,
-      date: e.date||''
+      arrow: e.arrow||null,
+      twoWay: e.twoWay||false,      date: e.date||''
     };
   });
   colourLegendMap=d.colourLegendMap||{};
@@ -3150,9 +3162,11 @@ function draw(){
       const as=(7*arrowScale)/zoom;
       const tdx=2*(bp.x-mx),tdy=2*(bp.y-my),tL=Math.sqrt(tdx*tdx+tdy*tdy)||1;
       const tNx=tdx/tL,tNy=tdy/tL,tPx=-tNy,tPy=tNx; // unit tangent + perp at bp (t=1)
-      const bpS={x:bp.x-as*tNx,y:bp.y-as*tNy}; // stroke end = arrowhead base
+      const headT=arrowOf(e)==='forward'||arrowOf(e)==='both';
+      const headS=arrowOf(e)==='backward'||arrowOf(e)==='both';
+      let bpS=headT?{x:bp.x-as*tNx,y:bp.y-as*tNy}:{x:bp.x,y:bp.y}; // stroke end: arrowhead base, or the node edge if no head
       let apS=ap,rPx=0,rPy=0;
-      if(e.twoWay){
+      if(headS){
         const rdx=mx-ap.x,rdy=my-ap.y,rL=Math.sqrt(rdx*rdx+rdy*rdy)||1;
         const rNx=rdx/rL,rNy=rdy/rL;
         rPx=-rNy;rPy=rNx; // perp at ap (t=0)
@@ -3177,15 +3191,17 @@ function draw(){
         ctx.stroke();ctx.setLineDash([]);
       }
       // Arrowhead at target: filled triangle — tip=bp, base=bpS, no translate/rotate needed
-      ctx.beginPath();
-      ctx.moveTo(bp.x,bp.y);
-      ctx.lineTo(bpS.x+tPx*as*0.45,bpS.y+tPy*as*0.45);
-      ctx.lineTo(bpS.x-tPx*as*0.45,bpS.y-tPy*as*0.45);
-      ctx.closePath();
-      ctx.fillStyle=drawStroke;ctx.fill();
+      if(headT){
+        ctx.beginPath();
+        ctx.moveTo(bp.x,bp.y);
+        ctx.lineTo(bpS.x+tPx*as*0.45,bpS.y+tPy*as*0.45);
+        ctx.lineTo(bpS.x-tPx*as*0.45,bpS.y-tPy*as*0.45);
+        ctx.closePath();
+        ctx.fillStyle=drawStroke;ctx.fill();
+      }
       ctx.restore();
-      // Reverse arrowhead at source (two-way connections)
-      if(e.twoWay){
+      // Arrowhead at source (backward or both)
+      if(headS){
         ctx.save();
         ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
         ctx.beginPath();
@@ -4595,6 +4611,7 @@ function confirmPuddlImport(){
       note:e.note||'',
       colour:e.colour||(style?style.colour:'#888888'),
       isLoop:isLoop||false,
+      arrow:e.arrow||null,
       twoWay:e.twoWay||false,
       date:e.date||''
     });
@@ -4766,6 +4783,7 @@ const IMPORT_ROLES=[
   {id:'name',     label:'Node name'},
   {id:'connto',   label:'Connected to'},
   {id:'conntype', label:'Connection type'},
+  {id:'arrow', label:'Arrow'},
   {id:'notes',    label:'Notes'},
   {id:'colour',   label:'Node colour'},
   {id:'date',     label:'Date added'},
@@ -4774,8 +4792,16 @@ const IMPORT_ROLES=[
   {id:'field',    label:'Field'},
   {id:'skip',     label:"Don't import"},
 ];
+function importArrowOf(raw){
+  const t=String(raw).trim().toLowerCase();
+  if(['→','->','forward','one way','one-way','to'].includes(t)) return 'forward';
+  if(['←','<-','backward','back','reverse'].includes(t)) return 'backward';
+  if(['↔','<->','both','both ways','two way','two-way','mutual'].includes(t)) return 'both';
+  return 'none';
+}
 function _importGuessRole(h,nameTaken){
   const k=_fieldKey(h);
+  if(/^(arrow|arrows|direction)$/.test(k)) return 'arrow';
   if(!nameTaken&&/^(name|nodename|organisation|organization|organisationname|organizationname|orgname|label|title|node)$/.test(k)) return 'name';
   if(/main/.test(k)&&/(connect|link)/.test(k)) return 'mainconn';
   if(/^(connectiontype|conntype|linktype|relationshiptype|relationship|strength|type ?of ?connection|typeofconnection)$/.test(k)) return 'conntype';
@@ -4870,7 +4896,7 @@ function buildColumnMapper(resetOnly=false){
 
 // ── Download a blank spreadsheet with this map's headings ──────────────────
 function downloadImportTemplate(){
-  const heads=['Name','Connected to','Connection type','Date added','Notes',...FIELD_DEFS.map(f=>f.name)];
+  const heads=['Name','Connected to','Connection type','Arrow','Date added','Notes',...FIELD_DEFS.map(f=>f.name)];
   const slug=((mapTitle||'puddl').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'puddl')+'-template';
   if(typeof XLSX!=='undefined'){
     const ws=XLSX.utils.aoa_to_sheet([heads]);
@@ -4932,7 +4958,8 @@ function runImportMapper(){
     const nl=name.toLowerCase();
     if(!nodeMap.has(nl)) nodeMap.set(nl,{name,notes:'',colour:'',date:'',fields:{},connToRaw:[],connToMain:false,grants:[],tags:[]});
     const e=nodeMap.get(nl);
-    let ctype='moderate', cdate='';
+    let ctype='moderate', cdate='', carrow='none';
+    cols.forEach((c,i)=>{ if(c.role==='arrow'&&val(row,i)) carrow=importArrowOf(val(row,i)); });
     cols.forEach((c,i)=>{ if(c.role==='conntype'&&val(row,i)) ctype=connTypeOf(val(row,i)); if(c.role==='conndate'&&row[i]!==''&&row[i]!=null) cdate=parseFlexDate(row[i]); });
     cols.forEach((c,i)=>{
       const v=val(row,i); if(!v) return;
@@ -4941,7 +4968,7 @@ function runImportMapper(){
       else if(c.role==='date'){ const dd=parseFlexDate(row[i]); if(dd&&(!e.date||dd<e.date)) e.date=dd; }
       else if(c.role==='field'&&!e.fields[c.fname]) e.fields[c.fname]=v;
       else if(c.role==='mainconn'&&/^(yes|y|true|1)$/i.test(v)) e.connToMain=true;
-      else if(c.role==='connto') v.split(/[,;\n]/).map(t=>t.trim()).filter(Boolean).forEach(t=>e.connToRaw.push({to:t,type:ctype,date:cdate}));
+      else if(c.role==='connto') v.split(/[,;\n]/).map(t=>t.trim()).filter(Boolean).forEach(t=>e.connToRaw.push({to:t,type:ctype,date:cdate,arrow:carrow}));
     });
   });
 
@@ -4978,8 +5005,8 @@ function runImportMapper(){
   // Build planned edges (will be resolved at confirmImport time)
   const toAddEdges=[];
   incoming.forEach(r=>{
-    r.connToRaw.forEach(({to,type,date})=>{
-      toAddEdges.push({fromName:r.name,toName:to,type,date:date||''});
+    r.connToRaw.forEach(({to,type,date,arrow})=>{
+      toAddEdges.push({fromName:r.name,toName:to,type,date:date||'',arrow:arrow||'none'});
     });
   });
 
@@ -4989,7 +5016,7 @@ function runImportMapper(){
   if(mainNodeName){
     incoming.forEach(r=>{
       if(r.connToMain&&r.name.toLowerCase()!==mainNodeName.toLowerCase()){
-        toAddEdges.push({fromName:r.name,toName:mainNodeName,type:'moderate',isMainConn:true});
+        toAddEdges.push({fromName:r.name,toName:mainNodeName,type:'moderate',isMainConn:true,arrow:'none'});
         mainConnCount++;
       }
     });
@@ -5432,7 +5459,7 @@ function confirmImport(){
     if(mergeMap[nl]) return mergeMap[nl];
     return nodes.find(n=>n.label.trim().toLowerCase()===nl)||null;
   };
-  toAddEdges.forEach(({fromName,toName,type,date})=>{
+  toAddEdges.forEach(({fromName,toName,type,date,arrow})=>{
     const srcNode=resolveNode(fromName);
     const tgtNode=resolveNode(toName);
     if(!srcNode||!tgtNode||srcNode.id===tgtNode.id) return;
@@ -5443,7 +5470,7 @@ function confirmImport(){
     });
     if(dup) return;
     const style=CONNECTION_STYLES.find(s=>s.id===type);
-    edges.push({source:srcNode.id,target:tgtNode.id,strength:type,colour:style?style.colour:'#888888',date:date||''});
+    edges.push({source:srcNode.id,target:tgtNode.id,strength:type,colour:style?style.colour:'#888888',arrow:arrow||'none',twoWay:arrow==='both',date:date||''});
     connsAdded++;
   });
 
@@ -5518,7 +5545,7 @@ function openEdgeEditPopup(idx, sx, sy){
 
   // Render style buttons with current style highlighted
   renderEdgeStyleList(e.strength||'moderate');
-  document.getElementById('edge-twoway-toggle').checked=!!e.twoWay;
+  renderEdgeArrowBtns(arrowOf(e));
 
   // Position near click
   const popup=document.getElementById('edge-edit-popup');
@@ -5541,7 +5568,7 @@ function confirmEdgeEdit(){
 }
 function addEdge(a,b){
   const style = CONNECTION_STYLES.find(s => s.id === 'moderate');
-  const newEdge={source:a.id,target:b.id,strength:'moderate',colour:style.colour,date:todayISO()};
+  const newEdge={source:a.id,target:b.id,strength:'moderate',colour:style.colour,arrow:'none',twoWay:false,date:todayISO()};
   edges.push(newEdge);
   addLog(`linked "${a.label}" ↔ "${b.label}"`);
   buildSim();if(forceOn)sim.alpha(0.2).restart();
@@ -5563,9 +5590,22 @@ function closeEdgeEditPopup(){
   document.getElementById('edge-edit-popup').style.display='none';
   edgeEditIdx=null;
 }
-function toggleEdgeTwoWay(val){
+function renderEdgeArrowBtns(v){
+  document.querySelectorAll('#edge-arrow-btns button').forEach(b=>{
+    const on=b.dataset.arrow===v;
+    b.style.background=on?'var(--ink)':'transparent';
+    b.style.color=on?'var(--on-ink)':'var(--ink)';
+    b.style.border='1px solid '+(on?'var(--ink)':'var(--bdr-m)');
+    b.style.borderRadius='6px';
+    b.style.cursor='pointer';
+  });
+}
+function setEdgeArrow(val){
   if(edgeEditIdx===null) return;
-  edges[edgeEditIdx].twoWay=val;
+  const e=edges[edgeEditIdx];
+  e.arrow=val;
+  e.twoWay=val==='both';
+  renderEdgeArrowBtns(val);
   draw(); saveState(); markUnsaved();
 }
 
@@ -6942,7 +6982,7 @@ function confirmConnectionFull(forceStrength){
   const {from,to}=pendingConnection;
   pendingConnection=null;
   const s=forceStrength||selectedConnType;
-  edges.push({source:from,target:to,strength:s,colour:selectedConnColour,date:todayISO()});
+  edges.push({source:from,target:to,strength:s,colour:selectedConnColour,arrow:'none',twoWay:false,date:todayISO()});
   const na=nodes.find(n=>n.id===from),nb=nodes.find(n=>n.id===to);
   addLog(`connected "${na?na.label:from}" → "${nb?nb.label:to}" (${s})`);
   if(sim){buildSim();if(forceOn)sim.alpha(0.3).restart();}
@@ -8800,8 +8840,9 @@ function computeKnock(originId){
     const s=(e.source&&typeof e.source==='object')?e.source.id:e.source;
     const t=(e.target&&typeof e.target==='object')?e.target.id:e.target;
     if(s===t) return;
-    add(s,t,i);                       // arrows point source to target
-    if(e.twoWay) add(t,s,i);          // two-way connections carry it both ways
+    const a=arrowOf(e);
+    if(a!=='backward') add(s,t,i);    // forward, both, and plain lines
+    if(a!=='forward')  add(t,s,i);    // backward, both, and plain lines
   });
   const step=new Map([[originId,0]]), edgeStep=new Map();
   let frontier=[originId];
