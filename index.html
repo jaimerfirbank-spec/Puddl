@@ -1244,6 +1244,31 @@ body.share-mode #present-exit{display:none !important;}
       <div class="ms-label">All tags</div>
       <div id="tag-filter-chips" class="ms-chips" style="display:none;"></div>
     </div>
+    <!-- Connection count -->
+    <div style="display:flex;align-items:center;gap:6px;margin:8px 0 6px;font-size:11px;color:var(--ink-m);">
+      <span style="font-weight:600;min-width:74px;">Connections</span>
+      <input type="number" id="conn-min" min="0" placeholder="from" oninput="applyFilters()" style="width:64px;height:28px;font-size:12px;padding:0 6px;">
+      <span>to</span>
+      <input type="number" id="conn-max" min="0" placeholder="to" oninput="applyFilters()" style="width:64px;height:28px;font-size:12px;padding:0 6px;">
+    </div>
+    <!-- Dates -->
+    <div id="date-filter-sec" style="border-top:1px solid var(--bdr);margin-top:8px;padding-top:8px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:var(--ink-m);">
+        <span style="font-weight:600;min-width:74px;" title="Show the map as it was on this date">Map as at</span>
+        <input type="date" id="date-asat" onchange="setDateAsAt(this.value)" style="flex:1;height:28px;font-size:12px;padding:0 6px;">
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:var(--ink-m);">
+        <span style="font-weight:600;min-width:74px;" title="Highlight what was added between these dates">Added</span>
+        <input type="date" id="date-from" onchange="applyFilters()" style="flex:1;min-width:0;height:28px;font-size:12px;padding:0 4px;">
+        <span>to</span>
+        <input type="date" id="date-to" onchange="applyFilters()" style="flex:1;min-width:0;height:28px;font-size:12px;padding:0 4px;">
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink-m);cursor:pointer;margin-bottom:8px;">
+        <input type="checkbox" id="timeline-toggle" onchange="setTimeline(this.checked)" style="width:auto;margin:0;accent-color:var(--ink);">
+        <span><strong>Timeline</strong>: a slider to play the map growing over time</span>
+      </label>
+      <div id="date-filter-none" style="display:none;font-size:10.5px;color:var(--ink-h);margin:-2px 0 8px;line-height:1.4;">Nothing on this map has a date yet. New nodes get today's date, or import a "Date added" column.</div>
+    </div>
     <!-- Hidden selects for compatibility with existing applyFilters() logic -->
     <select id="cat-filter" style="display:none;"></select>
     <select id="area-filter" style="display:none;"></select>
@@ -1257,6 +1282,16 @@ body.share-mode #present-exit{display:none !important;}
     </div>
   </div>
 
+  <div id="timeline-year" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:44px;font-weight:800;letter-spacing:-0.02em;color:var(--ink);opacity:0.16;pointer-events:none;z-index:5;font-variant-numeric:tabular-nums;"></div>
+  <div id="timeline-bar" style="display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:56px;z-index:15;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--bdr);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px 12px;width:min(640px,calc(100% - 200px));">
+    <button id="timeline-play" onclick="timelinePlay()" title="Play the map growing over time" style="width:32px;height:30px;padding:0;font-size:12px;flex-shrink:0;">▶</button>
+    <input type="range" id="timeline-slider" oninput="timelineSlide(this.value)" style="flex:1;accent-color:var(--ink);">
+    <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:96px;">
+      <span id="timeline-date" style="font-size:12px;font-weight:700;color:var(--ink);"></span>
+      <span id="timeline-count" style="font-size:10px;color:var(--ink-h);"></span>
+    </div>
+    <button onclick="setTimeline(false)" title="Close timeline" style="width:26px;height:26px;padding:0;font-size:11px;border:none;background:none;color:var(--ink-h);">✕</button>
+  </div>
   <div class="zoom-btns">
     <button onclick="zoomBy(1.2)" title="Zoom in">+</button>
     <button onclick="zoomReset()" title="Reset zoom">⊙</button>
@@ -1381,6 +1416,10 @@ body.share-mode #present-exit{display:none !important;}
       <div>
         <div class="pres-field-lbl">Seconds on screen <span style="font-weight:400;opacity:.6;">(used by Play)</span></div>
         <input type="number" id="pres-editor-duration" min="1" max="600" step="1" value="8" oninput="updatePresDuration()">
+      </div>
+      <div>
+        <div class="pres-field-lbl">Map as at <span style="font-weight:400;opacity:.6;">(blank shows everything)</span></div>
+        <input type="date" id="pres-editor-asat" onchange="updatePresAsAt()" style="width:100%;height:30px;font-size:12px;padding:0 8px;border-radius:6px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;">
       </div>
     </div>
     <div id="pres-narration-box">
@@ -1507,6 +1546,12 @@ body.share-mode #present-exit{display:none !important;}
       <div>
         <div style="font-size:11px;color:var(--txt-m);margin-bottom:4px;">Notes <span style="color:var(--txt-h);font-weight:400;">(optional)</span></div>
         <textarea id="modal-notes" placeholder="e.g. Anything relevant…" style="font-family:'DM Sans',sans-serif;width:100%;height:80px;padding:8px 10px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);font-size:12px;outline:none;resize:none;line-height:1.5;box-sizing:border-box;"></textarea>
+      </div>
+
+      <!-- Date added -->
+      <div style="display:flex;align-items:center;gap:10px;margin-top:-2px;">
+        <label for="modal-date" style="font-size:11px;font-weight:600;color:var(--ink-m);white-space:nowrap;">Date added</label>
+        <input type="date" id="modal-date" style="flex:1;height:30px;font-size:12px;padding:0 9px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;">
       </div>
 
       <!-- Additional fields (named per map) -->
@@ -2431,7 +2476,13 @@ let dragGroupInit=null;   // Shift-drag: {id:{x,y}} for the node and its direct 
 let panDragging=false,panSX=0,panSY=0,panPX=0,panPY=0;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
-let FIELD_DEFS=[];              // map's own node fields: [{id,name}] — values live in node.customFields[id]
+let FIELD_DEFS=[];
+// Dates: nodes/connections may carry n.date / e.date as 'YYYY-MM-DD'. Undated items always show.
+let DATE_ASAT=null;              // show the map as it was on this date (hides anything later)
+let DATE_FROM=null, DATE_TO=null;// highlight things added between these dates
+let CONN_MIN=null, CONN_MAX=null;// connection-count filter
+let TIMELINE_ON=false;
+const _dateHidden=new Set();              // map's own node fields: [{id,name}] — values live in node.customFields[id]
 let SIZE_BY_CONNECTIONS=false;   // true whenever SIZE_BY is set (kept for the radius refresh logic)
 let SIMPLE_MODE='auto';          // 'auto' | 'on' | 'off' — fast square drawing for big maps
 const SIMPLE_THRESHOLD=600;      // nodes at which 'auto' switches to simple drawing
@@ -2628,6 +2679,7 @@ function nodeAt(sx,sy){
   const wx=(sx-panX)/zoom, wy=(sy-panY)/zoom;
   for(let i=nodes.length-1;i>=0;i--){
     const n=nodes[i];
+    if(_dateHidden.size&&_dateHidden.has(n.id)) continue;
     if(n.type==='centre'){
       if(wx>=n.x-65&&wx<=n.x+65&&wy>=n.y-31&&wy<=n.y+31) return n;
     } else if(_simpleNow){
@@ -2674,8 +2726,8 @@ function snap(){
     };
   }
   return JSON.stringify({
-    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||''})),
-    edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false})),
+    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||''})),
+    edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,date:e.date||''})),
     colourLegendMap,
     categories:CATEGORIES,
     centralEventLabel,
@@ -2689,6 +2741,7 @@ function snap(){
     presentationStops:presentationStops||[],
     presMapOnly:!!presMapOnly,
     fieldDefs:FIELD_DEFS,
+    dateAsAt:DATE_ASAT,
     areas:AREAS,
     nodeLabelPosition:NODE_LABEL_POSITION,
     sizeByConnections:SIZE_BY==='connections',
@@ -2724,7 +2777,8 @@ function restoreSnap(s){
       note: e.note||'',
       colour: e.colour||(style?style.colour:'#888888'),
       isLoop: isLoop||false,
-      twoWay: e.twoWay||false
+      twoWay: e.twoWay||false,
+      date: e.date||''
     };
   });
   colourLegendMap=d.colourLegendMap||{};
@@ -2740,6 +2794,7 @@ function restoreSnap(s){
   presentationStops=d.presentationStops||[];
   presMapOnly=!!d.presMapOnly;
   FIELD_DEFS=Array.isArray(d.fieldDefs)?d.fieldDefs:[];
+  DATE_ASAT=d.dateAsAt||null; if(typeof recomputeDateHidden==='function') recomputeDateHidden();
   if(d.areas&&Array.isArray(d.areas)&&d.areas.length) AREAS=d.areas;
   if(d.nodeLabelPosition) NODE_LABEL_POSITION=d.nodeLabelPosition;
   SIZE_BY=typeof d.sizeBy==='string'?d.sizeBy:(d.sizeByConnections?'connections':'');
@@ -2810,6 +2865,7 @@ function drawSimpleEdges(hasHL,_dark){
     const a=typeof e.source==='object'?e.source:byId.get(e.source);
     const b=typeof e.target==='object'?e.target:byId.get(e.target);
     if(!a||!b) return;
+    if(DATE_ASAT&&edgeHiddenByDate(e,a,b)) return;
     if(Math.max(a.x,b.x)<vb.x0||Math.min(a.x,b.x)>vb.x1||Math.max(a.y,b.y)<vb.y0||Math.min(a.y,b.y)>vb.y1) return;
     const isHl=highlightEdges.has(i);
     const style=CONNECTION_STYLES.find(s=>s.id===(e.strength||'moderate'))||CONNECTION_STYLES[1];
@@ -2835,6 +2891,7 @@ function drawSimpleNodes(hasHL,_dark){
   ctx.save();
   nodes.forEach(n=>{
     if(n.x<vb.x0||n.x>vb.x1||n.y<vb.y0||n.y>vb.y1) return;
+    if(_dateHidden.size&&_dateHidden.has(n.id)) return;
     const isHl=highlightIds.has(n.id), isSec=secondaryIds.has(n.id)&&!isHl;
     ctx.globalAlpha=hasHL&&!isHl&&!isSec?0.10:isSec?0.45:1;
     const r=Math.max(_simpleR(n),2.2/zoom);
@@ -2994,6 +3051,7 @@ function draw(){
     if(_simpleNow) return;
     const a=typeof e.source==='object'?e.source:nodes.find(n=>n.id===e.source);
     const b=typeof e.target==='object'?e.target:nodes.find(n=>n.id===e.target);
+    if(DATE_ASAT&&edgeHiddenByDate(e,a,b)) return;
     if(!a||!b) return;
     const isHl=highlightEdges.has(i);
     const dimmed=hasHL&&!isHl;
@@ -3230,6 +3288,7 @@ function draw(){
   if(_simpleNow) drawSimpleNodes(hasHL,_dark);
   nodes.forEach(n=>{
     if(_simpleNow) return;
+    if(_dateHidden.size&&_dateHidden.has(n.id)) return;
     const isHl=highlightIds.has(n.id);
     const isSecondary=secondaryIds.has(n.id)&&!highlightIds.has(n.id)||false;
     const dimmed=hasHL&&!isHl&&!isSecondary;
@@ -3647,14 +3706,19 @@ function applyFilters(){
   const member=members.length===1?members[0]:(members.length>1?'__multi__':'');
   const tag=tags.length===1?tags[0]:(tags.length>1?'__multi__':'');
   const connType=connTypes.length===1?connTypes[0]:(connTypes.length>1?'__multi__':'');
-  const hasFilter=q||cats.length||areas.length||members.length||tags.length||connTypes.length;
+  const cmin=parseInt(document.getElementById('conn-min')?.value,10), cmax=parseInt(document.getElementById('conn-max')?.value,10);
+  CONN_MIN=isNaN(cmin)?null:cmin; CONN_MAX=isNaN(cmax)?null:cmax;
+  DATE_FROM=document.getElementById('date-from')?.value||null; DATE_TO=document.getElementById('date-to')?.value||null;
+  const hasRange=CONN_MIN!==null||CONN_MAX!==null||!!DATE_FROM||!!DATE_TO;
+  _degCache=null;
+  const hasFilter=q||cats.length||areas.length||members.length||tags.length||connTypes.length||hasRange;
   highlightIds.clear();highlightEdges.clear();secondaryIds.clear();
 
   if(!hasFilter){ updateFilterCount(0,false); draw(); return; }
 
   // Step 1: find nodes matching text/cat/area/member/tag filters
   const nodeMatched=new Set();
-  const anyNodeFilter=q||cats.length||areas.length||members.length||tags.length;
+  const anyNodeFilter=q||cats.length||areas.length||members.length||tags.length||hasRange;
   nodes.forEach(n=>{
     if(n.type==='centre') return;
     const matchQ=!q||n.label.toLowerCase().includes(q)||(n.notes&&n.notes.toLowerCase().includes(q))||(n.pTopic&&n.pTopic.toLowerCase().includes(q))||(n.customFields&&Object.values(n.customFields).some(v=>String(v||'').toLowerCase().includes(q)));
@@ -3662,7 +3726,11 @@ function applyFilters(){
     const matchArea=!areas.length||areas.includes(n.area);
     const matchMember=!members.length||(n.owners&&n.owners.some(o=>members.includes(o)));
     const matchTag=!tags.length||(n.tags&&tags.some(t=>n.tags.includes(t)));
-    if(matchQ&&matchCat&&matchArea&&matchMember&&matchTag) nodeMatched.add(n.id);
+    let matchRange=true;
+    if(CONN_MIN!==null||CONN_MAX!==null){ const c=connectionCount(n); if((CONN_MIN!==null&&c<CONN_MIN)||(CONN_MAX!==null&&c>CONN_MAX)) matchRange=false; }
+    if(DATE_FROM||DATE_TO){ const d=n.date||''; if(!d||(DATE_FROM&&d<DATE_FROM)||(DATE_TO&&d>DATE_TO)) matchRange=false; }
+    if(_dateHidden.has(n.id)) matchRange=false;
+    if(matchQ&&matchCat&&matchArea&&matchMember&&matchTag&&matchRange) nodeMatched.add(n.id);
   });
 
   // In combined mode centre node
@@ -3746,6 +3814,7 @@ function toggleSearchPanel(){
   const btn=document.getElementById('btn-search-toggle');
   const open=panel.style.display==='none'||!panel.style.display;
   panel.style.display=open?'block':'none';
+  if(open) syncDateFilterUI();
   if(btn){
     btn.style.background=open?'var(--ink)':'var(--surf)';
     btn.style.color=open?'var(--on-ink)':'var(--ink-m)';
@@ -3861,6 +3930,9 @@ function clearSearch(){
     if(wrap) wrap.classList.remove('open','active-filter');
   });
   const sb=document.getElementById('search-suggestions');if(sb) sb.style.display='none';
+  ['conn-min','conn-max','date-from','date-to'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  CONN_MIN=CONN_MAX=DATE_FROM=DATE_TO=null;
+  if(TIMELINE_ON) setTimeline(false); else if(DATE_ASAT) setDateAsAt(null);
   updateFilterCount(0,false);
   clearHighlight();
 }
@@ -4298,7 +4370,8 @@ function confirmPuddlImport(){
       note:e.note||'',
       colour:e.colour||(style?style.colour:'#888888'),
       isLoop:isLoop||false,
-      twoWay:e.twoWay||false
+      twoWay:e.twoWay||false,
+      date:e.date||''
     });
     conns++;
   });
@@ -4470,6 +4543,8 @@ const IMPORT_ROLES=[
   {id:'conntype', label:'Connection type'},
   {id:'notes',    label:'Notes'},
   {id:'colour',   label:'Node colour'},
+  {id:'date',     label:'Date added'},
+  {id:'conndate', label:'Connection date'},
   {id:'mainconn', label:'Connected to main node (Yes/No)'},
   {id:'field',    label:'Field'},
   {id:'skip',     label:"Don't import"},
@@ -4482,6 +4557,8 @@ function _importGuessRole(h,nameTaken){
   if(/^(connections?|connectedto|connto|linkedto|links?|linkto|connectsto)$/.test(k)) return 'connto';
   if(/^(notes?|description|comments?)$/.test(k)) return 'notes';
   if(/^(colou?r|nodecolou?r|hex)$/.test(k)) return 'colour';
+  if(/^(connectiondate|connectedsince|linkdate|connsince|relationshipstart)$/.test(k)) return 'conndate';
+  if(/^(date|dateadded|datejoined|joined|yearjoined|year|since|startdate|started|datestarted|yearstarted|added)$/.test(k)) return 'date';
   return 'field';
 }
 function _importRowState(i){
@@ -4568,7 +4645,7 @@ function buildColumnMapper(resetOnly=false){
 
 // ── Download a blank spreadsheet with this map's headings ──────────────────
 function downloadImportTemplate(){
-  const heads=['Name','Connected to','Connection type','Notes',...FIELD_DEFS.map(f=>f.name)];
+  const heads=['Name','Connected to','Connection type','Date added','Notes',...FIELD_DEFS.map(f=>f.name)];
   const slug=((mapTitle||'puddl').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'puddl')+'-template';
   if(typeof XLSX!=='undefined'){
     const ws=XLSX.utils.aoa_to_sheet([heads]);
@@ -4628,17 +4705,18 @@ function runImportMapper(){
     const name=val(row,nameIdx);
     if(!name){ skipped++; return; }
     const nl=name.toLowerCase();
-    if(!nodeMap.has(nl)) nodeMap.set(nl,{name,notes:'',colour:'',fields:{},connToRaw:[],connToMain:false,grants:[],tags:[]});
+    if(!nodeMap.has(nl)) nodeMap.set(nl,{name,notes:'',colour:'',date:'',fields:{},connToRaw:[],connToMain:false,grants:[],tags:[]});
     const e=nodeMap.get(nl);
-    let ctype='moderate';
-    cols.forEach((c,i)=>{ if(c.role==='conntype'&&val(row,i)) ctype=connTypeOf(val(row,i)); });
+    let ctype='moderate', cdate='';
+    cols.forEach((c,i)=>{ if(c.role==='conntype'&&val(row,i)) ctype=connTypeOf(val(row,i)); if(c.role==='conndate'&&row[i]!==''&&row[i]!=null) cdate=parseFlexDate(row[i]); });
     cols.forEach((c,i)=>{
       const v=val(row,i); if(!v) return;
       if(c.role==='notes') e.notes=e.notes?(e.notes.includes(v)?e.notes:e.notes+'\n'+v):v;
       else if(c.role==='colour'&&!e.colour) e.colour=v;
+      else if(c.role==='date'){ const dd=parseFlexDate(row[i]); if(dd&&(!e.date||dd<e.date)) e.date=dd; }
       else if(c.role==='field'&&!e.fields[c.fname]) e.fields[c.fname]=v;
       else if(c.role==='mainconn'&&/^(yes|y|true|1)$/i.test(v)) e.connToMain=true;
-      else if(c.role==='connto') v.split(/[,;\n]/).map(t=>t.trim()).filter(Boolean).forEach(t=>e.connToRaw.push({to:t,type:ctype}));
+      else if(c.role==='connto') v.split(/[,;\n]/).map(t=>t.trim()).filter(Boolean).forEach(t=>e.connToRaw.push({to:t,type:ctype,date:cdate}));
     });
   });
 
@@ -4675,8 +4753,8 @@ function runImportMapper(){
   // Build planned edges (will be resolved at confirmImport time)
   const toAddEdges=[];
   incoming.forEach(r=>{
-    r.connToRaw.forEach(({to,type})=>{
-      toAddEdges.push({fromName:r.name,toName:to,type});
+    r.connToRaw.forEach(({to,type,date})=>{
+      toAddEdges.push({fromName:r.name,toName:to,type,date:date||''});
     });
   });
 
@@ -4872,6 +4950,104 @@ function resolveIconId(text){
   return icon?icon.id:null;
 }
 
+// ── Dates and timeline ─────────────────────────────────────────────────────
+function todayISO(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// Accepts 2021, "2021-03", "15/03/2021", "2021-03-15", "March 2021", Excel date numbers. Returns 'YYYY-MM-DD' or ''.
+function parseFlexDate(v){
+  if(v===null||v===undefined||v==='') return '';
+  const iso=(y,m,d)=>{ y=+y; m=+m||1; d=+d||1; if(!(y>=1000&&y<=2999)||m<1||m>12||d<1||d>31) return ''; return y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0'); };
+  if(typeof v==='number'){
+    if(v>=1000&&v<=2999&&Number.isInteger(v)) return iso(v,1,1);
+    if(v>20000&&v<80000){ const ms=Math.round((v-25569)*86400000); const d=new Date(ms); return iso(d.getUTCFullYear(),d.getUTCMonth()+1,d.getUTCDate()); }
+    return '';
+  }
+  if(v instanceof Date&&!isNaN(v)) return iso(v.getFullYear(),v.getMonth()+1,v.getDate());
+  const t=String(v).trim(); let m;
+  if((m=t.match(/^(\d{4})$/))) return iso(m[1],1,1);
+  if((m=t.match(/^(\d{4})[-\/.](\d{1,2})$/))) return iso(m[1],m[2],1);
+  if((m=t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/))) return iso(m[1],m[2],m[3]);
+  if((m=t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))) return iso(m[3],m[2],m[1]);   // UK day/month/year
+  if((m=t.match(/^(\d{1,2})[-\/.](\d{4})$/))) return iso(m[2],m[1],1);
+  if(/^\d{5}$/.test(t)) return parseFlexDate(+t);
+  const p=Date.parse(t); if(!isNaN(p)){ const d=new Date(p); return iso(d.getFullYear(),d.getMonth()+1,d.getDate()); }
+  return '';
+}
+function edgeDateOf(e,a,b){
+  if(e.date) return e.date;
+  const da=(a&&a.date)||'', db=(b&&b.date)||'';
+  return da>db?da:db;
+}
+function edgeHiddenByDate(e,a,b){
+  if(!DATE_ASAT) return false;
+  if((a&&_dateHidden.has(a.id))||(b&&_dateHidden.has(b.id))) return true;
+  const d=edgeDateOf(e,a,b); return !!d&&d>DATE_ASAT;
+}
+function recomputeDateHidden(){
+  _dateHidden.clear();
+  if(DATE_ASAT) nodes.forEach(n=>{ if(n.date&&n.date>DATE_ASAT) _dateHidden.add(n.id); });
+}
+function mapDateRange(){
+  let lo='',hi='';
+  nodes.forEach(n=>{ if(n.date){ if(!lo||n.date<lo) lo=n.date; if(!hi||n.date>hi) hi=n.date; } });
+  edges.forEach(e=>{ if(e.date){ if(!lo||e.date<lo) lo=e.date; if(!hi||e.date>hi) hi=e.date; } });
+  return lo?{lo,hi}:null;
+}
+function setDateAsAt(v){
+  DATE_ASAT=v||null;
+  const inp=document.getElementById('date-asat'); if(inp&&inp.value!==(DATE_ASAT||'')) inp.value=DATE_ASAT||'';
+  recomputeDateHidden(); _degCache=null;
+  syncTimelineUI();
+  applyFilters();
+}
+function syncDateFilterUI(){
+  const none=document.getElementById('date-filter-none');
+  if(none) none.style.display=mapDateRange()?'none':'block';
+  const a=document.getElementById('date-asat'); if(a) a.value=DATE_ASAT||'';
+  const t=document.getElementById('timeline-toggle'); if(t) t.checked=TIMELINE_ON;
+}
+// Timeline bar
+const _dayMs=86400000;
+const _isoToDay=d=>Math.round(Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/_dayMs);
+const _dayToIso=n=>{ const d=new Date(n*_dayMs); return d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0'); };
+let _tlTimer=null;
+function setTimeline(on){
+  const r=mapDateRange();
+  if(on&&!r){ showStatus('Nothing on this map has a date yet.'); const t=document.getElementById('timeline-toggle'); if(t) t.checked=false; return; }
+  TIMELINE_ON=!!on;
+  const bar=document.getElementById('timeline-bar'); if(bar) bar.style.display=TIMELINE_ON?'flex':'none';
+  const yl=document.getElementById('timeline-year'); if(yl) yl.style.display=TIMELINE_ON?'block':'none';
+  if(!TIMELINE_ON){ timelineStop(); setDateAsAt(null); return; }
+  const sl=document.getElementById('timeline-slider');
+  sl.min=_isoToDay(r.lo); sl.max=_isoToDay(r.hi);
+  setDateAsAt(DATE_ASAT||r.hi);
+}
+function syncTimelineUI(){
+  const sl=document.getElementById('timeline-slider'), lab=document.getElementById('timeline-date'), yl=document.getElementById('timeline-year');
+  if(!sl||!TIMELINE_ON) return;
+  const d=DATE_ASAT||(mapDateRange()?.hi); if(!d) return;
+  sl.value=_isoToDay(d);
+  const dt=new Date(d+'T00:00:00');
+  if(lab) lab.textContent=dt.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  if(yl) yl.textContent=d.slice(0,4);
+  const shown=nodes.length-_dateHidden.size;
+  const cnt=document.getElementById('timeline-count'); if(cnt) cnt.textContent=shown+' of '+nodes.length+' nodes';
+}
+function timelineSlide(v){ timelineStop(); setDateAsAt(_dayToIso(+v)); }
+function timelineStop(){ if(_tlTimer){ clearInterval(_tlTimer); _tlTimer=null; } const b=document.getElementById('timeline-play'); if(b) b.textContent='▶'; }
+function timelinePlay(){
+  if(_tlTimer){ timelineStop(); return; }
+  const sl=document.getElementById('timeline-slider'); const lo=+sl.min, hi=+sl.max;
+  let cur=+sl.value; if(cur>=hi) cur=lo;
+  const steps=120, inc=Math.max(1,(hi-lo)/steps);      // about 12 seconds start to finish
+  document.getElementById('timeline-play').textContent='❚❚';
+  setDateAsAt(_dayToIso(Math.round(cur)));
+  _tlTimer=setInterval(()=>{
+    cur=Math.min(hi,cur+inc);
+    setDateAsAt(_dayToIso(Math.round(cur)));
+    if(cur>=hi) timelineStop();
+  },100);
+}
+
 // ── Spacing tools ──────────────────────────────────────────────────────────
 function _collR(n){
   if(n.type==='centre') return 70;
@@ -4989,6 +5165,7 @@ function confirmImport(){
       y:cy+Math.sin(angle)*radius,
       vx:0,vy:0,pinned:false,fx:null,fy:null,
       notes:r.notes||'',
+      date:r.date||'',
       tags:r.tags||[],
       grants:[],contacts:[],
       groupSize:r.groupsize||'',
@@ -5010,6 +5187,7 @@ function confirmImport(){
     });
     if(!n.area&&r.area) n.area=r.area;
     if(!n.notes&&r.notes) n.notes=r.notes;
+    if(!n.date&&r.date) n.date=r.date;
     if(!n.customFields) n.customFields={};
     Object.entries(r.fields||{}).forEach(([fname,v])=>{ const f=addFieldDef(fname); if(f&&!String(n.customFields[f.id]||'').trim()){ n.customFields[f.id]=v; mergedCount++; } });
     if(r.tags&&r.tags.length){
@@ -5028,7 +5206,7 @@ function confirmImport(){
     if(mergeMap[nl]) return mergeMap[nl];
     return nodes.find(n=>n.label.trim().toLowerCase()===nl)||null;
   };
-  toAddEdges.forEach(({fromName,toName,type})=>{
+  toAddEdges.forEach(({fromName,toName,type,date})=>{
     const srcNode=resolveNode(fromName);
     const tgtNode=resolveNode(toName);
     if(!srcNode||!tgtNode||srcNode.id===tgtNode.id) return;
@@ -5039,7 +5217,7 @@ function confirmImport(){
     });
     if(dup) return;
     const style=CONNECTION_STYLES.find(s=>s.id===type);
-    edges.push({source:srcNode.id,target:tgtNode.id,strength:type,colour:style?style.colour:'#888888'});
+    edges.push({source:srcNode.id,target:tgtNode.id,strength:type,colour:style?style.colour:'#888888',date:date||''});
     connsAdded++;
   });
 
@@ -5137,7 +5315,7 @@ function confirmEdgeEdit(){
 }
 function addEdge(a,b){
   const style = CONNECTION_STYLES.find(s => s.id === 'moderate');
-  const newEdge={source:a.id,target:b.id,strength:'moderate',colour:style.colour};
+  const newEdge={source:a.id,target:b.id,strength:'moderate',colour:style.colour,date:todayISO()};
   edges.push(newEdge);
   addLog(`linked "${a.label}" ↔ "${b.label}"`);
   buildSim();if(forceOn)sim.alpha(0.2).restart();
@@ -5511,6 +5689,7 @@ function openAddModal(){
   document.getElementById('modal-notes').value='';
   { const v=document.getElementById('modal-video'); if(v) v.value=''; }
   renderModalFields({});
+  { const md=document.getElementById('modal-date'); if(md) md.value=todayISO(); }
   selectedModalColour='#FFB3C8';
   selectedModalShape='circle';
   selectedModalSize='medium';
@@ -5583,6 +5762,7 @@ function switchToEditMode(){
   document.getElementById('modal-notes').value=n.notes||'';
   { const v=document.getElementById('modal-video'); if(v) v.value=n.videoUrl||''; }
   renderModalFields(n.customFields||{});
+  { const md=document.getElementById('modal-date'); if(md) md.value=n.date||''; }
   selectedModalColour=n.colour||'#FFB3C8';
   selectedModalShape=n.shape||'circle';
   selectedModalSize=n.nodeSize||'medium';
@@ -5737,6 +5917,7 @@ function confirmModal(){
   const name=(nameInp?nameInp.value.trim():'');
   const notes=document.getElementById('modal-notes')?.value.trim()||'';
   const customFields=readModalFields();
+  const nodeDate=parseFlexDate(document.getElementById('modal-date')?.value||'');
   const colour=selectedModalColour;
   const shape=selectedModalShape;
   const nodeSize=selectedModalSize;
@@ -5750,7 +5931,7 @@ function confirmModal(){
     const newNode={
       id:++idCtr, x:cx, y:cy,
       fx:cx, fy:cy, pinned:true,
-      label:name, colour, shape, nodeSize, titleSize, notes, videoUrl:'', customFields,
+      label:name, colour, shape, nodeSize, titleSize, notes, videoUrl:'', customFields, date:nodeDate,
       type:'process'
     };
     nodes.push(newNode);
@@ -5772,6 +5953,7 @@ function confirmModal(){
       n.titleSize=titleSize;
       n.notes=notes;
       n.customFields=customFields;
+      n.date=nodeDate;
       if(n.type==='centre') centralEventLabel=n.label;
       addLog('edited node "'+n.label+'"');
     }
@@ -6534,7 +6716,7 @@ function confirmConnectionFull(forceStrength){
   const {from,to}=pendingConnection;
   pendingConnection=null;
   const s=forceStrength||selectedConnType;
-  edges.push({source:from,target:to,strength:s,colour:selectedConnColour});
+  edges.push({source:from,target:to,strength:s,colour:selectedConnColour,date:todayISO()});
   const na=nodes.find(n=>n.id===from),nb=nodes.find(n=>n.id===to);
   addLog(`connected "${na?na.label:from}" → "${nb?nb.label:to}" (${s})`);
   if(sim){buildSim();if(forceOn)sim.alpha(0.3).restart();}
@@ -7271,7 +7453,7 @@ function capturePresStop(){
   presentationStops.push({id,panX,panY,zoom,
     worldCX:(W/2-panX)/zoom, worldCY:(H/2-panY)/zoom,
     captureW:W, captureH:H,
-    header:'Stop '+num,subheader:'',body:'',duration:8});
+    header:'Stop '+num,subheader:'',body:'',duration:8,asAt:DATE_ASAT||null});
   saveState(); markUnsaved();
   rebuildPresStopList();
   selectPresStop(presentationStops.length-1);
@@ -7313,6 +7495,8 @@ function selectPresStop(idx){
   if(eb) eb.value=stop.body||'';
   const ed=document.getElementById('pres-editor-duration');
   if(ed) ed.value=stop.duration||8;
+  const ea=document.getElementById('pres-editor-asat');
+  if(ea) ea.value=stop.asAt||'';
   const editor=document.getElementById('pres-editor');
   if(editor) editor.style.display='flex';
 }
@@ -7437,7 +7621,9 @@ function presWake(){
 document.addEventListener('mousemove',()=>{ if(inPresentationMode) presWake(); });
 document.addEventListener('touchstart',()=>{ if(inPresentationMode) presWake(); },{passive:true});
 
+let _preAsAt=null;
 function enterPresentationMode(){
+  _preAsAt=DATE_ASAT;
   if(presentationStops.length===0){ showStatus('Add at least one stop first'); return; }
   inPresentationMode=true;
   exitPresentationEditMode();
@@ -7459,6 +7645,7 @@ function enterPresentationMode(){
 const IS_SHARE_VIEW=(function(){ try{ const e=document.getElementById('puddl-share'); const v=e&&e.textContent.trim()==='1'; if(v&&e) e.textContent=''; return !!v; }catch(err){ return false; } })();
 function exitPresentationMode(){
   if(IS_SHARE_VIEW) return;
+  DATE_ASAT=_preAsAt; recomputeDateHidden(); syncTimelineUI();
   clearTimeout(_presIdleTimer);
   const _ov=document.getElementById('present-overlay'); if(_ov) _ov.classList.remove('idle');
   presPlayReset();
@@ -7496,6 +7683,7 @@ function presGoToStop(idx,animate){
   presentationCurrentIdx=idx;
   presNodeOverride=null;
   presCurrentStop=stop;
+  if(stop.asAt!==undefined){ DATE_ASAT=stop.asAt||null; recomputeDateHidden(); }
   presTargetZoom=stop.zoom;
   // Resolve world-centre (new stops store it; estimate for old stops)
   presTargetWorldCX=stop.worldCX??null;
@@ -7648,6 +7836,11 @@ function presTimelineSeek(e){
 }
 
 // Editor: seconds on screen + narration
+function updatePresAsAt(){
+  const stop=presentationStops[presentationSelectedIdx]; if(!stop) return;
+  stop.asAt=document.getElementById('pres-editor-asat').value||null;
+  saveState(); markUnsaved();
+}
 function updatePresDuration(){
   const stop=presentationStops[presentationSelectedIdx]; if(!stop) return;
   const el=document.getElementById('pres-editor-duration'); if(!el) return;
