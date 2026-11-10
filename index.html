@@ -1156,6 +1156,10 @@ body.share-mode #present-exit{display:none !important;}
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
     Remove image
   </button>
+  <button id="ctx-btn-knock" onclick="ctxKnockOn()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+    Show knock-on effects
+  </button>
   <div class="ctx-sep"></div>
   <button onclick="ctxDeleteNode()" class="ctx-danger">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
@@ -1300,6 +1304,7 @@ body.share-mode #present-exit{display:none !important;}
     </div>
   </div>
 
+  <div id="knock-banner" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:16;align-items:center;gap:6px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:7px 12px;font-size:12px;color:var(--ink);max-width:min(620px,calc(100% - 240px));"></div>
   <div id="timeline-year" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:44px;font-weight:800;letter-spacing:-0.02em;color:var(--ink);opacity:0.16;pointer-events:none;z-index:5;font-variant-numeric:tabular-nums;"></div>
   <div id="timeline-bar" style="display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:56px;z-index:15;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--bdr);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px 12px;width:min(640px,calc(100% - 200px));">
     <button id="timeline-play" onclick="timelinePlay()" title="Play the map changing over time" style="width:32px;height:30px;padding:0;font-size:12px;flex-shrink:0;">▶</button>
@@ -2483,6 +2488,7 @@ wdLogoImg.src=WD_LOGO_SRC;
 wdLogoImg.onload=()=>{ if(nodes.length) draw(); };
 let W=0,H=0;
 let nodes=[],edges=[],loops=[];
+let KNOCK=null; // knock-on state, see ctxKnockOn
 let zoom=1,panX=0,panY=0;
 let mode='move';
 let connectFrom=null;
@@ -2889,7 +2895,7 @@ function drawSimpleEdges(hasHL,_dark){
     const style=CONNECTION_STYLES.find(s=>s.id===(e.strength||'moderate'))||CONNECTION_STYLES[1];
     let col=isHl?'#FF8C8C':(e.colour||style.colour);
     if(_dark&&!isHl) col=adaptColourForDark(col);
-    const alpha=hasHL&&!isHl?0.06:1;
+    const alpha=knockEdgeAlpha(i,hasHL&&!isHl?0.06:1);
     const key=col+'|'+alpha+'|'+(isHl?1:0);
     let g=groups.get(key); if(!g){ g={col,alpha,hl:isHl,segs:[]}; groups.set(key,g); }
     g.segs.push(a.x,a.y,b.x,b.y);
@@ -2911,7 +2917,7 @@ function drawSimpleNodes(hasHL,_dark){
     if(n.x<vb.x0||n.x>vb.x1||n.y<vb.y0||n.y>vb.y1) return;
     if(_dateHidden.size&&_dateHidden.has(n.id)) return;
     const isHl=highlightIds.has(n.id), isSec=secondaryIds.has(n.id)&&!isHl;
-    ctx.globalAlpha=hasHL&&!isHl&&!isSec?0.10:isSec?0.45:1;
+    ctx.globalAlpha=knockNodeAlpha(n,hasHL&&!isHl&&!isSec?0.10:isSec?0.45:1);
     const r=Math.max(_simpleR(n),2.2/zoom);
     ctx.fillStyle=nodeFill(n);
     ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
@@ -3114,7 +3120,7 @@ function draw(){
     ctx.save();
     // Edges pass under nodes — no clipping needed (nodes drawn on top in render order)
 
-    ctx.globalAlpha=dimmed?0.06:isSecondaryEdge?0.30:1;
+    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
     const drawStroke=isHl?'#FF8C8C':edgeCol;
 
     // Draw stroke — loop arcs use ctx.arc(), others use quadratic Bezier
@@ -3181,7 +3187,7 @@ function draw(){
       // Reverse arrowhead at source (two-way connections)
       if(e.twoWay){
         ctx.save();
-        ctx.globalAlpha=dimmed?0.06:isSecondaryEdge?0.30:1;
+        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
         ctx.lineTo(apS.x+rPx*as*0.45,apS.y+rPy*as*0.45);
@@ -3310,7 +3316,7 @@ function draw(){
     const isHl=highlightIds.has(n.id);
     const isSecondary=secondaryIds.has(n.id)&&!highlightIds.has(n.id)||false;
     const dimmed=hasHL&&!isHl&&!isSecondary;
-    ctx.globalAlpha=dimmed?0.10:isSecondary?0.45:1;
+    ctx.globalAlpha=knockNodeAlpha(n,dimmed?0.10:isSecondary?0.45:1);
 
     // ── Central event node: logo card ────────────────────────────────────────
     if(n.type==='centre'){
@@ -3323,7 +3329,7 @@ function draw(){
       const pad=7/zoom;
       ctx.beginPath();rr(ctx,cx2-pad,cy2-pad,cw+pad*2,ch+pad*2,(10/zoom)+pad);
       ctx.strokeStyle=_dark?'rgba(255,255,255,0.35)':centreCol;
-      ctx.globalAlpha=(dimmed?0.10:isSecondary?0.45:1)*0.40;
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?0.10:isSecondary?0.45:1)*0.40;
       ctx.lineWidth=1.5/zoom;
       ctx.setLineDash([5/zoom,4/zoom]);
       ctx.stroke();
@@ -3506,7 +3512,7 @@ function draw(){
         : _shapeBot + 7/zoom;
       const _pilX=n.x-_spw/2;
       // pill background
-      ctx.globalAlpha=dimmed?0.10:isSecondary?0.45:0.88;
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?0.10:isSecondary?0.45:0.88);
       ctx.fillStyle=_dark?'rgba(59,130,246,0.25)':'rgba(59,130,246,0.12)';
       ctx.beginPath();
       const _pr=_sph/2;
@@ -3527,7 +3533,7 @@ function draw(){
       // pill text
       ctx.fillStyle=_dark?'rgba(147,197,253,1)':'rgba(29,78,216,1)';
       ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.globalAlpha=dimmed?0.10:isSecondary?0.45:1;
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?0.10:isSecondary?0.45:1);
       ctx.fillText(n.groupStatus,n.x,_pilY+_sph/2);
       ctx.restore();
     }
@@ -3913,6 +3919,7 @@ function buildSearchSuggestions(){
 function selectSearchSuggestion(id){
   const n=nodes.find(nd=>String(nd.id)===String(id));
   if(!n) return;
+  clearKnock();
   // Set search input to exact name
   const inp=document.getElementById('search-input');
   if(inp){ inp.value=n.label; }
@@ -4127,7 +4134,9 @@ function refreshInsightsIfOpen(){
 }
 
 function applyFilters(){
+  const wasKnock=!!KNOCK;
   _applyFiltersCore();
+  if(wasKnock) clearKnock();
   syncSecBadges();
   refreshInsightsIfOpen();
 }
@@ -4154,6 +4163,7 @@ function clearSearch(){
   refreshInsightsIfOpen();
 }
 function clearHighlight(){
+  clearKnock();
   highlightIds.clear();highlightEdges.clear();secondaryIds.clear();
   const el=document.getElementById('filter-count');
   if(el) el.style.display='none';
@@ -8768,6 +8778,77 @@ function syncDemoBannerOffset(){
   }
 }
 window.addEventListener('resize', ()=>{ syncDemoBannerOffset(); });
+// ── Knock-on effects (right-click on a node) ─────────────────────────────────
+// Follows the arrows out from one node, up to three steps. Shows what could be affected.
+// Nothing on the map changes; Esc or a new search clears it.
+function knockEdgeAlpha(i,fallback){
+  if(!KNOCK) return fallback;
+  const k=KNOCK.edgeStep.get(i);
+  if(k===1) return 1;
+  if(k===2) return 0.30;
+  if(k===3) return 0.16;
+  return 0.05;
+}
+function knockNodeAlpha(n,base){
+  if(!KNOCK) return base;
+  return KNOCK.step.get(n.id)===3?0.25:base;
+}
+function computeKnock(originId){
+  const out=new Map();
+  const add=(from,to,i)=>{ if(!out.has(from)) out.set(from,[]); out.get(from).push({to,i}); };
+  edges.forEach((e,i)=>{
+    const s=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+    const t=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+    if(s===t) return;
+    add(s,t,i);                       // arrows point source to target
+    if(e.twoWay) add(t,s,i);          // two-way connections carry it both ways
+  });
+  const step=new Map([[originId,0]]), edgeStep=new Map();
+  let frontier=[originId];
+  for(let k=1;k<=3&&frontier.length;k++){
+    const next=[];
+    frontier.forEach(u=>{
+      (out.get(u)||[]).forEach(({to,i})=>{
+        if(step.has(to)) return;
+        step.set(to,k); edgeStep.set(i,k); next.push(to);
+      });
+    });
+    frontier=next;
+  }
+  step.delete(originId);
+  const counts=[0,0,0,0];
+  step.forEach(k=>counts[k]++);
+  return {step,edgeStep,counts};
+}
+function ctxKnockOn(){
+  const id=ctxMenuNodeId; closeNodeCtxMenu();
+  const n=nodes.find(x=>x.id===id); if(!n) return;
+  const r=computeKnock(id);
+  highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
+  highlightIds.add(id);
+  r.step.forEach((k,nid)=>{ if(k===1) highlightIds.add(nid); else secondaryIds.add(nid); });
+  r.edgeStep.forEach((k,i)=>{ if(k===1) highlightEdges.add(i); });
+  KNOCK={origin:id,label:n.label,step:r.step,edgeStep:r.edgeStep,counts:r.counts};
+  showKnockBanner();
+  draw();
+}
+function showKnockBanner(){
+  const el=document.getElementById('knock-banner');
+  if(!el||!KNOCK) return;
+  const [,d1,d2,d3]=KNOCK.counts;
+  const name=escHtml(KNOCK.label);
+  const body=(d1+d2+d3)
+    ? `<strong>Following arrows from ${name}:</strong>&nbsp;${d1} direct &middot; ${d2} at step 2 &middot; ${d3} at step 3`
+    : `<strong>${name}</strong> has no arrows leading out to follow.`;
+  el.innerHTML=`<span>${body}</span><span style="color:var(--ink-h);margin-left:4px;">Esc clears</span>`;
+  el.style.display='flex';
+}
+function clearKnock(){
+  if(!KNOCK) return;
+  KNOCK=null;
+  const el=document.getElementById('knock-banner');
+  if(el) el.style.display='none';
+}
 // ── Node right-click context menu ────────────────────────────────────────────
 let ctxMenuNodeId=null,_ctxClientX=0,_ctxClientY=0;
 canvas.addEventListener('contextmenu',e=>{
