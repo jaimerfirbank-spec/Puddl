@@ -1158,7 +1158,7 @@ body.share-mode #present-exit{display:none !important;}
   </button>
   <button id="ctx-btn-knock" onclick="ctxKnockOn()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
-    Show knock-on effects
+    Show ripple effects
   </button>
   <div class="ctx-sep"></div>
   <button onclick="ctxDeleteNode()" class="ctx-danger">
@@ -2488,7 +2488,7 @@ wdLogoImg.src=WD_LOGO_SRC;
 wdLogoImg.onload=()=>{ if(nodes.length) draw(); };
 let W=0,H=0;
 let nodes=[],edges=[],loops=[];
-let KNOCK=null; // knock-on state, see ctxKnockOn
+let KNOCK=null; // ripple state, see ctxKnockOn
 let zoom=1,panX=0,panY=0;
 let mode='move';
 let connectFrom=null;
@@ -8778,7 +8778,7 @@ function syncDemoBannerOffset(){
   }
 }
 window.addEventListener('resize', ()=>{ syncDemoBannerOffset(); });
-// ── Knock-on effects (right-click on a node) ─────────────────────────────────
+// ── Ripple effects (right-click on a node) ─────────────────────────────────
 // Follows the arrows out from one node, up to three steps. Shows what could be affected.
 // Nothing on the map changes; Esc or a new search clears it.
 function knockEdgeAlpha(i,fallback){
@@ -8838,7 +8838,7 @@ function showKnockBanner(){
   const [,d1,d2,d3]=KNOCK.counts;
   const name=escHtml(KNOCK.label);
   const body=(d1+d2+d3)
-    ? `<strong>Following arrows from ${name}:</strong>&nbsp;${d1} direct &middot; ${d2} at step 2 &middot; ${d3} at step 3`
+    ? `<strong>Ripple from ${name}:</strong>&nbsp;${d1} direct &middot; ${d2} at step 2 &middot; ${d3} at step 3`
     : `<strong>${name}</strong> has no arrows leading out to follow.`;
   el.innerHTML=`<span>${body}</span><span style="color:var(--ink-h);margin-left:4px;">Esc clears</span>`;
   el.style.display='flex';
