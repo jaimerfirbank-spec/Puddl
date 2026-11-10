@@ -4077,7 +4077,7 @@ function renderInsights(){
   if(!people.length){ body.innerHTML='<div style="color:var(--ink-h);font-size:11px;">Add some nodes to see insights.</div>'; return; }
   const I=computeInsights();
   const esc=escHtml;
-  const plural=(k,w)=>`${k} ${w}${k===1?'':'s'}`;
+  const plural=(k,w)=>w==='person'?`${k} ${k===1?'person':'people'}`:`${k} ${w}${k===1?'':'s'}`;
   const head=t=>`<div style="font-size:10.5px;font-weight:700;letter-spacing:0.04em;color:var(--ink-h);margin:12px 0 4px;">${t}</div>`;
   const none=t=>`<div style="color:var(--ink-h);font-size:11px;padding:3px 6px;">${t}</div>`;
   const row=(n,right)=>`<div onclick="selectSearchSuggestion('${esc(n.id)}')" style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`;
