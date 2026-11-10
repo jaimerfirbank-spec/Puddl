@@ -1221,7 +1221,7 @@ body.share-mode #present-exit{display:none !important;}
       <span id="search-btn-label">Search &amp; filter</span>
     </button>
   </div>
-  <div id="search-panel" style="display:none;position:absolute;z-index:20;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:14px 16px;width:288px;font-family:'DM Sans',sans-serif;">
+  <div id="search-panel" style="display:none;position:absolute;z-index:20;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:14px 16px;width:300px;max-height:calc(100vh - 120px);overflow-y:auto;font-family:'DM Sans',sans-serif;">
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);margin-bottom:10px;">Filter &amp; Search</div>
     <!-- Search with autocomplete -->
     <div style="position:relative;margin-bottom:8px;">
@@ -1244,37 +1244,49 @@ body.share-mode #present-exit{display:none !important;}
       <div class="ms-label">All tags</div>
       <div id="tag-filter-chips" class="ms-chips" style="display:none;"></div>
     </div>
-    <!-- Connection count -->
-    <div style="display:flex;align-items:center;gap:6px;margin:8px 0 6px;font-size:11px;color:var(--ink-m);">
-      <span style="font-weight:600;min-width:74px;">Connections</span>
-      <input type="number" id="conn-min" min="0" placeholder="from" oninput="applyFilters()" style="width:64px;height:28px;font-size:12px;padding:0 6px;">
-      <span>to</span>
-      <input type="number" id="conn-max" min="0" placeholder="to" oninput="applyFilters()" style="width:64px;height:28px;font-size:12px;padding:0 6px;">
-    </div>
-    <!-- Dates -->
-    <div id="date-filter-sec" style="border-top:1px solid var(--bdr);margin-top:8px;padding-top:8px;">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:var(--ink-m);">
-        <span style="font-weight:600;min-width:74px;" title="Show the map as it was on this date">Map as at</span>
-        <input type="date" id="date-asat" onchange="setDateAsAt(this.value)" style="flex:1;height:28px;font-size:12px;padding:0 6px;">
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:var(--ink-m);">
-        <span style="font-weight:600;min-width:74px;" title="Highlight what was added between these dates">Added</span>
-        <input type="date" id="date-from" onchange="applyFilters()" style="flex:1;min-width:0;height:28px;font-size:12px;padding:0 4px;">
-        <span>to</span>
-        <input type="date" id="date-to" onchange="applyFilters()" style="flex:1;min-width:0;height:28px;font-size:12px;padding:0 4px;">
-      </div>
-      <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink-m);cursor:pointer;margin-bottom:8px;">
-        <input type="checkbox" id="timeline-toggle" onchange="setTimeline(this.checked)" style="width:auto;margin:0;accent-color:var(--ink);">
-        <span><strong>Timeline</strong>: a slider to play the map growing over time</span>
-      </label>
-      <div id="date-filter-none" style="display:none;font-size:10.5px;color:var(--ink-h);margin:-2px 0 8px;line-height:1.4;">Nothing on this map has a date yet. New nodes get today's date, or import a "Date added" column.</div>
-    </div>
-    <!-- Insights: calculated from the map as it stands, collapsed by default -->
-    <div id="insights-sec" style="border-top:1px solid var(--bdr);margin-top:8px;padding-top:8px;">
-      <button id="insights-toggle" onclick="toggleInsights()" aria-expanded="false" style="width:100%;display:flex;justify-content:space-between;align-items:center;height:30px;padding:0 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);background:none;border:none;cursor:pointer;">
-        <span>Insights</span><span id="insights-arrow">▸</span>
+    <!-- Connections: dropdown -->
+    <div class="fsec" style="border-top:1px solid var(--bdr);margin-top:8px;padding-top:8px;">
+      <button class="fsec-head" onclick="toggleSec('conn')" aria-expanded="false" style="width:100%;display:flex;justify-content:space-between;align-items:center;height:30px;padding:0 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);background:none;border:none;cursor:pointer;">
+        <span>Connections <span id="sec-conn-badge" style="display:none;margin-left:6px;font-size:9.5px;font-weight:700;color:var(--on-ink);background:var(--ink);border-radius:8px;padding:1px 6px;">ON</span></span><span id="sec-conn-arrow">▸</span>
       </button>
-      <div id="insights-body" style="display:none;margin-top:6px;max-height:240px;overflow-y:auto;font-size:12px;color:var(--ink);"></div>
+      <div id="sec-conn-body" style="display:none;margin-top:6px;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-m);">
+          <span style="font-weight:600;min-width:52px;">Count</span>
+          <input type="number" id="conn-min" min="0" placeholder="from" oninput="applyFilters()" style="width:72px;height:28px;font-size:12px;padding:0 6px;">
+          <span>to</span>
+          <input type="number" id="conn-max" min="0" placeholder="to" oninput="applyFilters()" style="width:72px;height:28px;font-size:12px;padding:0 6px;">
+        </div>
+      </div>
+    </div>
+    <!-- Dates: dropdown -->
+    <div id="date-filter-sec" class="fsec" style="border-top:1px solid var(--bdr);margin-top:8px;padding-top:8px;">
+      <button class="fsec-head" onclick="toggleSec('dates')" aria-expanded="false" style="width:100%;display:flex;justify-content:space-between;align-items:center;height:30px;padding:0 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);background:none;border:none;cursor:pointer;">
+        <span>Dates <span id="sec-dates-badge" style="display:none;margin-left:6px;font-size:9.5px;font-weight:700;color:var(--on-ink);background:var(--ink);border-radius:8px;padding:1px 6px;">ON</span></span><span id="sec-dates-arrow">▸</span>
+      </button>
+      <div id="sec-dates-body" style="display:none;margin-top:6px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:var(--ink-m);">
+          <span style="font-weight:600;min-width:52px;" title="Show the map as it was on this date">As at</span>
+          <input type="date" id="date-asat" onchange="setDateAsAt(this.value)" style="flex:1;height:28px;font-size:12px;padding:0 6px;">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:11px;color:var(--ink-m);">
+          <span style="font-weight:600;min-width:52px;" title="Highlight what was added between these dates">Added</span>
+          <input type="date" id="date-from" onchange="applyFilters()" style="flex:1;min-width:0;height:28px;font-size:12px;padding:0 4px;">
+          <span>to</span>
+          <input type="date" id="date-to" onchange="applyFilters()" style="flex:1;min-width:0;height:28px;font-size:12px;padding:0 4px;">
+        </div>
+        <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:var(--ink-m);cursor:pointer;margin-bottom:6px;">
+          <input type="checkbox" id="timeline-toggle" onchange="setTimeline(this.checked)" style="width:auto;margin:0;accent-color:var(--ink);">
+          <span><strong>Timeline</strong>: watch the map change over time</span>
+        </label>
+        <div id="date-filter-none" style="display:none;font-size:10.5px;color:var(--ink-h);margin:-2px 0 4px;line-height:1.4;">Nothing on this map has a date yet. New nodes get today's date, or import a "Date added" column.</div>
+      </div>
+    </div>
+    <!-- Insights: calculated from the current search, or the full map -->
+    <div class="fsec" style="border-top:1px solid var(--bdr);margin-top:8px;padding-top:8px;">
+      <button id="insights-toggle" class="fsec-head" onclick="toggleSec('insights')" aria-expanded="false" style="width:100%;display:flex;justify-content:space-between;align-items:center;height:30px;padding:0 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);background:none;border:none;cursor:pointer;">
+        <span>Insights</span><span id="sec-insights-arrow">▸</span>
+      </button>
+      <div id="sec-insights-body" style="display:none;margin-top:6px;font-size:12px;color:var(--ink);"></div>
     </div>
     <!-- Hidden selects for compatibility with existing applyFilters() logic -->
     <select id="cat-filter" style="display:none;"></select>
@@ -1285,13 +1297,12 @@ body.share-mode #present-exit{display:none !important;}
     <div style="display:flex;justify-content:space-between;align-items:center;">
       <div id="filter-count" style="font-size:11px;color:var(--ink-h);display:none;"></div>
       <button onclick="clearSearch()" style="font-size:11px;height:28px;padding:0 10px;">Clear</button>
-      <button id="btn-report" onclick="openReport()" style="display:none;font-size:11px;height:28px;padding:0 10px;">📊 Report</button>
     </div>
   </div>
 
   <div id="timeline-year" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:44px;font-weight:800;letter-spacing:-0.02em;color:var(--ink);opacity:0.16;pointer-events:none;z-index:5;font-variant-numeric:tabular-nums;"></div>
   <div id="timeline-bar" style="display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:56px;z-index:15;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--bdr);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px 12px;width:min(640px,calc(100% - 200px));">
-    <button id="timeline-play" onclick="timelinePlay()" title="Play the map growing over time" style="width:32px;height:30px;padding:0;font-size:12px;flex-shrink:0;">▶</button>
+    <button id="timeline-play" onclick="timelinePlay()" title="Play the map changing over time" style="width:32px;height:30px;padding:0;font-size:12px;flex-shrink:0;">▶</button>
     <input type="range" id="timeline-slider" oninput="timelineSlide(this.value)" style="flex:1;accent-color:var(--ink);">
     <div style="display:flex;flex-direction:column;align-items:flex-end;min-width:96px;">
       <span id="timeline-date" style="font-size:12px;font-weight:700;color:var(--ink);"></span>
@@ -3699,7 +3710,7 @@ function fitAll(){
 }
 
 // ── Search / filter ───────────────────────────────────────────────────────────
-function applyFilters(){
+function _applyFiltersCore(){
   const q=document.getElementById('search-input').value.trim().toLowerCase();
   // Multi-select: get arrays of selected values
   const cats=getMsValues('cat-filter');
@@ -3924,36 +3935,50 @@ function selectSearchSuggestion(id){
   updateFilterCount(1,true);
 }
 // ── Insights ─────────────────────────────────────────────────────────────────
-// Read-only summaries of the map as it stands. Nothing here changes the map.
-function toggleInsights(){
-  const body=document.getElementById('insights-body');
+// Read-only summaries. With a search or filter on, they cover the matching people only;
+// with nothing searched they cover the full map. Nothing here changes the map.
+function toggleSec(key){
+  const body=document.getElementById('sec-'+key+'-body');
+  const arrow=document.getElementById('sec-'+key+'-arrow');
+  if(!body) return;
   const open=body.style.display==='none';
   body.style.display=open?'block':'none';
-  document.getElementById('insights-arrow').textContent=open?'▾':'▸';
-  document.getElementById('insights-toggle').setAttribute('aria-expanded',open?'true':'false');
-  if(open) renderInsights();
+  if(arrow) arrow.textContent=open?'▾':'▸';
+  const btn=arrow&&arrow.closest('button');
+  if(btn) btn.setAttribute('aria-expanded',open?'true':'false');
+  if(key==='insights'&&open) renderInsights();
+}
+function toggleInsights(){ toggleSec('insights'); }
+function syncSecBadges(){
+  const conn=CONN_MIN!==null||CONN_MAX!==null;
+  const dates=!!(DATE_ASAT||DATE_FROM||DATE_TO||TIMELINE_ON);
+  const cb=document.getElementById('sec-conn-badge'); if(cb) cb.style.display=conn?'inline-block':'none';
+  const db=document.getElementById('sec-dates-badge'); if(db) db.style.display=dates?'inline-block':'none';
 }
 function computeInsights(){
   const people=nodes.filter(n=>n.type!=='centre');
-  const adj=new Map();
-  nodes.forEach(n=>adj.set(n.id,new Set()));
+  const filtered=highlightIds.size>0;
+  const pool=filtered?people.filter(n=>highlightIds.has(n.id)):people;
+  const inPool=new Set(pool.map(n=>n.id));
+  const adj=new Map(pool.map(n=>[n.id,new Set()]));
+  const edgesIn=[];
   edges.forEach(e=>{
     const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
     const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
-    if(a===b||!adj.has(a)||!adj.has(b)) return;
-    adj.get(a).add(b); adj.get(b).add(a);
+    if(a===b||!inPool.has(a)||!inPool.has(b)) return;
+    adj.get(a).add(b); adj.get(b).add(a); edgesIn.push(e);
   });
-  const deg=new Map(people.map(n=>[n.id,connectionCount(n)]));
-  const byMost=[...people].sort((x,y)=>deg.get(y.id)-deg.get(x.id)||String(x.label).localeCompare(String(y.label)));
-  const byLeast=[...people].sort((x,y)=>deg.get(x.id)-deg.get(y.id)||String(x.label).localeCompare(String(y.label)));
-  const isolated=people.filter(n=>deg.get(n.id)===0).length;
+  const deg=new Map(pool.map(n=>[n.id,adj.get(n.id).size]));
+  const byLabel=(x,y)=>String(x.label).localeCompare(String(y.label));
+  const most=[...pool].sort((x,y)=>deg.get(y.id)-deg.get(x.id)||byLabel(x,y)).slice(0,5);
+  const least=[...pool].sort((x,y)=>deg.get(x.id)-deg.get(y.id)||byLabel(x,y)).slice(0,5);
+  const isolated=pool.filter(n=>deg.get(n.id)===0).length;
 
   // One depth-first pass (iterative, so large maps cannot overflow the stack).
-  // For each person, works out how many others would be cut off if they were removed.
   const disc=new Map(), low=new Map(), sz=new Map(), par=new Map(), sepSum=new Map(), sepMax=new Map();
   const compRoot=new Map(), compSize=new Map();
   let clock=0;
-  nodes.forEach(root=>{
+  pool.forEach(root=>{
     if(disc.has(root.id)) return;
     disc.set(root.id,clock); low.set(root.id,clock); clock++;
     sz.set(root.id,1); par.set(root.id,null); compRoot.set(root.id,root.id);
@@ -3984,41 +4009,128 @@ function computeInsights(){
     }
     compSize.set(root.id,sz.get(root.id));
   });
-  // Cut-off count: nodes in the same group that would be separated from its largest remaining piece.
+  // Bridges: how many people in the same group would be cut off from the largest piece left.
   const bridges=[];
-  nodes.forEach(n=>{
-    if(n.type==='centre') return;
+  pool.forEach(n=>{
     const cs=compSize.get(compRoot.get(n.id));
     const rest=cs-1-(sepSum.get(n.id)||0);
     const biggest=Math.max(sepMax.get(n.id)||0, rest);
     const cutOff=(cs-1)-biggest;
     if(cutOff>0) bridges.push({node:n,cutOff});
   });
-  bridges.sort((a,b)=>b.cutOff-a.cutOff);
-  return {total:people.length,isolated,most:byMost.slice(0,5),least:byLeast.slice(0,5),bridges:bridges.slice(0,5),deg};
+  bridges.sort((a,b)=>b.cutOff-a.cutOff||byLabel(a.node,b.node));
+
+  // Groups: separate linked clusters, with the best-connected person in each.
+  const groupMap=new Map();
+  pool.forEach(n=>{
+    const r=compRoot.get(n.id);
+    const g=groupMap.get(r)||{size:0,best:null};
+    g.size++;
+    if(!g.best||deg.get(n.id)>deg.get(g.best.id)) g.best=n;
+    groupMap.set(r,g);
+  });
+  const groupList=[...groupMap.values()].sort((a,b)=>b.size-a.size);
+  const linked=groupList.filter(g=>g.size>=2);
+  const alone=groupList.filter(g=>g.size===1).length;
+
+  const cats={};
+  pool.forEach(n=>{ const k=n.colourLabel||'No category'; cats[k]=(cats[k]||0)+1; });
+
+  const fieldDefs=(typeof FIELD_DEFS!=='undefined'&&Array.isArray(FIELD_DEFS))?FIELD_DEFS:[];
+  const fieldSummaries=fieldDefs.map(f=>{
+    const counts={}; let filled=0;
+    pool.forEach(n=>{
+      const v=n.customFields&&n.customFields[f.id];
+      if(v===undefined||v===null||String(v).trim()==='') return;
+      filled++;
+      const k=String(v).trim(); counts[k]=(counts[k]||0)+1;
+    });
+    return {name:f.name,filled,top:Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,4)};
+  }).filter(f=>f.filled>0);
+
+  const types={};
+  edgesIn.forEach(e=>{ const k=e.strength||'moderate'; types[k]=(types[k]||0)+1; });
+  const typeLabel=k=>{
+    const st=(typeof CONNECTION_STYLES!=='undefined')&&CONNECTION_STYLES.find(s=>s.id===k);
+    return (st&&st.label)||k.charAt(0).toUpperCase()+k.slice(1);
+  };
+
+  const years={};
+  const yearOf=d=>{ const m=/^(\d{4})/.exec(d||''); return m?m[1]:null; };
+  pool.forEach(n=>{ const y=yearOf(n.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].p++; });
+  edgesIn.forEach(e=>{ const y=yearOf(e.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].c++; });
+
+  return {filtered,pool,deg,most,least,isolated,bridges:bridges.slice(0,5),linked,alone,
+          groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length};
 }
 function renderInsights(){
-  const body=document.getElementById('insights-body');
+  const body=document.getElementById('sec-insights-body');
   if(!body) return;
   const people=nodes.filter(n=>n.type!=='centre');
   if(!people.length){ body.innerHTML='<div style="color:var(--ink-h);font-size:11px;">Add some nodes to see insights.</div>'; return; }
   const I=computeInsights();
-  const row=(n,right)=>`<div onclick="selectSearchSuggestion('${escHtml(n.id)}')" style="display:flex;justify-content:space-between;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`;
-  const head=t=>`<div style="font-size:10.5px;font-weight:700;color:var(--ink-h);margin:8px 0 2px;">${t}</div>`;
+  const esc=escHtml;
   const plural=(k,w)=>`${k} ${w}${k===1?'':'s'}`;
-  let h=`<div style="color:var(--ink-h);font-size:11px;">${plural(I.total,'person')} on the map. ${plural(I.isolated,'person')} with no connections.</div>`;
-  h+=head('Most connected');
-  h+=I.most.map(n=>row(n,plural(I.deg.get(n.id),'connection'))).join('');
-  h+=head('Fewest connections');
-  h+=I.least.map(n=>row(n,plural(I.deg.get(n.id),'connection'))).join('');
-  h+=head('Bridges: removing one would cut others off');
-  h+=I.bridges.length
-    ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('')
-    : '<div style="color:var(--ink-h);font-size:11px;padding:4px 6px;">No single person links separate groups.</div>';
-  h+=`<div style="margin-top:8px;text-align:right;"><button onclick="renderInsights()" style="font-size:11px;height:24px;padding:0 8px;">Refresh</button></div>`;
+  const head=t=>`<div style="font-size:10.5px;font-weight:700;letter-spacing:0.04em;color:var(--ink-h);margin:12px 0 4px;">${t}</div>`;
+  const none=t=>`<div style="color:var(--ink-h);font-size:11px;padding:3px 6px;">${t}</div>`;
+  const row=(n,right)=>`<div onclick="selectSearchSuggestion('${esc(n.id)}')" style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`;
+  const pair=(a,b)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 6px;"><span>${a}</span><span style="color:var(--ink-h);">${b}</span></div>`;
+  const bar=pct=>`<div style="height:6px;border-radius:3px;background:var(--ink);opacity:.7;width:${Math.max(2,Math.round(pct))}%;margin:2px 6px 6px;"></div>`;
+
+  let h = I.filtered
+    ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--surf-3);font-size:11.5px;"><span><strong>Filtered view:</strong> ${plural(I.pool.length,'person')}</span><button onclick="clearSearch()" style="font-size:10.5px;height:24px;padding:0 8px;">Show full map</button></div>`
+    : `<div style="font-size:11.5px;color:var(--ink-h);">Full map: ${plural(I.pool.length,'person')}. Search or filter to look at part of it.</div>`;
+  h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these people. ${plural(I.isolated,'person')} with none.</div>`;
+
+  h += head('Most connected');
+  h += I.most.length ? I.most.map(n=>row(n,plural(I.deg.get(n.id),'connection'))).join('') : none('None yet.');
+  h += head('Fewest connections');
+  h += I.least.map(n=>row(n,plural(I.deg.get(n.id),'connection'))).join('');
+  h += head('Bridges: removing one person cuts others off');
+  h += I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none('No single person links separate groups.');
+
+  h += head('Groups');
+  h += pair(plural(I.linked.length,'linked group'), plural(I.alone,'person')+' on their own');
+  h += I.linked.slice(0,5).map(g=>row(g.best,`group of ${g.size}`)).join('');
+
+  h += head('By category');
+  const cEntries=Object.entries(I.cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const cMax=cEntries.length?cEntries[0][1]:1;
+  h += cEntries.map(([k,v])=>`<div style="padding:3px 6px 0;display:flex;justify-content:space-between;font-size:11.5px;"><span>${esc(k)}</span><span style="color:var(--ink-h);">${v}</span></div>${bar(v/cMax*100)}`).join('') || none('Nothing to count yet.');
+
+  h += head('By field');
+  if(!I.fieldSummaries.length) h += none('No field values filled in yet.');
+  I.fieldSummaries.forEach(f=>{
+    h += `<div style="padding:4px 6px 0;font-size:11px;font-weight:600;color:var(--ink-h);">${esc(f.name)} <span style="font-weight:400;">(${f.filled} filled in)</span></div>`;
+    h += f.top.map(([k,v])=>pair(esc(k),v)).join('');
+  });
+
+  h += head('Connection types');
+  const tEntries=Object.entries(I.types).sort((a,b)=>b[1]-a[1]);
+  h += tEntries.length ? tEntries.map(([k,v])=>pair(esc(I.typeLabel(k)),v)).join('') : none('No connections in this view.');
+
+  h += head('Growth by year');
+  const ys=Object.keys(I.years).sort();
+  if(!ys.length){
+    h += none('No dates yet. Import a "Date added" column, or new items get today\'s date.');
+  } else {
+    const yMax=Math.max(...ys.map(y=>I.years[y].p+I.years[y].c),1);
+    h += ys.map(y=>`<div style="padding:3px 6px 0;display:flex;justify-content:space-between;font-size:11.5px;"><span>${y}</span><span style="color:var(--ink-h);">${I.years[y].p} people, ${I.years[y].c} connections</span></div>${bar((I.years[y].p+I.years[y].c)/yMax*100)}`).join('');
+  }
+
+  h += `<div style="margin-top:10px;display:flex;justify-content:space-between;gap:6px;"><button onclick="renderInsights()" style="font-size:11px;height:26px;padding:0 10px;">Refresh</button><button onclick="openReport()" title="The matrix, strength and version views" style="font-size:11px;height:26px;padding:0 10px;">Full report</button></div>`;
   body.innerHTML=h;
 }
+function refreshInsightsIfOpen(){
+  const body=document.getElementById('sec-insights-body');
+  if(body&&body.style.display!=='none') renderInsights();
+}
 
+function applyFilters(){
+  _applyFiltersCore();
+  syncSecBadges();
+  refreshInsightsIfOpen();
+}
 function clearSearch(){
   document.getElementById('search-input').value='';
   // Clear all multi-select chips
@@ -4038,11 +4150,11 @@ function clearSearch(){
   if(TIMELINE_ON) setTimeline(false); else if(DATE_ASAT) setDateAsAt(null);
   updateFilterCount(0,false);
   clearHighlight();
+  syncSecBadges();
+  refreshInsightsIfOpen();
 }
 function clearHighlight(){
   highlightIds.clear();highlightEdges.clear();secondaryIds.clear();
-  const btn=document.getElementById('btn-report');
-  if(btn) btn.style.display='none';
   const el=document.getElementById('filter-count');
   if(el) el.style.display='none';
   draw();
@@ -5103,6 +5215,7 @@ function setDateAsAt(v){
   applyFilters();
 }
 function syncDateFilterUI(){
+  syncSecBadges();
   const none=document.getElementById('date-filter-none');
   if(none) none.style.display=mapDateRange()?'none':'block';
   const a=document.getElementById('date-asat'); if(a) a.value=DATE_ASAT||'';
@@ -6858,20 +6971,10 @@ let namedVersions = []; // [{name, date, snap}]
 // Show/hide report button based on filter activity
 function updateFilterCount(count, active){
   const el=document.getElementById('filter-count');
-  const btn=document.getElementById('btn-report');
-  if(!active){
-    el.style.display='none';
-    if(btn){ btn.style.display='none'; }
-    return;
-  }
+  if(!active){ el.style.display='none'; return; }
   const total=nodes.filter(n=>n.type!=='centre').length;
   el.style.display='block';
   el.textContent=`${count} of ${total} node${total!==1?'s':''}`;
-  if(btn && btn.style.display==='none'){
-    btn.style.display='inline-flex';
-    btn.style.alignItems='center';
-    btn.style.animation='reportPop .18s ease';
-  }
 }
 
 // Also show report button whenever a search/filter is active even with 0 results
