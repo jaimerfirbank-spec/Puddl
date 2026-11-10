@@ -1269,6 +1269,13 @@ body.share-mode #present-exit{display:none !important;}
       </label>
       <div id="date-filter-none" style="display:none;font-size:10.5px;color:var(--ink-h);margin:-2px 0 8px;line-height:1.4;">Nothing on this map has a date yet. New nodes get today's date, or import a "Date added" column.</div>
     </div>
+    <!-- Insights: calculated from the map as it stands, collapsed by default -->
+    <div id="insights-sec" style="border-top:1px solid var(--bdr);margin-top:8px;padding-top:8px;">
+      <button id="insights-toggle" onclick="toggleInsights()" aria-expanded="false" style="width:100%;display:flex;justify-content:space-between;align-items:center;height:30px;padding:0 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);background:none;border:none;cursor:pointer;">
+        <span>Insights</span><span id="insights-arrow">▸</span>
+      </button>
+      <div id="insights-body" style="display:none;margin-top:6px;max-height:240px;overflow-y:auto;font-size:12px;color:var(--ink);"></div>
+    </div>
     <!-- Hidden selects for compatibility with existing applyFilters() logic -->
     <select id="cat-filter" style="display:none;"></select>
     <select id="area-filter" style="display:none;"></select>
@@ -3916,6 +3923,102 @@ function selectSearchSuggestion(id){
   draw();
   updateFilterCount(1,true);
 }
+// ── Insights ─────────────────────────────────────────────────────────────────
+// Read-only summaries of the map as it stands. Nothing here changes the map.
+function toggleInsights(){
+  const body=document.getElementById('insights-body');
+  const open=body.style.display==='none';
+  body.style.display=open?'block':'none';
+  document.getElementById('insights-arrow').textContent=open?'▾':'▸';
+  document.getElementById('insights-toggle').setAttribute('aria-expanded',open?'true':'false');
+  if(open) renderInsights();
+}
+function computeInsights(){
+  const people=nodes.filter(n=>n.type!=='centre');
+  const adj=new Map();
+  nodes.forEach(n=>adj.set(n.id,new Set()));
+  edges.forEach(e=>{
+    const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+    const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+    if(a===b||!adj.has(a)||!adj.has(b)) return;
+    adj.get(a).add(b); adj.get(b).add(a);
+  });
+  const deg=new Map(people.map(n=>[n.id,connectionCount(n)]));
+  const byMost=[...people].sort((x,y)=>deg.get(y.id)-deg.get(x.id)||String(x.label).localeCompare(String(y.label)));
+  const byLeast=[...people].sort((x,y)=>deg.get(x.id)-deg.get(y.id)||String(x.label).localeCompare(String(y.label)));
+  const isolated=people.filter(n=>deg.get(n.id)===0).length;
+
+  // One depth-first pass (iterative, so large maps cannot overflow the stack).
+  // For each person, works out how many others would be cut off if they were removed.
+  const disc=new Map(), low=new Map(), sz=new Map(), par=new Map(), sepSum=new Map(), sepMax=new Map();
+  const compRoot=new Map(), compSize=new Map();
+  let clock=0;
+  nodes.forEach(root=>{
+    if(disc.has(root.id)) return;
+    disc.set(root.id,clock); low.set(root.id,clock); clock++;
+    sz.set(root.id,1); par.set(root.id,null); compRoot.set(root.id,root.id);
+    const frames=[{v:root.id,it:[...adj.get(root.id)],i:0}];
+    while(frames.length){
+      const f=frames[frames.length-1];
+      if(f.i<f.it.length){
+        const w=f.it[f.i++];
+        if(!disc.has(w)){
+          disc.set(w,clock); low.set(w,clock); clock++;
+          sz.set(w,1); par.set(w,f.v); compRoot.set(w,root.id);
+          frames.push({v:w,it:[...adj.get(w)],i:0});
+        } else if(w!==par.get(f.v)){
+          low.set(f.v,Math.min(low.get(f.v),disc.get(w)));
+        }
+      } else {
+        frames.pop();
+        const v=f.v, pv=par.get(v);
+        if(pv!==null){
+          low.set(pv,Math.min(low.get(pv),low.get(v)));
+          sz.set(pv,sz.get(pv)+sz.get(v));
+          if(low.get(v)>=disc.get(pv)){
+            sepSum.set(pv,(sepSum.get(pv)||0)+sz.get(v));
+            sepMax.set(pv,Math.max(sepMax.get(pv)||0,sz.get(v)));
+          }
+        }
+      }
+    }
+    compSize.set(root.id,sz.get(root.id));
+  });
+  // Cut-off count: nodes in the same group that would be separated from its largest remaining piece.
+  const bridges=[];
+  nodes.forEach(n=>{
+    if(n.type==='centre') return;
+    const cs=compSize.get(compRoot.get(n.id));
+    const rest=cs-1-(sepSum.get(n.id)||0);
+    const biggest=Math.max(sepMax.get(n.id)||0, rest);
+    const cutOff=(cs-1)-biggest;
+    if(cutOff>0) bridges.push({node:n,cutOff});
+  });
+  bridges.sort((a,b)=>b.cutOff-a.cutOff);
+  return {total:people.length,isolated,most:byMost.slice(0,5),least:byLeast.slice(0,5),bridges:bridges.slice(0,5),deg};
+}
+function renderInsights(){
+  const body=document.getElementById('insights-body');
+  if(!body) return;
+  const people=nodes.filter(n=>n.type!=='centre');
+  if(!people.length){ body.innerHTML='<div style="color:var(--ink-h);font-size:11px;">Add some nodes to see insights.</div>'; return; }
+  const I=computeInsights();
+  const row=(n,right)=>`<div onclick="selectSearchSuggestion('${escHtml(n.id)}')" style="display:flex;justify-content:space-between;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`;
+  const head=t=>`<div style="font-size:10.5px;font-weight:700;color:var(--ink-h);margin:8px 0 2px;">${t}</div>`;
+  const plural=(k,w)=>`${k} ${w}${k===1?'':'s'}`;
+  let h=`<div style="color:var(--ink-h);font-size:11px;">${plural(I.total,'person')} on the map. ${plural(I.isolated,'person')} with no connections.</div>`;
+  h+=head('Most connected');
+  h+=I.most.map(n=>row(n,plural(I.deg.get(n.id),'connection'))).join('');
+  h+=head('Fewest connections');
+  h+=I.least.map(n=>row(n,plural(I.deg.get(n.id),'connection'))).join('');
+  h+=head('Bridges: removing one would cut others off');
+  h+=I.bridges.length
+    ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('')
+    : '<div style="color:var(--ink-h);font-size:11px;padding:4px 6px;">No single person links separate groups.</div>';
+  h+=`<div style="margin-top:8px;text-align:right;"><button onclick="renderInsights()" style="font-size:11px;height:24px;padding:0 8px;">Refresh</button></div>`;
+  body.innerHTML=h;
+}
+
 function clearSearch(){
   document.getElementById('search-input').value='';
   // Clear all multi-select chips
