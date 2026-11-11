@@ -1243,7 +1243,7 @@ body.share-mode #present-exit{display:none !important;}
       <span id="search-btn-label">Search &amp; filter</span>
     </button>
   </div>
-  <div id="search-panel" style="display:none;position:absolute;z-index:20;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:14px 16px;width:300px;max-height:calc(100vh - 120px);overflow-y:auto;font-family:'DM Sans',sans-serif;">
+  <div id="search-panel" style="display:none;position:absolute;z-index:20;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:14px 16px;width:300px;max-height:calc(100vh - 190px - var(--demo-banner-offset, 0px));overflow-y:auto;overscroll-behavior:contain;font-family:'DM Sans',sans-serif;">
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);margin-bottom:10px;">Filter &amp; Search</div>
     <!-- Search with autocomplete -->
     <div style="position:relative;margin-bottom:8px;">
@@ -5644,12 +5644,13 @@ function spreadNodes(factor){
 function rotateMap(deg){
   if(!nodes.length) return;
   const rad=deg*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
-  const cx=nodes.reduce((a,n)=>a+n.x,0)/nodes.length, cy=nodes.reduce((a,n)=>a+n.y,0)/nodes.length;
+  // Pivot on the centre of the current view, and leave zoom and pan alone
+  const cx=(W/2-panX)/zoom, cy=(H/2-panY)/zoom;
   const rot=(x,y)=>[cx+(x-cx)*cos-(y-cy)*sin, cy+(x-cx)*sin+(y-cy)*cos];
   nodes.forEach(n=>{ const r=rot(n.x,n.y); n.x=n.fx=r[0]; n.y=n.fy=r[1]; n.pinned=true; });
   loops.forEach(lp=>{ if(lp.cx!==undefined){ const r=rot(lp.cx,lp.cy); lp.cx=r[0]; lp.cy=r[1]; } });
   addLog('rotated map');
-  saveState(); markUnsaved(); fitAll();
+  saveState(); markUnsaved(); draw();
   showStatus('Rotated '+(deg<0?'left':'right')+'. Undo puts it back.');
 }
 function tidyLayout(){
