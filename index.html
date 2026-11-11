@@ -2274,8 +2274,21 @@ function selectConnColour(col){
           <select id="settings-colour-by" onchange="setColourBy(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);"></select>
         </div>
         <div style="margin-bottom:24px;">
-          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Big maps</h4>
-          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Simple drawing uses small squares and straight lines so very large maps stay smooth. Names show once you zoom in far enough to read them.</p>
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Large map display</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Maps with 300 nodes or more get darker nodes, smaller nodes and thinner connections so they stay readable. Simple drawing uses small squares and straight lines from 600 nodes, so very large maps stay smooth.</p>
+          <div style="font-size:12px;font-weight:600;color:var(--ink);margin:12px 0 4px 0;">Node contrast</div>
+          <select id="settings-node-contrast" onchange="setNodeContrast(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);">
+            <option value="auto">Automatic (dark from 300 nodes)</option>
+            <option value="always">Always dark</option>
+            <option value="never">Never, keep each node's colour</option>
+          </select>
+          <div style="font-size:12px;font-weight:600;color:var(--ink);margin:12px 0 4px 0;">Node size</div>
+          <select id="settings-node-size" onchange="setNodeSizeMode(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);">
+            <option value="auto">Automatic (smaller from 300 nodes)</option>
+            <option value="always">Always smaller</option>
+            <option value="never">Never, normal size</option>
+          </select>
+          <div style="font-size:12px;font-weight:600;color:var(--ink);margin:12px 0 4px 0;">Simple drawing</div>
           <select id="settings-simple-mode" onchange="setSimpleMode(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);">
             <option value="auto">Automatic (simple from 600 nodes)</option>
             <option value="on">Always simple</option>
@@ -2523,11 +2536,25 @@ const _dateHidden=new Set();              // map's own node fields: [{id,name}] 
 let SIZE_BY_CONNECTIONS=false;   // true whenever SIZE_BY is set (kept for the radius refresh logic)
 let SIMPLE_MODE='auto';          // 'auto' | 'on' | 'off' — fast square drawing for big maps
 const SIMPLE_THRESHOLD=600;
-const THIN_LINES_AT=500;          // from this many nodes, lines are drawn fine (widths scaled by strength)
+const THIN_LINES_AT=300;          // from this many nodes, lines are drawn fine (widths scaled by strength)
 function thinLinesOn(){ return nodes.length>=THIN_LINES_AT; }
+// Large map display: dark nodes and smaller nodes from LARGE_MAP_AT nodes. Each setting: 'auto' | 'always' | 'never'.
+const LARGE_MAP_AT=300;
+const SMALLER_NODE_SCALE=0.7;
+let NODE_CONTRAST='auto';
+let NODE_SIZE_MODE='auto';
+function largeMapOn(){ return nodes.length>=LARGE_MAP_AT; }
+function nodeSizeScale(){ const m=NODE_SIZE_MODE; return (m==='always'||(m==='auto'&&largeMapOn()))?SMALLER_NODE_SCALE:1; }
+// Dark ink for a node's body on large maps. Returns null when the node keeps its own colour.
+function nodeInk(n){
+  if(COLOUR_BY) return null;
+  if(n.type==='centre'||n.outline||n.iconId) return null;
+  const m=NODE_CONTRAST; if(!(m==='always'||(m==='auto'&&largeMapOn()))) return null;
+  return document.documentElement.getAttribute('data-theme')==='dark'?'#ffffff':'#18181b';
+}
 // Fixed fine widths for big maps, in screen-independent world units (before zoom).
-const THIN_WIDTH={strong:1.1,bold:1.5,moderate:0.8,weak:0.45,dashed:0.8,double:0.8};
-function thinWidth(st){ return THIN_WIDTH[st.id]||0.8; }
+const THIN_WIDTH={strong:1.4,bold:1.2,moderate:1.0,weak:0.8,dashed:1.0,double:1.0};
+function thinWidth(st){ return THIN_WIDTH[st.id]||1.0; }
 let _thinShown=null;
 function syncStrengthLegend(){
   const el=document.getElementById('strength-legend');
@@ -2699,6 +2726,7 @@ function nodeDims(n){
   const maxTW=Math.max(lw,catW,areaW);
   let r = n.nodeSize==='small' ? 28 : n.nodeSize==='large' ? 60 : n.nodeSize==='xl' ? 120 : n.nodeSize==='xxl' ? 240 : 40;
   if(SIZE_BY_CONNECTIONS){ r = Math.round(r * sizeScale(n)); }
+  r = Math.round(r * nodeSizeScale());
   return {w:r*2, h:r*2, r, tagText:'', FS};
 }
 
@@ -2804,6 +2832,8 @@ function snap(){
     sizeByConnections:SIZE_BY==='connections',
     sizeBy:SIZE_BY,
     simpleMode:SIMPLE_MODE,
+    nodeContrast:NODE_CONTRAST,
+    nodeSizeMode:NODE_SIZE_MODE,
     colourBy:COLOUR_BY,
     defaultNodeStyle:DEFAULT_NODE_OUTLINE?'outline':'filled',
   });
@@ -2857,6 +2887,8 @@ function restoreSnap(s){
   SIZE_BY=typeof d.sizeBy==='string'?d.sizeBy:(d.sizeByConnections?'connections':'');
   COLOUR_BY=typeof d.colourBy==='string'?d.colourBy:'';
   SIMPLE_MODE=['auto','on','off'].includes(d.simpleMode)?d.simpleMode:'auto';
+  NODE_CONTRAST=['auto','always','never'].includes(d.nodeContrast)?d.nodeContrast:'auto';
+  NODE_SIZE_MODE=['auto','always','never'].includes(d.nodeSizeMode)?d.nodeSizeMode:'auto';
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
   if(d.defaultNodeStyle) DEFAULT_NODE_OUTLINE=d.defaultNodeStyle==='outline';
   if(inPresentationEditMode) rebuildPresStopList();
@@ -2909,6 +2941,7 @@ function adaptColourForDark(col){
 function _simpleR(n){
   let r=n.nodeSize==='small'?5:n.nodeSize==='large'?8:n.nodeSize==='xl'?11:n.nodeSize==='xxl'?15:6.5;
   if(SIZE_BY) r=r*sizeScale(n);
+  r=r*nodeSizeScale();
   return r;
 }
 function _viewBounds(pad){
@@ -2952,9 +2985,9 @@ function drawSimpleNodes(hasHL,_dark){
     const isHl=highlightIds.has(n.id), isSec=secondaryIds.has(n.id)&&!isHl;
     ctx.globalAlpha=knockNodeAlpha(n,hasHL&&!isHl&&!isSec?0.10:isSec?0.45:1);
     const r=Math.max(_simpleR(n),2.2/zoom);
-    ctx.fillStyle=nodeFill(n);
+    ctx.fillStyle=nodeInk(n)||nodeFill(n);
     ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
-    if(isHl){ ctx.strokeStyle=_dark?'#fff':'#18181b'; ctx.lineWidth=2/zoom; ctx.strokeRect(n.x-r,n.y-r,r*2,r*2); }
+    if(isHl){ ctx.strokeStyle=nodeInk(n)?'#f59e0b':(_dark?'#fff':'#18181b'); ctx.lineWidth=2/zoom; ctx.strokeRect(n.x-r,n.y-r,r*2,r*2); }
     if(showNodeLabels&&(zoom>=0.9||isHl||isSec)) labels.push([n,r,ctx.globalAlpha]);
   });
   if(labels.length){
@@ -2983,6 +3016,18 @@ function drawSimpleNodes(hasHL,_dark){
     }
   }
   ctx.restore(); ctx.globalAlpha=1;
+}
+function setNodeContrast(v){
+  NODE_CONTRAST=['auto','always','never'].includes(v)?v:'auto';
+  syncLargeMapUI(); saveState(); markUnsaved(); draw();
+}
+function setNodeSizeMode(v){
+  NODE_SIZE_MODE=['auto','always','never'].includes(v)?v:'auto';
+  syncLargeMapUI(); saveState(); markUnsaved(); draw();
+}
+function syncLargeMapUI(){
+  const c=document.getElementById('settings-node-contrast'); if(c) c.value=NODE_CONTRAST;
+  const z=document.getElementById('settings-node-size'); if(z) z.value=NODE_SIZE_MODE;
 }
 function setSimpleMode(v){
   SIMPLE_MODE=['auto','on','off'].includes(v)?v:'auto';
@@ -3164,7 +3209,7 @@ function draw(){
       // Stop the arc stroke one arrowhead-length before the tip so the filled triangle sits on top cleanly
       const arcAdjEnd=antiCW ? arcEndAngle+as/loopC.r : arcEndAngle-as/loopC.r;
       ctx.strokeStyle=drawStroke;
-      ctx.lineWidth=(isHl?lw+(thinLinesOn()?0.4:1):lw)/zoom;
+      ctx.lineWidth=(isHl?lw+(thinLinesOn()?0.6:1):lw)/zoom;
       if(style.dashPattern) ctx.setLineDash(style.dashPattern.map(d=>d/zoom));
       if(style.isDouble&&!dimmed){
         const off=3/zoom;
@@ -3207,7 +3252,7 @@ function draw(){
         ctx.beginPath();
         ctx.moveTo(apS.x,apS.y);
         ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y);
-        ctx.strokeStyle=drawStroke;ctx.lineWidth=(isHl?lw+(thinLinesOn()?0.4:1):lw)/zoom;
+        ctx.strokeStyle=drawStroke;ctx.lineWidth=(isHl?lw+(thinLinesOn()?0.6:1):lw)/zoom;
         if(style.dashPattern){ctx.setLineDash(style.dashPattern.map(d=>d/zoom));}
         else{ctx.setLineDash([]);}
         ctx.stroke();ctx.setLineDash([]);
@@ -3448,11 +3493,18 @@ function draw(){
       ctx.lineWidth=2/zoom;
       ctx.stroke();
     } else {
-      ctx.fillStyle=nodeCol;
+      const _ink=nodeInk(n);
+      ctx.fillStyle=_ink||nodeCol;
       ctx.fill();
-      // Subtle border — slightly darker than fill
-      ctx.strokeStyle=_dark?'rgba(255,255,255,0.18)':'rgba(0,0,0,0.12)';
-      ctx.lineWidth=(isHl?2.5:1.5)/zoom;
+      if(_ink){
+        // Ring in the node's own colour so categories still show on a dark node
+        ctx.strokeStyle=isHl?'#f59e0b':(n.colour||'#888');
+        ctx.lineWidth=(isHl?4:3)/zoom;
+      } else {
+        // Subtle border, slightly darker than fill
+        ctx.strokeStyle=_dark?'rgba(255,255,255,0.18)':'rgba(0,0,0,0.12)';
+        ctx.lineWidth=(isHl?2.5:1.5)/zoom;
+      }
       ctx.stroke();
     }
     ctx.shadowBlur=0;
@@ -10306,6 +10358,7 @@ function syncNodeStyleButtons(){
 
 function syncSizeByConnButtons(){
   { const sm=document.getElementById('settings-simple-mode'); if(sm) sm.value=SIMPLE_MODE; }
+  syncLargeMapUI();
   const ss=document.getElementById('settings-size-by'), cs=document.getElementById('settings-colour-by');
   const opt=(v,t,sel)=>'<option value="'+escHtml(v)+'"'+(v===sel?' selected':'')+'>'+escHtml(t)+'</option>';
   if(ss){
