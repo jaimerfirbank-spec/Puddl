@@ -1305,6 +1305,7 @@ body.share-mode #present-exit{display:none !important;}
   </div>
 
   <div id="knock-banner" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:16;align-items:center;gap:6px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:7px 12px;font-size:12px;color:var(--ink);max-width:min(620px,calc(100% - 240px));"></div>
+  <div id="strength-legend" style="display:none;position:absolute;left:12px;bottom:12px;z-index:12;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:8px 10px;font-size:11px;color:var(--ink);pointer-events:none;"></div>
   <div id="timeline-year" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:44px;font-weight:800;letter-spacing:-0.02em;color:var(--ink);opacity:0.16;pointer-events:none;z-index:5;font-variant-numeric:tabular-nums;"></div>
   <div id="timeline-bar" style="display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:56px;z-index:15;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--bdr);border-radius:12px;box-shadow:var(--shadow-lg);padding:8px 12px;width:min(640px,calc(100% - 200px));">
     <button id="timeline-play" onclick="timelinePlay()" title="Play the map changing over time" style="width:32px;height:30px;padding:0;font-size:12px;flex-shrink:0;">▶</button>
@@ -2409,12 +2410,12 @@ let LOOP_CONNECTION_STYLE = {id:'loop',label:'Loop',colour:'#3B82F6',lineWidth:2
 
 // Connection styles configuration
 let CONNECTION_STYLES = [
-  {id:'strong', label:'', colour:'#1E40AF', lineWidth:4.5, dashPattern:[], arrowScale:1.3},
-  {id:'moderate', label:'', colour:'#3B82F6', lineWidth:2.2, dashPattern:[], arrowScale:1},
-  {id:'weak', label:'', colour:'#888888', lineWidth:1.2, dashPattern:[], arrowScale:0.75},
-  {id:'bold', label:'', colour:'#0F172A', lineWidth:7, dashPattern:[], arrowScale:1.8},
-  {id:'dashed', label:'', colour:'#64748B', lineWidth:2.2, dashPattern:[8,4], arrowScale:1},
-  {id:'double', label:'', colour:'#059669', lineWidth:2, dashPattern:[], arrowScale:1, isDouble:true}
+  {id:'strong', label:'Strong', colour:'#1E40AF', lineWidth:4.5, dashPattern:[], arrowScale:1.3},
+  {id:'moderate', label:'Moderate', colour:'#3B82F6', lineWidth:2.2, dashPattern:[], arrowScale:1},
+  {id:'weak', label:'Weak', colour:'#888888', lineWidth:1.2, dashPattern:[], arrowScale:0.75},
+  {id:'bold', label:'Bold', colour:'#0F172A', lineWidth:7, dashPattern:[], arrowScale:1.8},
+  {id:'dashed', label:'Dashed', colour:'#64748B', lineWidth:2.2, dashPattern:[8,4], arrowScale:1},
+  {id:'double', label:'Double', colour:'#059669', lineWidth:2, dashPattern:[], arrowScale:1, isDouble:true}
 ];
 
 
@@ -2521,7 +2522,24 @@ let TIMELINE_ON=false;
 const _dateHidden=new Set();              // map's own node fields: [{id,name}] — values live in node.customFields[id]
 let SIZE_BY_CONNECTIONS=false;   // true whenever SIZE_BY is set (kept for the radius refresh logic)
 let SIMPLE_MODE='auto';          // 'auto' | 'on' | 'off' — fast square drawing for big maps
-const SIMPLE_THRESHOLD=600;      // nodes at which 'auto' switches to simple drawing
+const SIMPLE_THRESHOLD=600;
+const THIN_LINES_AT=500;          // from this many nodes, lines are drawn fine (widths scaled by strength)
+function thinLinesOn(){ return nodes.length>=THIN_LINES_AT; }
+let _thinShown=null;
+function syncStrengthLegend(){
+  const el=document.getElementById('strength-legend');
+  if(!el) return;
+  const on=thinLinesOn();
+  if(!on){ el.style.display='none'; return; }
+  el.innerHTML='<div style="font-weight:700;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-h);margin-bottom:6px;">Connection strength</div>'+
+    CONNECTION_STYLES.filter(st=>st.id!=='loop').map(st=>{
+      const dash=(st.dashPattern&&st.dashPattern.length)?'dashed':'solid';
+      const h=st.isDouble?'4px double':'';
+      const bw=st.isDouble?'3px double':(st.lineWidth*0.45)+'px '+dash;
+      return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;"><span style="width:36px;border-top:${bw} ${st.colour};display:inline-block;"></span><span>${st.label}</span></div>`;
+    }).join('');
+  el.style.display='block';
+}      // nodes at which 'auto' switches to simple drawing
 let _simpleNow=false;
 let SIZE_BY='';                  // '' | 'connections' | 'field:<id>'
 let COLOUR_BY='';                // '' | 'connections' | 'field:<id>'
@@ -2971,6 +2989,7 @@ function setSimpleMode(v){
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function draw(){
+  const _tn=thinLinesOn(); if(_tn!==_thinShown){ _thinShown=_tn; syncStrengthLegend(); }
   _degCache=null; _fieldStatCache={};
   _simpleNow=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&nodes.length>=SIMPLE_THRESHOLD);
   if(SIZE_BY_CONNECTIONS&&sim&&edges.length!==_sizeSigEdges){
@@ -3100,7 +3119,7 @@ function draw(){
     const _rawEdgeCol=e.colour||(isHl?'#FF8C8C':style.colour);
     const edgeCol=_dark?adaptColourForDark(_rawEdgeCol):_rawEdgeCol;
     // Line weight + dash pattern by type
-    const lw = style.lineWidth;
+    const lw = thinLinesOn()? style.lineWidth*0.45 : style.lineWidth;
     // Arrow size by type
     const arrowScale = style.arrowScale;
 
