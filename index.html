@@ -4067,9 +4067,20 @@ function computeInsights(){
     adj.get(a).add(b); adj.get(b).add(a); edgesIn.push(e);
   });
   const deg=new Map(pool.map(n=>[n.id,adj.get(n.id).size]));
+  // Total connections per person across the whole map, including links to people outside the filter
+  const peopleIds=new Set(people.map(n=>n.id));
+  const totalAdj=new Map(pool.map(n=>[n.id,new Set()]));
+  edges.forEach(e=>{
+    const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+    const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+    if(a===b||!peopleIds.has(a)||!peopleIds.has(b)) return;
+    if(totalAdj.has(a)) totalAdj.get(a).add(b);
+    if(totalAdj.has(b)) totalAdj.get(b).add(a);
+  });
+  const total=new Map(pool.map(n=>[n.id,totalAdj.get(n.id).size]));
   const byLabel=(x,y)=>String(x.label).localeCompare(String(y.label));
-  const most=[...pool].sort((x,y)=>deg.get(y.id)-deg.get(x.id)||byLabel(x,y)).slice(0,5);
-  const least=[...pool].sort((x,y)=>deg.get(x.id)-deg.get(y.id)||byLabel(x,y)).slice(0,5);
+  const most=[...pool].sort((x,y)=>total.get(y.id)-total.get(x.id)||byLabel(x,y)).slice(0,5);
+  const least=[...pool].sort((x,y)=>total.get(x.id)-total.get(y.id)||byLabel(x,y)).slice(0,5);
   const isolated=pool.filter(n=>deg.get(n.id)===0).length;
 
   // One depth-first pass (iterative, so large maps cannot overflow the stack).
@@ -4158,7 +4169,7 @@ function computeInsights(){
   pool.forEach(n=>{ const y=yearOf(n.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].p++; });
   edgesIn.forEach(e=>{ const y=yearOf(e.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].c++; });
 
-  return {filtered,pool,deg,most,least,isolated,bridges:bridges.slice(0,5),linked,alone,
+  return {filtered,pool,deg,total,most,least,isolated,bridges:bridges.slice(0,5),linked,alone,
           groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length};
 }
 function renderInsights(){
@@ -4180,10 +4191,11 @@ function renderInsights(){
     : `<div style="font-size:11.5px;color:var(--ink-h);">Full map: ${plural(I.pool.length,'person')}. Search or filter to look at part of it.</div>`;
   h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these people. ${plural(I.isolated,'person')} with none.</div>`;
 
+  if(I.filtered) h += `<div style="font-size:10.5px;color:var(--ink-h);margin-top:4px;">Lists show each person's total connections across the whole map.</div>`;
   h += head('Most connected');
-  h += I.most.length ? I.most.map(n=>row(n,plural(I.deg.get(n.id),'connection'))).join('') : none('None yet.');
+  h += I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.');
   h += head('Fewest connections');
-  h += I.least.map(n=>row(n,plural(I.deg.get(n.id),'connection'))).join('');
+  h += I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('');
   h += head('Bridges: removing one person cuts others off');
   h += I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none('No single person links separate groups.');
 
