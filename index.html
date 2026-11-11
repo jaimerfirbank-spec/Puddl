@@ -1154,6 +1154,10 @@ body.share-mode #present-exit{display:none !important;}
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
     Remove image
   </button>
+  <button id="ctx-btn-focus" onclick="ctxMakeFocus()" style="display:none;">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>
+    Make this the centre of the map
+  </button>
   <button id="ctx-btn-knock" onclick="ctxKnockOn()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
     Show ripple effects
@@ -4196,11 +4200,73 @@ function computeInsights(){
 
   const years={};
   const yearOf=d=>{ const m=/^(\d{4})/.exec(d||''); return m?m[1]:null; };
+  // Directed stats: who influences whom (edges with an arrow give direction)
+  const outDeg=new Map(pool.map(n=>[n.id,0])), inDeg=new Map(pool.map(n=>[n.id,0]));
+  const dirAdj=new Map(pool.map(n=>[n.id,[]]));
+  let directedEdges=0;
+  edgesIn.forEach(e=>{
+    const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+    const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+    const ar=arrowOf(e); if(ar==='none') return;
+    directedEdges++;
+    if(ar!=='backward'){ outDeg.set(a,outDeg.get(a)+1); inDeg.set(b,inDeg.get(b)+1); dirAdj.get(a).push(b); }
+    if(ar!=='forward'){ outDeg.set(b,outDeg.get(b)+1); inDeg.set(a,inDeg.get(a)+1); dirAdj.get(b).push(a); }
+  });
+  const drivers=[...pool].filter(n=>outDeg.get(n.id)>0).sort((x,y)=>outDeg.get(y.id)-outDeg.get(x.id)||byLabel(x,y)).slice(0,5);
+  const sinks=[...pool].filter(n=>inDeg.get(n.id)>0).sort((x,y)=>inDeg.get(y.id)-inDeg.get(x.id)||byLabel(x,y)).slice(0,5);
+
+  // Feedback loops (systems maps): directed cycles of 3 to 6 nodes, work-capped
+  const loops=[];
+  if(MAP_TYPE==='systems'&&directedEdges&&pool.length<=2000){
+    const idx=new Map(pool.map((n,i)=>[n.id,i]));
+    const byId2=new Map(pool.map(n=>[n.id,n]));
+    let budget=150000;
+    const dfs=(start,cur,path,onPath)=>{
+      if(budget--<0||loops.length>=5) return;
+      for(const nxt of dirAdj.get(cur)||[]){
+        if(budget<0||loops.length>=5) return;
+        if(nxt===start){
+          if(path.length>=3) loops.push(path.map(id=>byId2.get(id)));
+        } else if(!onPath.has(nxt)&&path.length<6&&idx.get(nxt)>idx.get(start)){
+          onPath.add(nxt); path.push(nxt); dfs(start,nxt,path,onPath); path.pop(); onPath.delete(nxt);
+        }
+      }
+    };
+    for(const n of pool){ if(loops.length>=5||budget<0) break; dfs(n.id,n.id,[n.id],new Set([n.id])); }
+  }
+
+  // Clusters: separate pieces of the map that don't touch (within this view)
+  let compCount=0, compBig=0;
+  { const seen=new Set();
+    pool.forEach(n=>{
+      if(seen.has(n.id)) return;
+      compCount++; let csz=0; const st=[n.id]; seen.add(n.id);
+      while(st.length){ const u=st.pop(); csz++; (adj.get(u)||new Set()).forEach(v=>{ if(!seen.has(v)){ seen.add(v); st.push(v); } }); }
+      if(csz>compBig) compBig=csz;
+    });
+  }
+
+  // Stakeholder maps: distance of every stakeholder from the centre
+  let focus=null, focusGuessed=false, fD=null, fCounts=null;
+  if(MAP_TYPE==='stakeholder'&&pool.length){
+    focus=pool.find(n=>n.id===MAP_FOCUS)||null;
+    if(!focus&&most.length&&deg.get(most[0].id)>0){ focus=most[0]; focusGuessed=true; }
+    if(focus){
+      fD=new Map([[focus.id,0]]);
+      const q=[focus.id];
+      while(q.length){ const u=q.shift(); const dd=fD.get(u); (adj.get(u)||new Set()).forEach(v=>{ if(!fD.has(v)){ fD.set(v,dd+1); q.push(v); } }); }
+      let d1=0,d2=0,far=0,un=0;
+      pool.forEach(n=>{ if(n.id===focus.id) return; const dd=fD.get(n.id); if(dd===1)d1++; else if(dd===2)d2++; else if(dd===undefined)un++; else far++; });
+      fCounts={d1,d2,far,un};
+    }
+  }
+
   pool.forEach(n=>{ const y=yearOf(n.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].p++; });
   edgesIn.forEach(e=>{ const y=yearOf(e.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].c++; });
 
   return {filtered,pool,deg,total,most,least,isolated,bridges:bridges.slice(0,5),linked,alone,
-          groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length};
+          groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length,
+          outDeg,inDeg,drivers,sinks,directedEdges,loops,compCount,compBig,focus,focusGuessed,fD,fCounts};
 }
 function renderInsights(){
   const body=document.getElementById('sec-insights-body');
@@ -4209,7 +4275,9 @@ function renderInsights(){
   if(!people.length){ body.innerHTML='<div style="color:var(--ink-h);font-size:11px;">Add some nodes to see insights.</div>'; return; }
   const I=computeInsights();
   const esc=escHtml;
-  const plural=(k,w)=>w==='person'?`${k} ${k===1?'person':'people'}`:`${k} ${w}${k===1?'':'s'}`;
+  const NOUN=MAP_TYPE==='network'?['person','people']:MAP_TYPE==='systems'?['factor','factors']:MAP_TYPE==='stakeholder'?['stakeholder','stakeholders']:['node','nodes'];
+  const noun=k=>`${k} ${k===1?NOUN[0]:NOUN[1]}`;
+  const plural=(k,w)=>w==='person'?noun(k):`${k} ${w}${k===1?'':'s'}`;
   const head=t=>`<div style="font-size:10.5px;font-weight:700;letter-spacing:0.04em;color:var(--ink-h);margin:12px 0 4px;">${t}</div>`;
   const none=t=>`<div style="color:var(--ink-h);font-size:11px;padding:3px 6px;">${t}</div>`;
   const row=(n,right)=>`<div onclick="selectSearchSuggestion('${esc(n.id)}')" style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`;
@@ -4219,15 +4287,58 @@ function renderInsights(){
   let h = I.filtered
     ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--surf-3);font-size:11.5px;"><span><strong>Filtered view:</strong> ${plural(I.pool.length,'person')}</span><button onclick="clearSearch()" style="font-size:10.5px;height:24px;padding:0 8px;">Show full map</button></div>`
     : `<div style="font-size:11.5px;color:var(--ink-h);">Full map: ${plural(I.pool.length,'person')}. Search or filter to look at part of it.</div>`;
-  h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these people. ${plural(I.isolated,'person')} with none.</div>`;
+  h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these ${NOUN[1]}. ${plural(I.isolated,'person')} with none.</div>`;
 
-  if(I.filtered) h += `<div style="font-size:10.5px;color:var(--ink-h);margin-top:4px;">Lists show each person's total connections across the whole map.</div>`;
-  h += head('Most connected');
-  h += I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.');
-  h += head('Fewest connections');
-  h += I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('');
-  h += head('Bridges: removing one person cuts others off');
-  h += I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none('No single person links separate groups.');
+  // Plain-English summary: what the numbers mean, worded for the map type
+  const S=[];
+  const hub=I.most[0];
+  if(MAP_TYPE==='systems'){
+    if(!I.directedEdges){
+      S.push("No arrows are set, so Puddl can't tell what drives what. Open a connection and give it an arrow to see drivers, outcomes and feedback loops.");
+    } else {
+      if(I.drivers[0]) S.push(`${esc(I.drivers[0].label)} influences the most other factors: ${I.outDeg.get(I.drivers[0].id)} outgoing arrows.`);
+      if(I.sinks[0]) S.push(`${esc(I.sinks[0].label)} is affected by the most: ${I.inDeg.get(I.sinks[0].id)} incoming arrows.`);
+      S.push(I.loops.length
+        ? `${I.loops.length>=5?'At least 5':I.loops.length} feedback loop${I.loops.length===1?'':'s'} found: a chain of effects that circles back on itself.`
+        : 'No feedback loops found in this view: influence flows one way.');
+    }
+  } else if(MAP_TYPE==='stakeholder'){
+    if(!I.focus){
+      S.push('No centre is set. Right-click a stakeholder and choose "Make this the centre of the map".');
+    } else {
+      if(I.focusGuessed) S.push(`No centre is set, so these figures use the best-connected stakeholder, ${esc(I.focus.label)}. Right-click the real centre to change this.`);
+      const c=I.fCounts;
+      S.push(`${noun(c.d1)} ${c.d1===1?'is':'are'} directly linked to ${esc(I.focus.label)}, ${c.d2} two steps away, and ${c.far+c.un} further out or not connected to it at all.`);
+    }
+  } else {
+    if(hub&&I.total.get(hub.id)>0) S.push(`${esc(hub.label)} is the best connected: ${plural(I.total.get(hub.id),'connection')}. News and favours travel through ${NOUN[1]} like this.`);
+    if(I.bridges.length) S.push(`${esc(I.bridges[0].node.label)} is the only link holding ${I.bridges[0].cutOff} ${NOUN[1]} to the rest. If they left, that part would be cut off.`);
+    if(I.isolated>0) S.push(`${noun(I.isolated)} ${I.isolated===1?'has':'have'} no connections at all.`);
+  }
+  if(I.compCount>1) S.push(`This view is ${I.compCount} separate clusters that don't touch. The biggest holds ${noun(I.compBig)}.`);
+  if(S.length) h += `<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--ink);background:var(--surf-2);border-radius:6px;font-size:11.5px;line-height:1.55;">${S.map(t=>`<div style=\"margin:2px 0;\">${t}</div>`).join('')}</div>`;
+
+  if(I.filtered) h += `<div style="font-size:10.5px;color:var(--ink-h);margin-top:4px;">Lists show each ${NOUN[0]}'s total connections across the whole map.</div>`;
+  if(MAP_TYPE==='stakeholder'&&I.focus){
+    h += head(`Directly linked to ${esc(I.focus.label)}`);
+    const direct=I.pool.filter(n=>I.fD&&I.fD.get(n.id)===1).sort((a,b)=>I.total.get(b.id)-I.total.get(a.id)).slice(0,5);
+    h += direct.length ? direct.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('Nothing is linked to the centre yet.');
+  }
+  if(MAP_TYPE==='systems'&&I.directedEdges){
+    h += head('Drivers: most outgoing influence');
+    h += I.drivers.length ? I.drivers.map(n=>row(n,`${I.outDeg.get(n.id)} out`)).join('') : none('No arrows in this view.');
+    h += head('Most affected: incoming influence');
+    h += I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows in this view.');
+    h += head('Feedback loops');
+    h += I.loops.length ? I.loops.map(L=>`<div style="padding:3px 6px;font-size:11.5px;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)}</div>`).join('') : none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
+  } else {
+    h += head('Most connected');
+    h += I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.');
+    h += head('Fewest connections');
+    h += I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('');
+  }
+  h += head(MAP_TYPE==='systems' ? 'Choke points: removing one factor cuts others off' : `Bridges: removing one ${NOUN[0]} cuts others off`);
+  h += I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none(`No single ${NOUN[0]} links separate groups.`);
 
   h += head('Groups');
   h += pair(plural(I.linked.length,'linked group'), plural(I.alone,'person')+' on their own');
@@ -4255,7 +4366,7 @@ function renderInsights(){
     h += none('No dates yet. Import a "Date added" column, or new items get today\'s date.');
   } else {
     const yMax=Math.max(...ys.map(y=>I.years[y].p+I.years[y].c),1);
-    h += ys.map(y=>`<div style="padding:3px 6px 0;display:flex;justify-content:space-between;font-size:11.5px;"><span>${y}</span><span style="color:var(--ink-h);">${I.years[y].p} people, ${I.years[y].c} connections</span></div>${bar((I.years[y].p+I.years[y].c)/yMax*100)}`).join('');
+    h += ys.map(y=>`<div style="padding:3px 6px 0;display:flex;justify-content:space-between;font-size:11.5px;"><span>${y}</span><span style="color:var(--ink-h);">${I.years[y].p} ${NOUN[1]}, ${I.years[y].c} connections</span></div>${bar((I.years[y].p+I.years[y].c)/yMax*100)}`).join('');
   }
 
   h += `<div style="margin-top:10px;display:flex;justify-content:space-between;gap:6px;"><button onclick="renderInsights()" style="font-size:11px;height:26px;padding:0 10px;">Refresh</button><button onclick="openReport()" title="The matrix, strength and version views" style="font-size:11px;height:26px;padding:0 10px;">Full report</button></div>`;
@@ -9013,6 +9124,12 @@ function computeKnock(originId){
   step.forEach(k=>counts[k]++);
   return {step,edgeStep,counts};
 }
+function ctxMakeFocus(){
+  const id=ctxMenuNodeId; closeNodeCtxMenu();
+  const n=nodes.find(x=>x.id===id); if(!n) return;
+  MAP_FOCUS=id; saveState(); markUnsaved(); refreshInsightsIfOpen();
+  showStatus(n.label+' is now the centre of this stakeholder map.');
+}
 function ctxKnockOn(){
   const id=ctxMenuNodeId; closeNodeCtxMenu();
   const n=nodes.find(x=>x.id===id); if(!n) return;
@@ -9056,6 +9173,7 @@ canvas.addEventListener('contextmenu',e=>{
   if(btnRemImg) btnRemImg.style.display=n.nodeImg?'flex':'none';
   const vl=document.getElementById('ctx-video-label'); if(vl) vl.textContent=n.videoUrl?'Edit video link…':'Add video link…';
   const vr=document.getElementById('ctx-btn-video-remove'); if(vr) vr.style.display=n.videoUrl?'flex':'none';
+  const fb=document.getElementById('ctx-btn-focus'); if(fb) fb.style.display=MAP_TYPE==='stakeholder'?'flex':'none';
   const menu=document.getElementById('node-ctx-menu');
   if(!menu) return;
   menu.style.display='block';
