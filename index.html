@@ -2525,6 +2525,9 @@ let SIMPLE_MODE='auto';          // 'auto' | 'on' | 'off' — fast square drawin
 const SIMPLE_THRESHOLD=600;
 const THIN_LINES_AT=500;          // from this many nodes, lines are drawn fine (widths scaled by strength)
 function thinLinesOn(){ return nodes.length>=THIN_LINES_AT; }
+// Fixed fine widths for big maps, in screen-independent world units (before zoom).
+const THIN_WIDTH={strong:1.1,bold:1.5,moderate:0.8,weak:0.45,dashed:0.8,double:0.8};
+function thinWidth(st){ return THIN_WIDTH[st.id]||0.8; }
 let _thinShown=null;
 function syncStrengthLegend(){
   const el=document.getElementById('strength-legend');
@@ -2535,7 +2538,7 @@ function syncStrengthLegend(){
     CONNECTION_STYLES.filter(st=>st.id!=='loop').map(st=>{
       const dash=(st.dashPattern&&st.dashPattern.length)?'dashed':'solid';
       const h=st.isDouble?'4px double':'';
-      const bw=st.isDouble?'3px double':(st.lineWidth*0.45)+'px '+dash;
+      const bw=st.isDouble?'3px double':thinWidth(st)+'px '+dash;
       return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;"><span style="width:36px;border-top:${bw} ${st.colour};display:inline-block;"></span><span>${st.label}</span></div>`;
     }).join('');
   el.style.display='block';
@@ -3119,7 +3122,7 @@ function draw(){
     const _rawEdgeCol=e.colour||(isHl?'#FF8C8C':style.colour);
     const edgeCol=_dark?adaptColourForDark(_rawEdgeCol):_rawEdgeCol;
     // Line weight + dash pattern by type
-    const lw = thinLinesOn()? style.lineWidth*0.45 : style.lineWidth;
+    const lw = thinLinesOn()? thinWidth(style) : style.lineWidth;
     // Arrow size by type
     const arrowScale = style.arrowScale;
 
@@ -3161,7 +3164,7 @@ function draw(){
       // Stop the arc stroke one arrowhead-length before the tip so the filled triangle sits on top cleanly
       const arcAdjEnd=antiCW ? arcEndAngle+as/loopC.r : arcEndAngle-as/loopC.r;
       ctx.strokeStyle=drawStroke;
-      ctx.lineWidth=(isHl?lw+1:lw)/zoom;
+      ctx.lineWidth=(isHl?lw+(thinLinesOn()?0.4:1):lw)/zoom;
       if(style.dashPattern) ctx.setLineDash(style.dashPattern.map(d=>d/zoom));
       if(style.isDouble&&!dimmed){
         const off=3/zoom;
@@ -3204,7 +3207,7 @@ function draw(){
         ctx.beginPath();
         ctx.moveTo(apS.x,apS.y);
         ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y);
-        ctx.strokeStyle=drawStroke;ctx.lineWidth=(isHl?lw+1:lw)/zoom;
+        ctx.strokeStyle=drawStroke;ctx.lineWidth=(isHl?lw+(thinLinesOn()?0.4:1):lw)/zoom;
         if(style.dashPattern){ctx.setLineDash(style.dashPattern.map(d=>d/zoom));}
         else{ctx.setLineDash([]);}
         ctx.stroke();ctx.setLineDash([]);
