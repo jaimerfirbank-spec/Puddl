@@ -662,6 +662,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 .matrix-table tbody th.row-label{position:sticky;left:0;z-index:1;background:var(--surf-2);}
 .matrix-table thead th.row-label{left:0;z-index:3;}
 .matrix-table th.row-label{text-align:left;max-width:120px;overflow:hidden;text-overflow:ellipsis;}
+.matrix-table tbody tr:hover td,.matrix-table tbody tr:hover th{box-shadow:inset 0 0 0 99px rgba(127,127,127,0.12);}
 .matrix-cell-yes{background:#d4f0ee;color:#085041;font-weight:700;}
 .matrix-cell-strong{background:var(--teal);color:#fff;font-weight:700;}
 .matrix-cell-weak{background:#f5f5f5;color:var(--txt-h);}
@@ -958,12 +959,15 @@ body.share-mode #present-exit{display:none !important;}
 
 /* ── Print styles ─────────────────────────────────────────────────────────── */
 @media print{
+  @page{margin:12mm;}
+  html,body{height:auto !important;overflow:visible !important;}
   body *{visibility:hidden;}
   #print-area,#print-area *{visibility:visible;}
   #print-area{
-    position:fixed;top:0;left:0;width:100%;height:100%;
+    position:absolute;top:0;left:0;width:100%;height:auto;
     display:block !important;background:#fff;
   }
+  #print-area .pr-sec{page-break-inside:avoid;}
 }
 #print-area{display:none;}
 
@@ -4293,6 +4297,43 @@ function computeInsights(){
           groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length,
           outDeg,inDeg,drivers,sinks,directedEdges,loops,compCount,compBig,focus,focusGuessed,fD,fCounts};
 }
+function mapNounPack(){
+  return MAP_TYPE==='network'?['person','people']:MAP_TYPE==='systems'?['factor','factors']:MAP_TYPE==='stakeholder'?['stakeholder','stakeholders']:['node','nodes'];
+}
+function mapTypeLabel(){
+  return {general:'General map',network:'Network map',systems:'Systems map',stakeholder:'Stakeholder map'}[MAP_TYPE]||'Map';
+}
+function insightSummaryLines(I){
+  const NOUN=mapNounPack();
+  const noun=k=>`${k} ${k===1?NOUN[0]:NOUN[1]}`;
+  const S=[];
+  const hub=I.most[0];
+  if(MAP_TYPE==='systems'){
+    if(!I.directedEdges){
+      S.push("No arrows are set, so Puddl can't tell what drives what. Open a connection and give it an arrow to see drivers, outcomes and feedback loops.");
+    } else {
+      if(I.drivers[0]) S.push(`${I.drivers[0].label} influences the most other factors: ${I.outDeg.get(I.drivers[0].id)} outgoing arrows.`);
+      if(I.sinks[0]) S.push(`${I.sinks[0].label} is affected by the most: ${I.inDeg.get(I.sinks[0].id)} incoming arrows.`);
+      S.push(I.loops.length
+        ? `${I.loops.length>=5?'At least 5':I.loops.length} feedback loop${I.loops.length===1?'':'s'} found: a chain of effects that circles back on itself.`
+        : 'No feedback loops found in this view: influence flows one way.');
+    }
+  } else if(MAP_TYPE==='stakeholder'){
+    if(!I.focus){
+      S.push('No centre is set. Right-click a stakeholder and choose "Make this the centre of the map".');
+    } else {
+      if(I.focusGuessed) S.push(`No centre is set, so these figures use the best-connected stakeholder, ${I.focus.label}. Right-click the real centre to change this.`);
+      const c=I.fCounts;
+      S.push(`${noun(c.d1)} ${c.d1===1?'is':'are'} directly linked to ${I.focus.label}, ${c.d2} two steps away, and ${c.far+c.un} further out or not connected to it at all.`);
+    }
+  } else {
+    if(hub&&I.total.get(hub.id)>0) S.push(`${hub.label} is the best connected: ${I.total.get(hub.id)} connection${I.total.get(hub.id)===1?'':'s'}. News and favours travel through ${NOUN[1]} like this.`);
+    if(I.bridges.length) S.push(`${I.bridges[0].node.label} is the only link holding ${I.bridges[0].cutOff} ${NOUN[1]} to the rest. If they left, that part would be cut off.`);
+    if(I.isolated>0) S.push(`${noun(I.isolated)} ${I.isolated===1?'has':'have'} no connections at all.`);
+  }
+  if(I.compCount>1) S.push(`This view is ${I.compCount} separate clusters that don't touch. The biggest holds ${noun(I.compBig)}.`);
+  return S;
+}
 function renderInsights(){
   const body=document.getElementById('sec-insights-body');
   if(!body) return;
@@ -4314,34 +4355,8 @@ function renderInsights(){
     : `<div style="font-size:11.5px;color:var(--ink-h);">Full map: ${plural(I.pool.length,'person')}. Search or filter to look at part of it.</div>`;
   h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these ${NOUN[1]}. ${plural(I.isolated,'person')} with none.</div>`;
 
-  // Plain-English summary: what the numbers mean, worded for the map type
-  const S=[];
-  const hub=I.most[0];
-  if(MAP_TYPE==='systems'){
-    if(!I.directedEdges){
-      S.push("No arrows are set, so Puddl can't tell what drives what. Open a connection and give it an arrow to see drivers, outcomes and feedback loops.");
-    } else {
-      if(I.drivers[0]) S.push(`${esc(I.drivers[0].label)} influences the most other factors: ${I.outDeg.get(I.drivers[0].id)} outgoing arrows.`);
-      if(I.sinks[0]) S.push(`${esc(I.sinks[0].label)} is affected by the most: ${I.inDeg.get(I.sinks[0].id)} incoming arrows.`);
-      S.push(I.loops.length
-        ? `${I.loops.length>=5?'At least 5':I.loops.length} feedback loop${I.loops.length===1?'':'s'} found: a chain of effects that circles back on itself.`
-        : 'No feedback loops found in this view: influence flows one way.');
-    }
-  } else if(MAP_TYPE==='stakeholder'){
-    if(!I.focus){
-      S.push('No centre is set. Right-click a stakeholder and choose "Make this the centre of the map".');
-    } else {
-      if(I.focusGuessed) S.push(`No centre is set, so these figures use the best-connected stakeholder, ${esc(I.focus.label)}. Right-click the real centre to change this.`);
-      const c=I.fCounts;
-      S.push(`${noun(c.d1)} ${c.d1===1?'is':'are'} directly linked to ${esc(I.focus.label)}, ${c.d2} two steps away, and ${c.far+c.un} further out or not connected to it at all.`);
-    }
-  } else {
-    if(hub&&I.total.get(hub.id)>0) S.push(`${esc(hub.label)} is the best connected: ${plural(I.total.get(hub.id),'connection')}. News and favours travel through ${NOUN[1]} like this.`);
-    if(I.bridges.length) S.push(`${esc(I.bridges[0].node.label)} is the only link holding ${I.bridges[0].cutOff} ${NOUN[1]} to the rest. If they left, that part would be cut off.`);
-    if(I.isolated>0) S.push(`${noun(I.isolated)} ${I.isolated===1?'has':'have'} no connections at all.`);
-  }
-  if(I.compCount>1) S.push(`This view is ${I.compCount} separate clusters that don't touch. The biggest holds ${noun(I.compBig)}.`);
-  if(S.length) h += `<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--ink);background:var(--surf-2);border-radius:6px;font-size:11.5px;line-height:1.55;">${S.map(t=>`<div style=\"margin:2px 0;\">${t}</div>`).join('')}</div>`;
+  const S=insightSummaryLines(I);
+  if(S.length) h += `<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--ink);background:var(--surf-2);border-radius:6px;font-size:11.5px;line-height:1.55;">${S.map(t=>`<div style="margin:2px 0;">${esc(t)}</div>`).join('')}</div>`;
 
   if(I.filtered) h += `<div style="font-size:10.5px;color:var(--ink-h);margin-top:4px;">Lists show each ${NOUN[0]}'s total connections across the whole map.</div>`;
   if(MAP_TYPE==='stakeholder'&&I.focus){
@@ -7487,7 +7502,14 @@ function buildMatrixReport(){
   if(vis.length===0) return `<div style="color:var(--txt-m);padding:20px;text-align:center;">No nodes visible. Apply a filter first or clear the filter to see all nodes.</div>`;
   if(vis.length>60) return `<div style="color:var(--txt-m);padding:20px;text-align:center;">Too many nodes for a matrix (${vis.length}). Filter to 60 or fewer nodes.</div>`;
 
-  const sorted=[...vis].sort((a,b)=>a.label.localeCompare(b.label));
+  // Order by number of connections, so the busiest nodes cluster top-left
+  const _mc={}; vis.forEach(n=>_mc[n.id]=0);
+  visEdges.forEach(e=>{
+    const s2=typeof e.source==='object'?e.source.id:e.source;
+    const t2=typeof e.target==='object'?e.target.id:e.target;
+    if(_mc[s2]!==undefined)_mc[s2]++; if(_mc[t2]!==undefined)_mc[t2]++;
+  });
+  const sorted=[...vis].sort((a,b)=>(_mc[b.id]-_mc[a.id])||a.label.localeCompare(b.label));
   const connMap={};
   visEdges.forEach(e=>{
     const s=typeof e.source==='object'?e.source.id:e.source;
@@ -7498,9 +7520,9 @@ function buildMatrixReport(){
   });
 
   let html=`<div class="report-section"><h4>Connection matrix — ${sorted.length} nodes</h4>
-    <div style="font-size:11px;color:var(--txt-m);margin-bottom:8px;">■ Strong &nbsp; ● Moderate &nbsp; · Weak</div>
+    <div style="font-size:11px;color:var(--txt-m);margin-bottom:4px;">Each filled cell is a connection between its row and its column: ■ Strong &nbsp; ● Moderate &nbsp; · Weak. Hover a cell for the names. Busiest nodes are listed first.</div>
     <div class="matrix-wrap"><table class="matrix-table">
-    <thead><tr><th class="row-label">Node</th>`;
+    <thead><tr><th class="row-label">Node</th><th title="Total connections">#</th>`;
   sorted.forEach(n=>{
     const short=n.label.length>10?n.label.substring(0,9)+'…':n.label;
     html+=`<th title="${n.label}">${short}</th>`;
@@ -7508,7 +7530,7 @@ function buildMatrixReport(){
   html+=`</tr></thead><tbody>`;
   sorted.forEach(a=>{
     const short=a.label.length>16?a.label.substring(0,15)+'…':a.label;
-    html+=`<tr><th class="row-label" title="${a.label}">${short}</th>`;
+    html+=`<tr><th class="row-label" title="${a.label}">${short}</th><td style="font-weight:700;color:var(--txt-m);">${_mc[a.id]}</td>`;
     sorted.forEach(b=>{
       if(a.id===b.id){ html+=`<td style="background:var(--surf-2);color:var(--txt-h);">—</td>`; return; }
       const str=connMap[`${a.id}_${b.id}`];
@@ -7797,18 +7819,119 @@ function exportReportSnapshot(){
 // ── Print / PDF ───────────────────────────────────────────────────────────────
 
 function printReport(){
-  // Build a clean HTML string from the current report tab
-  const title=document.getElementById('report-modal-header').querySelector('h3').textContent;
-  const subtitle=document.getElementById('report-modal-subtitle').textContent;
-  const bodyHTML=document.getElementById('report-body').innerHTML;
-  const printArea=document.getElementById('print-area');
-  printArea.innerHTML=`
-    <div style="font-family:'Segoe UI',sans-serif;padding:32px;max-width:800px;margin:0 auto;color:#1B3A5C;">
-      <h1 style="font-size:20px;margin-bottom:4px;">${title}</h1>
-      <p style="font-size:13px;color:#5a7a96;margin-bottom:24px;">${subtitle} &nbsp;·&nbsp; ${mapTitle} &nbsp;·&nbsp; ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</p>
-      ${bodyHTML}
-    </div>`;
+  buildPrintReport();
   window.print();
+}
+// A complete take-away document: everything useful on the map, print-styled in plain colours
+function buildPrintReport(){
+  const I=computeInsights();
+  const NOUN=mapNounPack();
+  const esc=escHtml;
+  const noun=k=>`${k} ${k===1?NOUN[0]:NOUN[1]}`;
+  const cap=t=>t.charAt(0).toUpperCase()+t.slice(1);
+
+  // Map picture: whole map, light colours, white background
+  let mapImg='';
+  try{
+    const prevTheme=document.documentElement.getAttribute('data-theme');
+    const sPX=panX,sPY=panY,sZ=zoom;
+    if(prevTheme==='dark') document.documentElement.setAttribute('data-theme','light');
+    fitAll();
+    const ec=document.createElement('canvas');ec.width=W*2;ec.height=H*2;
+    const c=ec.getContext('2d');c.scale(2,2);
+    c.fillStyle='#ffffff';c.fillRect(0,0,W,H);
+    c.drawImage(canvas,0,0,W,H);
+    mapImg=ec.toDataURL('image/png');
+    if(prevTheme==='dark') document.documentElement.setAttribute('data-theme',prevTheme);
+    panX=sPX;panY=sPY;zoom=sZ;draw();
+  }catch(e){ mapImg=''; }
+
+  const sec=(title,inner)=>`<div class="pr-sec" style="margin:18px 0 0;"><div style="font-size:13px;font-weight:700;color:#111;border-bottom:1.5px solid #ddd;padding-bottom:3px;margin-bottom:7px;">${title}</div>${inner}</div>`;
+  const rowline=(a,b)=>`<div style="display:flex;justify-content:space-between;font-size:11.5px;padding:2px 0;border-bottom:1px dotted #eee;"><span>${a}</span><span style="color:#555;">${b}</span></div>`;
+  const note=t=>`<div style="font-size:11px;color:#666;">${t}</div>`;
+
+  let h='';
+  // Header
+  h+=`<div style="font-size:22px;font-weight:800;color:#111;">${esc(mapTitle||'Map report')}</div>`;
+  h+=`<div style="font-size:12px;color:#555;margin:2px 0 10px;">${mapTypeLabel()} · ${noun(I.pool.length)}, ${I.edgesCount} connection${I.edgesCount===1?'':'s'}${I.filtered?' (filtered view)':''} · ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}</div>`;
+  if(mapImg) h+=`<img src="${mapImg}" style="width:100%;border:1px solid #e5e5e5;border-radius:6px;" alt="Map">`;
+
+  // Plain-English summary
+  const S=insightSummaryLines(I);
+  if(S.length) h+=sec('What the map shows', S.map(t=>`<div style="font-size:12px;line-height:1.55;margin:3px 0;">${esc(t)}</div>`).join(''));
+
+  // Key figures
+  const avg=I.pool.length?Math.round(I.edgesCount*2/I.pool.length*10)/10:0;
+  const figs=[[noun(I.pool.length),''],[`${I.edgesCount} connections`,''],[`${avg} average connections each`,''],[`${I.compCount} separate cluster${I.compCount===1?'':'s'}`,''],[`${noun(I.isolated)} with no connections`,''],[`${I.linked.length} linked group${I.linked.length===1?'':'s'}`,'']];
+  h+=sec('Key figures', `<div style="display:flex;flex-wrap:wrap;gap:6px;">${figs.map(f=>`<span style="background:#f4f4f4;border-radius:14px;padding:4px 12px;font-size:11.5px;color:#222;">${esc(f[0])}</span>`).join('')}</div>`);
+
+  // Who matters, by type
+  if(MAP_TYPE==='systems'&&I.directedEdges){
+    h+=sec('Drivers: most outgoing influence', I.drivers.length?I.drivers.map(n=>rowline(esc(n.label),`${I.outDeg.get(n.id)} out`)).join(''):note('No arrows in this view.'));
+    h+=sec('Most affected: incoming influence', I.sinks.length?I.sinks.map(n=>rowline(esc(n.label),`${I.inDeg.get(n.id)} in`)).join(''):note('No arrows in this view.'));
+    h+=sec('Feedback loops', I.loops.length?I.loops.map(L=>`<div style="font-size:11.5px;margin:3px 0;line-height:1.5;">↻ ${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)}</div>`).join(''):note(I.directedEdges?'None found: influence flows one way.':'No arrows set.'));
+  } else {
+    h+=sec('Most connected', I.most.length?I.most.map(n=>rowline(esc(n.label),`${I.total.get(n.id)} connection${I.total.get(n.id)===1?'':'s'}`)).join(''):note('None yet.'));
+  }
+  if(MAP_TYPE==='stakeholder'&&I.focus){
+    const direct=I.pool.filter(n=>I.fD&&I.fD.get(n.id)===1).sort((a,b)=>I.total.get(b.id)-I.total.get(a.id)).slice(0,8);
+    h+=sec(`Directly linked to ${esc(I.focus.label)}`, direct.length?direct.map(n=>rowline(esc(n.label),`${I.total.get(n.id)} connection${I.total.get(n.id)===1?'':'s'}`)).join(''):note('Nothing linked to the centre yet.'));
+  }
+
+  // Fragility
+  h+=sec(MAP_TYPE==='systems'?'Choke points: removing one factor cuts others off':`Bridges: removing one ${NOUN[0]} cuts others off`,
+    I.bridges.length?I.bridges.map(b=>rowline(esc(b.node.label),`cuts off ${b.cutOff}`)).join(''):note(`No single ${NOUN[0]} links separate groups.`));
+
+  // Groups (not meaningful on a systems map, where everything is one causal web)
+  if(MAP_TYPE!=='systems'){
+    let gh=rowline(`${I.linked.length} linked group${I.linked.length===1?'':'s'}`,`${noun(I.alone)} on their own`);
+    gh+=I.linked.slice(0,6).map(g=>rowline(esc(g.best.label),`group of ${g.size}`)).join('');
+    h+=sec('Groups',gh);
+  }
+
+  // Categories and connection types
+  const cEntries=Object.entries(I.cats).sort((a,b)=>b[1]-a[1]);
+  if(cEntries.length&&!(cEntries.length===1&&cEntries[0][0]==='No category')) h+=sec('By category', cEntries.slice(0,10).map(([k,v])=>rowline(esc(k),v)).join(''));
+  const tEntries=Object.entries(I.types).sort((a,b)=>b[1]-a[1]);
+  if(tEntries.length) h+=sec('Connection types', tEntries.map(([k,v])=>rowline(esc(I.typeLabel(k)),v)).join(''));
+
+  // Growth
+  const ys=Object.keys(I.years).sort();
+  if(ys.length) h+=sec('Growth by year', ys.map(y=>rowline(y,`${I.years[y].p} ${NOUN[1]}, ${I.years[y].c} connections`)).join(''));
+
+  // Edges of the map
+  h+=sec('Fewest connections', I.least.slice(0,5).map(n=>rowline(esc(n.label),`${I.total.get(n.id)} connection${I.total.get(n.id)===1?'':'s'}`)).join(''));
+
+  // Matrix, only when it stays readable on paper
+  if(I.pool.length<=30){
+    const vis=I.pool, visEdges=[];
+    edges.forEach(e=>{
+      const a=typeof e.source==='object'?e.source.id:e.source, b2=typeof e.target==='object'?e.target.id:e.target;
+      if(vis.some(n=>n.id===a)&&vis.some(n=>n.id===b2)&&a!==b2) visEdges.push(e);
+    });
+    const cm={};
+    visEdges.forEach(e=>{
+      const a=typeof e.source==='object'?e.source.id:e.source, b2=typeof e.target==='object'?e.target.id:e.target;
+      cm[a+'_'+b2]=cm[b2+'_'+a]=e.strength||'moderate';
+    });
+    const srt=[...vis].sort((a,b)=>a.label.localeCompare(b.label));
+    let m=`<div style="font-size:10px;color:#666;margin-bottom:4px;">■ Strong &nbsp; ● Moderate &nbsp; · Weak</div><table style="border-collapse:collapse;font-size:8px;"><tr><td></td>${srt.map(n=>`<td style="border:1px solid #ddd;padding:2px 3px;max-width:52px;overflow:hidden;white-space:nowrap;color:#444;">${esc(n.label.slice(0,8))}</td>`).join('')}</tr>`;
+    srt.forEach(a=>{
+      m+=`<tr><td style="border:1px solid #ddd;padding:2px 4px;white-space:nowrap;color:#444;">${esc(a.label.slice(0,16))}</td>`;
+      srt.forEach(b2=>{
+        const st=a.id===b2.id?null:cm[a.id+'_'+b2.id];
+        m+=`<td style="border:1px solid #ddd;text-align:center;padding:1px 3px;${st?'background:#eef6f4;color:#0a5a48;font-weight:700;':''}">${a.id===b2.id?'—':st?(st==='strong'?'■':st==='weak'?'·':'●'):''}</td>`;
+      });
+      m+='</tr>';
+    });
+    m+='</table>';
+    h+=sec('Connection matrix',m);
+  }
+
+  h+=`<div style="margin-top:20px;font-size:10px;color:#999;">Made with Puddl · ${new Date().toLocaleDateString('en-GB')}</div>`;
+
+  const printArea=document.getElementById('print-area');
+  printArea.innerHTML=`<div style="font-family:'DM Sans','Segoe UI',sans-serif;padding:8px 4px;max-width:800px;margin:0 auto;color:#111;">${h}</div>`;
 }
 
 // ── Animated presentation mode ─────────────────────────────────────────────────
