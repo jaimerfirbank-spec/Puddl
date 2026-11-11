@@ -1100,9 +1100,9 @@ body.share-mode #present-exit{display:none !important;}
     <div class="dd-wrap">
       <button id="btn-menu-layout" onclick="toggleMenu('menu-layout',event)" title="Spacing and arranging">Layout ▾</button>
       <div class="dd-menu" id="menu-layout">
-        <button onclick="spreadNodes(1.25);closeMenus()" title="Move every node further apart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg> Spread out</button>
-        <button onclick="spreadNodes(0.8);closeMenus()" title="Move every node closer together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg> Pull in</button>
-        <button onclick="tidyLayout();closeMenus()" title="Re-arrange the whole map so connected nodes sit together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l2 8M16.5 10l-5 6"/></svg> Tidy layout</button>
+        <button onclick="spreadNodes(1.25)" title="Move every node further apart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg> Spread out</button>
+        <button onclick="spreadNodes(0.8)" title="Move every node closer together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg> Pull in</button>
+        <button onclick="tidyLayout()" title="Re-arrange the whole map so connected nodes sit together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l2 8M16.5 10l-5 6"/></svg> Tidy layout</button>
         <div class="dd-sep"></div>
         <div style="padding:4px 11px 6px;font-size:10.5px;color:var(--ink-h);line-height:1.4;white-space:normal;">Tip: hold Shift while dragging a node to move its connections with it.</div>
       </div>
@@ -11004,7 +11004,7 @@ function updateSettingsUI(){
 }
 // Close dropdown when clicking outside
 document.addEventListener('click',e=>{
-  closeSettings();
+  if(!e.target.closest('.dd-wrap')) closeSettings();   // clicks inside a menu keep it open
   // Close search suggestions if click is outside the search panel
   const panel=document.getElementById('search-panel');
   const sb=document.getElementById('search-suggestions');
