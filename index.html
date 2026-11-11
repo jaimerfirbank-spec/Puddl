@@ -1055,8 +1055,6 @@ body.share-mode #present-exit{display:none !important;}
       <div class="dd-menu" id="menu-import">
         <button onclick="openImportModal();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg> Spreadsheet</button>
         <button onclick="openPuddlImportModal();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg> Puddl map</button>
-        <div class="dd-sep"></div>
-        <button onclick="downloadImportTemplate();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 12v6M9 15l3 3 3-3"/></svg> Download template</button>
       </div>
     </div>
     <div class="dd-wrap">
@@ -1665,6 +1663,21 @@ body.share-mode #present-exit{display:none !important;}
         style="width:100%;height:44px;font-size:14px;border-radius:9px;border:1.5px solid rgba(0,0,0,0.14);background:#fafafa;color:#18181b;padding:0 14px;font-family:inherit;letter-spacing:-0.01em;outline:none;box-sizing:border-box;transition:border-color .15s;"
         autocomplete="off" spellcheck="false"
         onkeydown="if(event.key==='Enter')confirmWho()">
+      <div style="font-size:11px;font-weight:600;color:#71717a;margin:14px 0 6px;text-align:left;">What kind of map is this?</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <button type="button" class="mtype-btn" data-mt="general" onclick="pickMapType('general')" style="border:1.5px solid rgba(0,0,0,0.14);border-radius:9px;background:#fafafa;padding:8px 10px;text-align:left;cursor:pointer;font-family:inherit;">
+          <div style="font-size:12px;font-weight:700;color:#18181b;">General map</div><div style="font-size:10px;color:#a1a1aa;line-height:1.3;">Just mapping</div></button>
+        <button type="button" class="mtype-btn" data-mt="network" onclick="pickMapType('network')" style="border:1.5px solid rgba(0,0,0,0.14);border-radius:9px;background:#fafafa;padding:8px 10px;text-align:left;cursor:pointer;font-family:inherit;">
+          <div style="font-size:12px;font-weight:700;color:#18181b;">Network map</div><div style="font-size:10px;color:#a1a1aa;line-height:1.3;">People and groups. Also called a social or asset map</div></button>
+        <button type="button" class="mtype-btn" data-mt="systems" onclick="pickMapType('systems')" style="border:1.5px solid rgba(0,0,0,0.14);border-radius:9px;background:#fafafa;padding:8px 10px;text-align:left;cursor:pointer;font-family:inherit;">
+          <div style="font-size:12px;font-weight:700;color:#18181b;">Systems map</div><div style="font-size:10px;color:#a1a1aa;line-height:1.3;">Factors that affect each other. Also called a causal loop map</div></button>
+        <button type="button" class="mtype-btn" data-mt="stakeholder" onclick="pickMapType('stakeholder')" style="border:1.5px solid rgba(0,0,0,0.14);border-radius:9px;background:#fafafa;padding:8px 10px;text-align:left;cursor:pointer;font-family:inherit;">
+          <div style="font-size:12px;font-weight:700;color:#18181b;">Stakeholder map</div><div style="font-size:10px;color:#a1a1aa;line-height:1.3;">Everyone around one project or decision</div></button>
+      </div>
+      <div id="splash-focus-row" style="display:none;margin-top:8px;text-align:left;">
+        <div style="font-size:11px;color:#71717a;margin-bottom:4px;">What sits at the centre? A project, decision or organisation.</div>
+        <input type="text" id="splash-focus-input" placeholder="e.g. New Community Hub" autocomplete="off" spellcheck="false" style="width:100%;height:36px;font-size:13px;border-radius:9px;border:1.5px solid rgba(0,0,0,0.14);background:#fafafa;color:#18181b;padding:0 12px;font-family:inherit;outline:none;box-sizing:border-box;">
+      </div>
       <div id="who-error" style="font-size:11px;color:#E8736A;margin-top:6px;min-height:16px;"></div>
       <button onclick="confirmWho()" style="margin-top:12px;width:100%;height:44px;background:#18181b;color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:-0.02em;">Start mapping →</button>
     </div>
@@ -2033,7 +2046,7 @@ function selectConnColour(col){
           <div style="font-size:11px;color:var(--ink-h);">Excel (.xlsx, .xls) or CSV (.csv, .tsv)</div>
           <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv,.tsv" style="display:none;" onchange="handleImportFile(this.files[0])">
         </label>
-        <div style="margin-top:8px;font-size:11px;color:var(--ink-h);">Starting from scratch? <a href="#" onclick="event.preventDefault();downloadImportTemplate()" style="color:var(--ink);font-weight:600;">Download a template</a> with this map's column headings.</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--ink-h);">No spreadsheet yet? <a href="#" onclick="event.preventDefault();downloadImportTemplate()" style="color:var(--ink);font-weight:600;">Download a blank template</a> with example rows showing the layout.</div>
         <div id="import-file-name" style="display:none;margin-top:8px;font-size:12px;color:var(--ink-m);padding:6px 10px;background:var(--surf-3);border-radius:var(--radius);"></div>
         <!-- Import mode toggle -->
         <div id="import-mode-row" style="margin-top:12px;display:flex;gap:8px;">
@@ -2264,6 +2277,16 @@ function selectConnColour(col){
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Colour nodes by</h4>
           <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Number fields and connections use a pale to dark scale. Text fields give each value its own colour. The Legend fills in automatically. Turn it off to get each node's own colour back.</p>
           <select id="settings-colour-by" onchange="setColourBy(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);"></select>
+        </div>
+        <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Map type</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Sets the words Puddl uses and which insights show. A network map is people and groups (also called a social or asset map), a systems map is factors that affect each other, a stakeholder map is everyone around one project.</p>
+          <select id="settings-map-type" onchange="setMapType(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);">
+            <option value="general">General map</option>
+            <option value="network">Network map (social, asset)</option>
+            <option value="systems">Systems map (causal loop)</option>
+            <option value="stakeholder">Stakeholder map</option>
+          </select>
         </div>
         <div style="margin-bottom:24px;">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Large map display</h4>
@@ -2537,6 +2560,9 @@ const SMALLER_NODE_SCALE=0.7;
 let NODE_CONTRAST='auto';
 let NODE_SIZE_MODE='auto';
 let NODE_RING=false;               // coloured ring on dark nodes, off by default
+// Map type: changes wording and which insights show. 'general' keeps today's neutral wording.
+let MAP_TYPE='general';            // 'general' | 'network' | 'systems' | 'stakeholder'
+let MAP_FOCUS=null;                // node id at the centre of a stakeholder map, or null
 function largeMapOn(){ return nodes.length>=LARGE_MAP_AT; }
 function nodeSizeScale(){ const m=NODE_SIZE_MODE; return (m==='always'||(m==='auto'&&largeMapOn()))?SMALLER_NODE_SCALE:1; }
 // Dark ink for a node's body on large maps. Returns null when the node keeps its own colour.
@@ -2826,6 +2852,8 @@ function snap(){
     sizeByConnections:SIZE_BY==='connections',
     sizeBy:SIZE_BY,
     simpleMode:SIMPLE_MODE,
+    mapType:MAP_TYPE,
+    mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
     nodeSizeMode:NODE_SIZE_MODE,
     nodeRing:NODE_RING,
@@ -2885,6 +2913,8 @@ function restoreSnap(s){
   NODE_CONTRAST=['auto','always','never'].includes(d.nodeContrast)?d.nodeContrast:'auto';
   NODE_SIZE_MODE=['auto','always','never'].includes(d.nodeSizeMode)?d.nodeSizeMode:'auto';
   NODE_RING=d.nodeRing===true;
+  MAP_TYPE=['general','network','systems','stakeholder'].includes(d.mapType)?d.mapType:'general';
+  MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
   if(d.defaultNodeStyle) DEFAULT_NODE_OUTLINE=d.defaultNodeStyle==='outline';
   if(inPresentationEditMode) rebuildPresStopList();
@@ -4985,16 +5015,22 @@ function buildColumnMapper(resetOnly=false){
 function downloadImportTemplate(){
   const heads=['Name','Connected to','Connection type','Arrow','Date added','Notes',...FIELD_DEFS.map(f=>f.name)];
   const slug=((mapTitle||'puddl').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'puddl')+'-template';
+  const pad=r=>{ while(r.length<heads.length) r.push(''); return r; };
+  const exampleRows=[
+    pad(['Allotment Society','','','','2019-01-20','Example rows: delete these three before adding your own']),
+    pad(['Ruth Calder','Allotment Society','Strong','none','2021-05-04','One connection, to the group above']),
+    pad(['Sam Carter','Allotment Society, Ruth Calder','Moderate','none','2023-02-11','Two connections in one cell, separated by a comma']),
+  ];
   if(typeof XLSX!=='undefined'){
-    const ws=XLSX.utils.aoa_to_sheet([heads]);
+    const ws=XLSX.utils.aoa_to_sheet([heads,...exampleRows]);
     ws['!cols']=heads.map(h=>({wch:Math.max(14,h.length+4)}));
     const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Nodes');
     XLSX.writeFile(wb,slug+'.xlsx');
   } else {
-    const csv=heads.map(h=>'"'+h.replace(/"/g,'""')+'"').join(',')+'\n';
+    const csv=[heads,...exampleRows].map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n')+'\n';
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=slug+'.csv'; a.click();
   }
-  showStatus('Template downloaded. Put one node per row; separate several connections with commas.');
+  showStatus('Template downloaded. It has three example rows showing the layout. Delete them before adding your own. You can also put one connection per row and repeat the name.');
 }
 
 // ── Colour inference from category ───────────────────────────────────────────
@@ -8572,6 +8608,23 @@ function selectWhoOption(el, val){
   document.querySelectorAll('.who-opt').forEach(o=>o.classList.toggle('selected', o.textContent===val));
   document.getElementById('who-error').textContent='';
 }
+let _splashMapType='general';
+function pickMapType(t){
+  _splashMapType=['general','network','systems','stakeholder'].includes(t)?t:'general';
+  document.querySelectorAll('.mtype-btn').forEach(b=>{
+    const on=b.dataset.mt===_splashMapType;
+    b.style.borderColor=on?'#18181b':'rgba(0,0,0,0.14)';
+    b.style.background=on?'#f4f4f5':'#fafafa';
+  });
+  const fr=document.getElementById('splash-focus-row');
+  if(fr) fr.style.display=_splashMapType==='stakeholder'?'block':'none';
+}
+function setMapType(v){
+  MAP_TYPE=['general','network','systems','stakeholder'].includes(v)?v:'general';
+  const mt=document.getElementById('settings-map-type'); if(mt) mt.value=MAP_TYPE;
+  saveState(); markUnsaved();
+  if(typeof refreshInsightsIfOpen==='function') refreshInsightsIfOpen();
+}
 function confirmWho(){
   const input=document.getElementById('project-name-input');
   const name=(input?input.value:'').trim();
@@ -8594,6 +8647,18 @@ function confirmWho(){
   if(mtd) mtd.textContent=name;
 
   centralEventLabel=name;
+
+  MAP_TYPE=_splashMapType||'general';
+  if(MAP_TYPE==='stakeholder'&&MAP_FOCUS===null){
+    const fi=document.getElementById('splash-focus-input');
+    const fname=(fi?fi.value.trim():'');
+    if(fname){
+      const fx=W/2/zoom-panX/zoom, fy=H/2/zoom-panY/zoom;
+      const fn={id:++idCtr,x:fx,y:fy,fx:fx,fy:fy,pinned:true,label:fname,colour:'#FFD59E',shape:'circle',nodeSize:'large',titleSize:'large',notes:'',videoUrl:'',customFields:{},date:new Date().toISOString().slice(0,10),type:'process'};
+      nodes.push(fn); MAP_FOCUS=fn.id;
+    }
+  }
+  { const mt=document.getElementById('settings-map-type'); if(mt) mt.value=MAP_TYPE; }
 
   // New maps start blank: no starter node is created
   if(nodes.length===0){
@@ -10371,6 +10436,7 @@ function syncNodeStyleButtons(){
 
 function syncSizeByConnButtons(){
   { const sm=document.getElementById('settings-simple-mode'); if(sm) sm.value=SIMPLE_MODE; }
+  { const mt=document.getElementById('settings-map-type'); if(mt) mt.value=MAP_TYPE; }
   syncLargeMapUI();
   const ss=document.getElementById('settings-size-by'), cs=document.getElementById('settings-colour-by');
   const opt=(v,t,sel)=>'<option value="'+escHtml(v)+'"'+(v===sel?' selected':'')+'>'+escHtml(t)+'</option>';
