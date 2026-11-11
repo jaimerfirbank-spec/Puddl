@@ -1107,7 +1107,6 @@ body.share-mode #present-exit{display:none !important;}
     <button class="active" id="btn-move" onclick="setMode('move')" title="Drag nodes to move them. Hold Shift while dragging to bring its connected nodes too.">↖ Move</button>
     <button id="btn-connect" onclick="setMode('connect')">⟶ Connect</button>
     <button id="btn-delconn" onclick="setMode('delconn')">✕ Edit link</button>
-    <button id="btn-loop" onclick="setMode('loop')" title="Create a feedback loop by clicking nodes in sequence">⟳ Loop</button>
     <div class="dd-wrap">
       <button id="btn-menu-layout" onclick="toggleMenu('menu-layout',event)" title="Spacing and arranging">Layout ▾</button>
       <div class="dd-menu" id="menu-layout">
@@ -1272,6 +1271,7 @@ body.share-mode #present-exit{display:none !important;}
         <span>Connections <span id="sec-conn-badge" style="display:none;margin-left:6px;font-size:9.5px;font-weight:700;color:var(--on-ink);background:var(--ink);border-radius:8px;padding:1px 6px;">ON</span></span><span id="sec-conn-arrow">▸</span>
       </button>
       <div id="sec-conn-body" style="display:none;margin-top:6px;">
+        <div id="conn-loops-row" style="display:none;margin-bottom:8px;"><button onclick="highlightAllLoops()" style="width:100%;font-size:11px;height:28px;">↻ Highlight all feedback loops</button></div>
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-m);">
           <span style="font-weight:600;min-width:52px;">Count</span>
           <input type="number" id="conn-min" min="0" placeholder="from" oninput="applyFilters()" style="width:72px;height:28px;font-size:12px;padding:0 6px;">
@@ -2385,53 +2385,10 @@ function selectConnColour(col){
         </div>
       </div>
       <div id="customize-content-connections" style="display:none;">
-        <!-- Loop Connection Style -->
         <div style="margin-bottom:28px;">
-          <h4 style="margin:0 0 6px 0;font-size:14px;font-weight:600;color:var(--ink);">Loop Connection Style</h4>
-          <p style="margin:0 0 14px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Style applied to all loop connections. Preview updates as you edit.</p>
-          <div id="loop-style-presets" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
-          <div id="loop-style-editor" style="padding:16px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf);">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-              <span style="font-size:12px;font-weight:600;color:var(--ink);flex:1;">Style</span>
-              <label style="font-size:11px;color:var(--txt-m);">Colour</label>
-              <div id="loop-colour-trigger" onclick="openSwatchPicker(this,hexFromColour(_loopStyleDraft?_loopStyleDraft.colour:LOOP_CONNECTION_STYLE.colour),'loop','loop')" style="width:32px;height:32px;border-radius:4px;cursor:pointer;border:1px solid var(--bdr);"></div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
-              <div>
-                <label style="font-size:11px;color:var(--txt-m);display:block;margin-bottom:4px;">Line Width</label>
-                <input type="number" id="loop-width-input" min="0.5" max="10" step="0.5"
-                  oninput="loopDraftUpdateProp('lineWidth',this.value)"
-                  style="width:100%;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;background:var(--surf);color:var(--ink);">
-              </div>
-              <div>
-                <label style="font-size:11px;color:var(--txt-m);display:block;margin-bottom:4px;">Dash Pattern</label>
-                <input type="text" id="loop-dash-input"
-                  oninput="loopDraftUpdateDash(this.value)"
-                  placeholder="e.g. 8,4"
-                  style="width:100%;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;background:var(--surf);color:var(--ink);">
-              </div>
-              <div>
-                <label style="font-size:11px;color:var(--txt-m);display:block;margin-bottom:4px;">Arrow Scale</label>
-                <input type="number" id="loop-arrow-input" min="0.5" max="3" step="0.1"
-                  oninput="loopDraftUpdateProp('arrowScale',this.value)"
-                  style="width:100%;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;background:var(--surf);color:var(--ink);">
-              </div>
-            </div>
-            <canvas id="loop-conn-preview" width="600" height="52"
-              style="width:100%;height:52px;border-radius:6px;display:block;"></canvas>
-          </div>
-        </div>
-
-        <!-- Standard Connection Styles -->
-        <div style="margin-bottom:24px;">
-          <h4 style="margin:0 0 12px 0;font-size:14px;font-weight:600;color:var(--ink);">Connection Styles</h4>
-          <p style="margin:0 0 16px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Customise connection types, names, colours, and styles. The preview updates as you edit — click <strong>Done</strong> to apply changes to your map.</p>
-
-          <div id="connection-styles-list" style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;">
-            <!-- Connection styles will be rendered here -->
-          </div>
-
-          <button onclick="draftAddStyle()" style="padding:8px 16px;background:var(--accent-2);color:white;border:none;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;">+ Add Connection Style</button>
+          <h4 style="margin:0 0 6px 0;font-size:14px;font-weight:600;color:var(--ink);">Connection colours</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">On: every connection draws in its strength's colour, the same colours as the key on big maps. Off: connections keep their own colours.</p>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);cursor:pointer;"><input type="checkbox" id="settings-edge-colour-strength" onchange="setEdgeColourByStrength(this.checked)"> Colour connections by strength</label>
         </div>
       </div>
     </div>
@@ -2590,6 +2547,7 @@ let NODE_RING=false;               // coloured ring on dark nodes, off by defaul
 // Map type: changes wording and which insights show. 'general' keeps today's neutral wording.
 let MAP_TYPE='general';            // 'general' | 'network' | 'systems' | 'stakeholder'
 let MAP_FOCUS=null;                // node id at the centre of a stakeholder map, or null
+let EDGE_COLOUR_BY_STRENGTH=false; // when on, connections draw in their strength's colour
 function largeMapOn(){ return nodes.length>=LARGE_MAP_AT; }
 function nodeSizeScale(){ const m=NODE_SIZE_MODE; return (m==='always'||(m==='auto'&&largeMapOn()))?SMALLER_NODE_SCALE:1; }
 // Dark ink for a node's body on large maps. Returns null when the node keeps its own colour.
@@ -2880,6 +2838,7 @@ function snap(){
     sizeBy:SIZE_BY,
     simpleMode:SIMPLE_MODE,
     mapType:MAP_TYPE,
+    edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
     nodeSizeMode:NODE_SIZE_MODE,
@@ -2942,6 +2901,7 @@ function restoreSnap(s){
   NODE_RING=d.nodeRing===true;
   MAP_TYPE=['general','network','systems','stakeholder'].includes(d.mapType)?d.mapType:'general';
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
+  EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
   if(d.defaultNodeStyle) DEFAULT_NODE_OUTLINE=d.defaultNodeStyle==='outline';
   if(inPresentationEditMode) rebuildPresStopList();
@@ -3077,6 +3037,11 @@ function setNodeContrast(v){
 function setNodeSizeMode(v){
   NODE_SIZE_MODE=['auto','always','never'].includes(v)?v:'auto';
   syncLargeMapUI(); saveState(); markUnsaved(); draw();
+}
+function setEdgeColourByStrength(on){
+  EDGE_COLOUR_BY_STRENGTH=!!on;
+  const c=document.getElementById('settings-edge-colour-strength'); if(c) c.checked=EDGE_COLOUR_BY_STRENGTH;
+  saveState(); markUnsaved(); draw();
 }
 function setNodeRing(on){
   NODE_RING=!!on;
@@ -3222,7 +3187,7 @@ function draw(){
     const isSecondaryEdge=!isHl&&(secondaryIds.has(eSid)||secondaryIds.has(eTid))&&hasHL;
     const strengthId=e.strength||'moderate';
     const style = (e.isLoop||e.strength==='loop') ? LOOP_CONNECTION_STYLE : (CONNECTION_STYLES.find(s=>s.id===strengthId)||CONNECTION_STYLES[1]);
-    const _rawEdgeCol=e.colour||(isHl?'#FF8C8C':style.colour);
+    const _rawEdgeCol=EDGE_COLOUR_BY_STRENGTH?style.colour:(e.colour||(isHl?'#FF8C8C':style.colour));
     const edgeCol=_dark?adaptColourForDark(_rawEdgeCol):_rawEdgeCol;
     // Line weight + dash pattern by type
     const lw = thinLinesOn()? thinWidth(style) : style.lineWidth;
@@ -4113,6 +4078,7 @@ function toggleSec(key){
   if(key==='insights'&&open) renderInsights();
 }
 function toggleInsights(){ toggleSec('insights'); }
+function _syncLoopRow(){ const lr=document.getElementById('conn-loops-row'); if(lr) lr.style.display=MAP_TYPE==='systems'?'block':'none'; }
 function syncSecBadges(){
   const conn=CONN_MIN!==null||CONN_MAX!==null;
   const dates=!!(DATE_ASAT||DATE_FROM||DATE_TO||TIMELINE_ON);
@@ -4374,7 +4340,7 @@ function renderInsights(){
     h += I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows in this view.');
     h += head('Feedback loops');
     _insightLoops=I.loops;
-    h += I.loops.length ? I.loops.map((L,li)=>`<div onclick="highlightLoopByIdx(${li})" style="padding:3px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''" title="Click to highlight this loop on the map">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)}</div>`).join('') : none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
+    h += I.loops.length ? I.loops.map((L,li)=>`<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:3px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''" title="Click to highlight this loop on the map"><span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)}</span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle; Esc puts it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`).join('') : none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
   } else {
     h += head('Most connected');
     h += I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.');
@@ -4434,6 +4400,46 @@ function highlightLoopByIdx(i){
   showStatus('Feedback loop: '+L.map(n=>n.label).join(' → ')+' → '+L[0].label+'. Esc clears.');
 }
 function highlightLoopFromReport(i){ closeReport(); highlightLoopByIdx(i); }
+function highlightAllLoops(){
+  const I=computeInsights(); _insightLoops=I.loops||[];
+  if(!_insightLoops.length){ showStatus(I.directedEdges?'No feedback loops in this view.':"No arrows set, so loops can't be found. Give connections arrows first."); return; }
+  revertLoopCircle();
+  highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
+  _insightLoops.forEach(L=>{
+    const ids=L.map(n=>String(n.id));
+    L.forEach(n=>highlightIds.add(n.id));
+    edges.forEach((e,ei)=>{
+      const a=String(typeof e.source==='object'?e.source.id:e.source);
+      const b=String(typeof e.target==='object'?e.target.id:e.target);
+      for(let k=0;k<ids.length;k++){ const x=ids[k],y=ids[(k+1)%ids.length]; if((a===x&&b===y)||(a===y&&b===x)){ highlightEdges.add(ei); break; } }
+    });
+  });
+  draw();
+  showStatus(_insightLoops.length+' feedback loop'+(_insightLoops.length===1?'':'s')+' highlighted. Esc clears.');
+}
+// Temporary circle view of one loop: positions revert when the highlight clears
+let _loopCirclePrev=null;
+function revertLoopCircle(){
+  if(!_loopCirclePrev) return;
+  _loopCirclePrev.forEach(pv=>{ const n=nodes.find(x=>x.id===pv.id); if(n){ n.x=pv.x; n.y=pv.y; n.fx=pv.fx; n.fy=pv.fy; n.pinned=pv.pinned; } });
+  _loopCirclePrev=null;
+}
+function loopCircleView(i){
+  const L=_insightLoops[i]; if(!L||L.length<3) return;
+  revertLoopCircle();
+  const ns=L.map(o=>nodes.find(x=>x.id===o.id)).filter(Boolean);
+  if(ns.length<3) return;
+  _loopCirclePrev=ns.map(n=>({id:n.id,x:n.x,y:n.y,fx:n.fx,fy:n.fy,pinned:n.pinned}));
+  const ccx=ns.reduce((a,n)=>a+n.x,0)/ns.length, ccy=ns.reduce((a,n)=>a+n.y,0)/ns.length;
+  const r=Math.max(170, ns.length*150/(2*Math.PI));
+  const a0=Math.atan2(ns[0].y-ccy, ns[0].x-ccx);
+  ns.forEach((n,k)=>{
+    const a=a0+k*2*Math.PI/ns.length;
+    n.x=n.fx=ccx+r*Math.cos(a); n.y=n.fy=ccy+r*Math.sin(a); n.pinned=true;
+  });
+  highlightLoopByIdx(i);
+  showStatus('Loop shown as a circle. Esc or a click on the background puts it back.');
+}
 function refreshInsightsIfOpen(){
   const body=document.getElementById('sec-insights-body');
   if(body&&body.style.display!=='none') renderInsights();
@@ -4444,6 +4450,7 @@ function applyFilters(){
   _applyFiltersCore();
   if(wasKnock) clearKnock();
   syncSecBadges();
+  _syncLoopRow();
   refreshInsightsIfOpen();
 }
 function clearSearch(){
@@ -4470,6 +4477,7 @@ function clearSearch(){
 }
 function clearHighlight(){
   clearKnock();
+  if(typeof revertLoopCircle==='function') revertLoopCircle();
   highlightIds.clear();highlightEdges.clear();secondaryIds.clear();
   const el=document.getElementById('filter-count');
   if(el) el.style.display='none';
@@ -10768,6 +10776,7 @@ function syncNodeStyleButtons(){
 function syncSizeByConnButtons(){
   { const sm=document.getElementById('settings-simple-mode'); if(sm) sm.value=SIMPLE_MODE; }
   { const mt=document.getElementById('settings-map-type'); if(mt) mt.value=MAP_TYPE; }
+  { const ec=document.getElementById('settings-edge-colour-strength'); if(ec) ec.checked=EDGE_COLOUR_BY_STRENGTH; }
   syncLargeMapUI();
   const ss=document.getElementById('settings-size-by'), cs=document.getElementById('settings-colour-by');
   const opt=(v,t,sel)=>'<option value="'+escHtml(v)+'"'+(v===sel?' selected':'')+'>'+escHtml(t)+'</option>';
