@@ -651,13 +651,16 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 }
 .report-stat.warn{background:var(--coral-l);color:#8B2020;}
 .report-stat.dim{background:var(--surf-2);color:var(--txt-m);}
-.matrix-wrap{overflow-x:auto;}
+.matrix-wrap{overflow:auto;max-height:62vh;}
 .matrix-table{border-collapse:collapse;font-size:10px;min-width:100%;}
 .matrix-table th,.matrix-table td{
   border:1px solid var(--bdr);padding:4px 7px;
   white-space:nowrap;text-align:center;
 }
 .matrix-table th{background:var(--surf-2);font-weight:600;color:var(--txt-m);}
+.matrix-table thead th{position:sticky;top:0;z-index:2;}
+.matrix-table tbody th.row-label{position:sticky;left:0;z-index:1;background:var(--surf-2);}
+.matrix-table thead th.row-label{left:0;z-index:3;}
 .matrix-table th.row-label{text-align:left;max-width:120px;overflow:hidden;text-overflow:ellipsis;}
 .matrix-cell-yes{background:#d4f0ee;color:#085041;font-weight:700;}
 .matrix-cell-strong{background:var(--teal);color:#fff;font-weight:700;}
@@ -973,6 +976,12 @@ body.share-mode #present-exit{display:none !important;}
   font-weight:500;cursor:default;
 }
 .tag-chip-modal .tag-x{cursor:pointer;opacity:0.5;margin-left:2px;font-size:12px;}
+.report-pos{color:#085041;}
+[data-theme="dark"] .report-pos{color:#7fe0c3;}
+[data-theme="dark"] .report-stat{color:#7fe0c3;}
+[data-theme="dark"] .tag-chip-modal{color:#7fe0c3;}
+[data-theme="dark"] .matrix-cell-yes{background:#0f3d38;color:#8fe8d8;}
+[data-theme="dark"] .matrix-cell-weak{background:var(--surf-3);color:var(--ink-h);}
 .tag-chip-modal .tag-x:hover{opacity:1;}
 #tag-filter{
   height:30px;font-size:12px;border-radius:var(--radius);
@@ -4346,7 +4355,8 @@ function renderInsights(){
     h += head('Most affected: incoming influence');
     h += I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows in this view.');
     h += head('Feedback loops');
-    h += I.loops.length ? I.loops.map(L=>`<div style="padding:3px 6px;font-size:11.5px;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)}</div>`).join('') : none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
+    _insightLoops=I.loops;
+    h += I.loops.length ? I.loops.map((L,li)=>`<div onclick="highlightLoopByIdx(${li})" style="padding:3px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''" title="Click to highlight this loop on the map">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)}</div>`).join('') : none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
   } else {
     h += head('Most connected');
     h += I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.');
@@ -4388,6 +4398,24 @@ function renderInsights(){
   h += `<div style="margin-top:10px;display:flex;justify-content:space-between;gap:6px;"><button onclick="renderInsights()" style="font-size:11px;height:26px;padding:0 10px;">Refresh</button><button onclick="openReport()" title="The matrix, strength and version views" style="font-size:11px;height:26px;padding:0 10px;">Full report</button></div>`;
   body.innerHTML=h;
 }
+let _insightLoops=[];
+function highlightLoopByIdx(i){
+  const L=_insightLoops[i]; if(!L||!L.length) return;
+  highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
+  const ids=L.map(n=>n.id);
+  ids.forEach(id=>highlightIds.add(id));
+  for(let k=0;k<ids.length;k++){
+    const a=ids[k], b=ids[(k+1)%ids.length];
+    edges.forEach((e,ei)=>{
+      const es=typeof e.source==='object'?e.source.id:e.source;
+      const et=typeof e.target==='object'?e.target.id:e.target;
+      if((es===a&&et===b)||(es===b&&et===a)) highlightEdges.add(ei);
+    });
+  }
+  draw();
+  showStatus('Feedback loop: '+L.map(n=>n.label).join(' → ')+' → '+L[0].label+'. Esc clears.');
+}
+function highlightLoopFromReport(i){ closeReport(); highlightLoopByIdx(i); }
 function refreshInsightsIfOpen(){
   const body=document.getElementById('sec-insights-body');
   if(body&&body.style.display!=='none') renderInsights();
@@ -7440,6 +7468,16 @@ function buildSummaryReport(){
     html+=`</div>`;
   }
 
+  if(MAP_TYPE==='systems'){
+    const LI=computeInsights();
+    _insightLoops=LI.loops||[];
+    html+=`<div class="report-section"><h4>Feedback loops</h4>`;
+    if(!LI.directedEdges) html+=`<div style="font-size:12px;color:var(--txt-m);">No arrows set, so loops can't be detected. Give connections arrows to see them.</div>`;
+    else if(!_insightLoops.length) html+=`<div style="font-size:12px;color:var(--txt-m);">None found: influence flows one way.</div>`;
+    else html+=`<div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">A loop is a chain of effects that circles back on itself. Click one to see it on the map.</div>`+
+      _insightLoops.map((L,li)=>`<div class="report-row" onclick="highlightLoopFromReport(${li})" style="cursor:pointer;" title="Click to highlight this loop on the map">${L.map(n=>escHtml(n.label)).join(' → ')} → ${escHtml(L[0].label)}</div>`).join('');
+    html+=`</div>`;
+  }
   return html;
 }
 
@@ -7447,7 +7485,7 @@ function buildMatrixReport(){
   const vis=getVisibleNodes();
   const visEdges=getVisibleEdges();
   if(vis.length===0) return `<div style="color:var(--txt-m);padding:20px;text-align:center;">No nodes visible. Apply a filter first or clear the filter to see all nodes.</div>`;
-  if(vis.length>30) return `<div style="color:var(--txt-m);padding:20px;text-align:center;">Too many nodes for a matrix (${vis.length}). Filter to 30 or fewer nodes.</div>`;
+  if(vis.length>60) return `<div style="color:var(--txt-m);padding:20px;text-align:center;">Too many nodes for a matrix (${vis.length}). Filter to 60 or fewer nodes.</div>`;
 
   const sorted=[...vis].sort((a,b)=>a.label.localeCompare(b.label));
   const connMap={};
@@ -7630,7 +7668,7 @@ function buildChangeReport(){
 
   if(added.length){
     html+=`<div class="report-section"><h4>Nodes added</h4>`;
-    added.forEach(n=>{ html+=`<div class="report-row" style="color:#085041;"><span style="width:10px;height:10px;border-radius:50%;background:${n.colour||'#888'};display:inline-block;margin-right:8px;"></span>+ ${n.label}</div>`; });
+    added.forEach(n=>{ html+=`<div class="report-row report-pos"><span style="width:10px;height:10px;border-radius:50%;background:${n.colour||'#888'};display:inline-block;margin-right:8px;"></span>+ ${n.label}</div>`; });
     html+=`</div>`;
   }
   if(removed.length){
@@ -7655,7 +7693,7 @@ function buildChangeReport(){
   }
   if(addedEdges.length||removedEdges.length){
     html+=`<div class="report-section"><h4>Connection changes</h4>`;
-    addedEdges.forEach(e=>{ html+=`<div class="report-row" style="color:#085041;">+ ${nodeLabel(e.from||e.source,v2)} ↔ ${nodeLabel(e.to||e.target,v2)}</div>`; });
+    addedEdges.forEach(e=>{ html+=`<div class="report-row report-pos">+ ${nodeLabel(e.from||e.source,v2)} ↔ ${nodeLabel(e.to||e.target,v2)}</div>`; });
     removedEdges.forEach(e=>{ html+=`<div class="report-row" style="color:var(--coral-t);">− ${nodeLabel(e.from||e.source,v1)} ↔ ${nodeLabel(e.to||e.target,v1)}</div>`; });
     html+=`</div>`;
   }
