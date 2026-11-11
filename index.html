@@ -2256,14 +2256,6 @@ function selectConnColour(col){
           </div>
         </div>
         <div style="margin-bottom:24px;">
-          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Default node style</h4>
-          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Apply a fill style to all nodes instantly.</p>
-          <div style="display:flex;gap:8px;">
-            <button id="btn-style-filled" onclick="setDefaultNodeStyle('filled')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Filled</button>
-            <button id="btn-style-outline" onclick="setDefaultNodeStyle('outline')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Outline</button>
-          </div>
-        </div>
-        <div style="margin-bottom:24px;">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Size nodes by</h4>
           <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Nodes start at the size you picked and grow with the value, so the biggest stand out. Fields only appear here if they hold numbers.</p>
           <select id="settings-size-by" onchange="setSizeBy(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);"></select>
@@ -2288,6 +2280,7 @@ function selectConnColour(col){
             <option value="always">Always smaller</option>
             <option value="never">Never, normal size</option>
           </select>
+          <label style="display:flex;align-items:center;gap:8px;margin:12px 0 0 0;font-size:12px;color:var(--ink);cursor:pointer;"><input type="checkbox" id="settings-node-ring" onchange="setNodeRing(this.checked)"> Coloured ring on dark nodes</label>
           <div style="font-size:12px;font-weight:600;color:var(--ink);margin:12px 0 4px 0;">Simple drawing</div>
           <select id="settings-simple-mode" onchange="setSimpleMode(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);">
             <option value="auto">Automatic (simple from 600 nodes)</option>
@@ -2543,6 +2536,7 @@ const LARGE_MAP_AT=300;
 const SMALLER_NODE_SCALE=0.7;
 let NODE_CONTRAST='auto';
 let NODE_SIZE_MODE='auto';
+let NODE_RING=false;               // coloured ring on dark nodes, off by default
 function largeMapOn(){ return nodes.length>=LARGE_MAP_AT; }
 function nodeSizeScale(){ const m=NODE_SIZE_MODE; return (m==='always'||(m==='auto'&&largeMapOn()))?SMALLER_NODE_SCALE:1; }
 // Dark ink for a node's body on large maps. Returns null when the node keeps its own colour.
@@ -2834,6 +2828,7 @@ function snap(){
     simpleMode:SIMPLE_MODE,
     nodeContrast:NODE_CONTRAST,
     nodeSizeMode:NODE_SIZE_MODE,
+    nodeRing:NODE_RING,
     colourBy:COLOUR_BY,
     defaultNodeStyle:DEFAULT_NODE_OUTLINE?'outline':'filled',
   });
@@ -2889,6 +2884,7 @@ function restoreSnap(s){
   SIMPLE_MODE=['auto','on','off'].includes(d.simpleMode)?d.simpleMode:'auto';
   NODE_CONTRAST=['auto','always','never'].includes(d.nodeContrast)?d.nodeContrast:'auto';
   NODE_SIZE_MODE=['auto','always','never'].includes(d.nodeSizeMode)?d.nodeSizeMode:'auto';
+  NODE_RING=d.nodeRing===true;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
   if(d.defaultNodeStyle) DEFAULT_NODE_OUTLINE=d.defaultNodeStyle==='outline';
   if(inPresentationEditMode) rebuildPresStopList();
@@ -3025,7 +3021,12 @@ function setNodeSizeMode(v){
   NODE_SIZE_MODE=['auto','always','never'].includes(v)?v:'auto';
   syncLargeMapUI(); saveState(); markUnsaved(); draw();
 }
+function setNodeRing(on){
+  NODE_RING=!!on;
+  syncLargeMapUI(); saveState(); markUnsaved(); draw();
+}
 function syncLargeMapUI(){
+  const rg=document.getElementById('settings-node-ring'); if(rg) rg.checked=NODE_RING;
   const c=document.getElementById('settings-node-contrast'); if(c) c.value=NODE_CONTRAST;
   const z=document.getElementById('settings-node-size'); if(z) z.value=NODE_SIZE_MODE;
 }
@@ -3496,8 +3497,8 @@ function draw(){
       const _ink=nodeInk(n);
       ctx.fillStyle=_ink||nodeCol;
       ctx.fill();
-      if(_ink){
-        // Ring in the node's own colour so categories still show on a dark node
+      if(_ink&&(NODE_RING||isHl)){
+        // Ring in the node's own colour (or amber when selected) on a dark node
         ctx.strokeStyle=isHl?'#f59e0b':(n.colour||'#888');
         ctx.lineWidth=(isHl?4:3)/zoom;
       } else {
