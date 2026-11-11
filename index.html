@@ -1662,10 +1662,10 @@ body.share-mode #present-exit{display:none !important;}
     <div style="background:#fff;border-radius:16px;padding:26px 30px;box-shadow:0 8px 32px rgba(0,0,0,0.10);border:1px solid rgba(0,0,0,0.08);width:100%;">
       <div style="font-size:14px;font-weight:700;color:#18181b;margin-bottom:5px;letter-spacing:-0.02em;">Name your project</div>
       <p style="font-size:12px;color:#71717a;margin:0 0 14px;">Give your map a name to get started.</p>
-      <input type="text" id="project-name-input" name="puddl-map-title" data-lpignore="true" data-1p-ignore readonly onfocus="this.removeAttribute('readonly')"
+      <input type="text" id="project-name-input" name="puddl-field-x7" autocomplete="one-time-code" data-lpignore="true" data-1p-ignore readonly onfocus="this.removeAttribute('readonly')" oninput="window._nameTyped=true"
         placeholder="e.g. Community Network 2026"
         style="width:100%;height:44px;font-size:14px;border-radius:9px;border:1.5px solid rgba(0,0,0,0.14);background:#fafafa;color:#18181b;padding:0 14px;font-family:inherit;letter-spacing:-0.01em;outline:none;box-sizing:border-box;transition:border-color .15s;"
-        autocomplete="off" spellcheck="false"
+        spellcheck="false"
         onkeydown="if(event.key==='Enter')confirmWho()">
       <div id="splash-type-wrap">
       <div style="font-size:11px;font-weight:600;color:#71717a;margin:14px 0 6px;text-align:left;">What kind of map is this?</div>
@@ -1737,10 +1737,14 @@ function _splashAfterLand(skipBaa){
   setTimeout(()=>{
     phaseB.style.opacity='1'; phaseB.style.pointerEvents='auto';
     syncSplashTypeWrap();
-    setTimeout(()=>{
+    // Browsers autofill a sign-in email here at unpredictable moments; clear it unless the user typed it
+    window._nameTyped=false;
+    [150,500,1000,2000,3500].forEach((t,i)=>setTimeout(()=>{
       const inp=document.getElementById('project-name-input');
-      if(inp){ if(/@/.test(inp.value)) inp.value=''; inp.focus(); }
-    },150);
+      if(!inp) return;
+      if(/@/.test(inp.value)&&!window._nameTyped) inp.value='';
+      if(i===0) inp.focus();
+    },t));
   },1620+extra);
 }
 function _retroDrop(logo,phaseA,bg){
@@ -5615,11 +5619,13 @@ function layoutImportedNodes(newNodes){
     const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target;
     if(byId.has(a)&&byId.has(b)&&(isNew.has(a)||isNew.has(b))) links.push({source:a,target:b});
   });
-  const dist=simpleAfter?34:150;
+  // Systems maps need room between nodes so the arrows read; others stay compact
+  const roomy=MAP_TYPE==='systems'&&!simpleAfter;
+  const dist=simpleAfter?34:(roomy?300:150);
   const fs=d3.forceSimulation(simNodes)
-    .force('link',d3.forceLink(links).id(d=>d.id).distance(dist).strength(0.7))
-    .force('charge',d3.forceManyBody().strength(simpleAfter?-40:-400).distanceMax(simpleAfter?400:1500))
-    .force('collide',d3.forceCollide(d=>d.r))
+    .force('link',d3.forceLink(links).id(d=>d.id).distance(dist).strength(roomy?0.5:0.7))
+    .force('charge',d3.forceManyBody().strength(simpleAfter?-40:(roomy?-1200:-400)).distanceMax(simpleAfter?400:(roomy?3000:1500)))
+    .force('collide',d3.forceCollide(d=>roomy?d.r*1.6:d.r))
     .force('x',d3.forceX((W/2-panX)/zoom).strength(0.04))
     .force('y',d3.forceY((H/2-panY)/zoom).strength(0.04))
     .stop();
