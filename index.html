@@ -3829,8 +3829,17 @@ function syncFullscreenIcon(){
 document.addEventListener('fullscreenchange',syncFullscreenIcon);
 document.addEventListener('webkitfullscreenchange',syncFullscreenIcon);
 
+// How far out you'd need to zoom to see the whole map, and the floor that allows it
+function fitZoomLevel(){
+  if(!nodes.length) return 0.02;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  nodes.forEach(n=>{minX=Math.min(minX,n.x);maxX=Math.max(maxX,n.x);minY=Math.min(minY,n.y);maxY=Math.max(maxY,n.y);});
+  const pad=100,cw=maxX-minX+pad*2,ch=maxY-minY+pad*2;
+  return Math.min(W/cw,H/ch);
+}
+function minZoomAllowed(){ return Math.max(0.0005, Math.min(0.02, fitZoomLevel()*0.8)); }
 function zoomBy(f){
-  const oz=zoom;zoom=Math.max(0.02,Math.min(8,zoom*f));
+  const oz=zoom;zoom=Math.max(minZoomAllowed(),Math.min(8,zoom*f));
   panX=W/2-(W/2-panX)*(zoom/oz);panY=H/2-(H/2-panY)*(zoom/oz);draw();
 }
 function zoomReset(){zoom=1;panX=W/2;panY=H/2;fitAll();}
@@ -3839,7 +3848,7 @@ function fitAll(){
   let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
   nodes.forEach(n=>{minX=Math.min(minX,n.x);maxX=Math.max(maxX,n.x);minY=Math.min(minY,n.y);maxY=Math.max(maxY,n.y);});
   const pad=100,cw=maxX-minX+pad*2,ch=maxY-minY+pad*2;
-  zoom=Math.max(0.02,Math.min(2,Math.min(W/cw,H/ch)));
+  zoom=Math.max(minZoomAllowed(),Math.min(2,Math.min(W/cw,H/ch)));
   panX=W/2-(minX+maxX)/2*zoom;panY=H/2-(minY+maxY)/2*zoom;draw();
 }
 
@@ -5579,7 +5588,7 @@ function spreadNodes(factor){
   loops.forEach(lp=>{ if(lp.cx!==undefined){ lp.cx=cx+(lp.cx-cx)*factor; lp.cy=cy+(lp.cy-cy)*factor; if(lp.radius) lp.radius*=factor; } });
   if(factor<1) resolveOverlaps({silent:true});
   addLog(factor>1?'spread nodes out':'pulled nodes in');
-  saveState(); markUnsaved(); draw();
+  saveState(); markUnsaved(); fitAll();
   showStatus(factor>1?'Spread out. Undo puts it back.':'Pulled in. Undo puts it back.');
 }
 function tidyLayout(){
@@ -6476,7 +6485,7 @@ function confirmModal(){
 canvas.addEventListener('wheel',e=>{
   e.preventDefault();
   const f=e.deltaY<0?1.1:0.91,oz=zoom;
-  zoom=Math.max(0.02,Math.min(8,zoom*f));
+  zoom=Math.max(minZoomAllowed(),Math.min(8,zoom*f));
   panX=e.offsetX-(e.offsetX-panX)*(zoom/oz);
   panY=e.offsetY-(e.offsetY-panY)*(zoom/oz);
   draw();
