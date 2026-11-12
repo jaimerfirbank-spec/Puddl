@@ -1112,7 +1112,8 @@ body.share-mode #present-exit{display:none !important;}
       <div class="dd-menu" id="menu-layout">
         <button onclick="spreadNodes(1.25)" title="Move every node further apart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg> Spread out</button>
         <button onclick="spreadNodes(0.8)" title="Move every node closer together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg> Pull in</button>
-        <button onclick="tidyLayout()" title="Re-arrange the whole map so connected nodes sit together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l2 8M16.5 10l-5 6"/></svg> Tidy layout</button>
+        <button onclick="tidyLayout()" title="Even out spacing and reduce crossing lines without re-arranging your map"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l2 8M16.5 10l-5 6"/></svg> Tidy layout</button>
+        <button onclick="rearrangeLayout()" title="Rebuild the whole layout from scratch so connected nodes sit together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg> Re-arrange from scratch</button>
         <button id="btn-tree-layout" onclick="treeLayout()" style="display:none;" title="Arrange as a tree: the claim, centre or best-connected node at the top, everything else in rows below"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v5M5 17v-5h14v5"/></svg>Tree layout</button>
         <div class="dd-sep"></div>
         <button onclick="rotateMap(-15)" title="Turn the whole map 15 degrees anticlockwise; names stay level"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg> Rotate left</button>
@@ -1262,7 +1263,7 @@ body.share-mode #present-exit{display:none !important;}
       <div id="member-filter-chips" class="ms-chips" style="display:none;"></div>
     </div>
     <!-- Tag multi-select -->
-    <div id="tag-filter-wrap" class="ms-wrap" style="margin-bottom:6px;">
+    <div id="tag-filter-wrap" class="ms-wrap" style="display:none;margin-bottom:6px;">
       <div class="ms-label">All tags</div>
       <div id="tag-filter-chips" class="ms-chips" style="display:none;"></div>
     </div>
@@ -2745,7 +2746,7 @@ function findFreePosition(x, y, r, excludeId){
   const isFree=(cx,cy)=>{
     for(let i=0;i<nodes.length;i++){
       const o=nodes[i]; if(o.id===excludeId) continue;
-      const or=(nodeDims(o).r||40)+8;
+      const or=_layoutR(o)+12;
       const minD=r+or;
       if((cx-o.x)*(cx-o.x)+(cy-o.y)*(cy-o.y)<minD*minD) return false;
     }
@@ -5956,11 +5957,73 @@ function timelinePlay(){
 }
 
 // ── Spacing tools ──────────────────────────────────────────────────────────
+// Radius that covers the node AND the name under it, for layout spacing.
+// Keeps a clear minimum gap between whole nodes (name included), not just the circles.
+function _layoutR(n){
+  if(n.type==='centre') return 120;
+  const d=nodeDims(n), r=d.r||40;
+  if(!showNodeLabels||insideLabel(n)) return r+4;
+  ctx.save();
+  ctx.font=`400 ${d.FS}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+  let tw=ctx.measureText(n.label||'').width;
+  ctx.restore();
+  const maxW=r*3.5;
+  if(tw>maxW&&String(n.label||'').includes(' ')) tw=tw/2+12;   // the label wraps onto two lines
+  tw=Math.min(tw,maxW);
+  const below=r+5+(d.FS+2)*2;      // bottom of a two-line label
+  return Math.max(r, tw*0.48, below*0.72);
+}
 function _collR(n){
   if(n.type==='centre') return 70;
   if(_simpleNow) return _simpleR(n)*1.42+3;      // square: half-diagonal
   const r=nodeDims(n).r||40;
   return n.shape==='pill'?r*1.45:r;
+}
+// Try swapping node positions and keep any swap that reduces crossing lines. Time-capped.
+function untangleLayout(maxMs){
+  if(nodes.length<3||nodes.length>400||edges.length<2||edges.length>600) return 0;
+  const ids=nodes.filter(n=>n.type!=='centre').map(n=>n.id);
+  if(ids.length<3) return 0;
+  const pos=new Map(nodes.map(n=>[n.id,{x:n.x,y:n.y}]));
+  const segs=[];
+  const byNode=new Map(nodes.map(n=>[n.id,[]]));
+  edges.forEach(e=>{
+    const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target;
+    if(a===b||!pos.has(a)||!pos.has(b)) return;
+    const si=segs.length; segs.push([a,b]);
+    byNode.get(a).push(si); byNode.get(b).push(si);
+  });
+  if(segs.length<2) return 0;
+  const o=(p,q,r)=>{ const v=(q.y-p.y)*(r.x-q.x)-(q.x-p.x)*(r.y-q.y); return v>0?1:v<0?-1:0; };
+  const cross=(i,j)=>{
+    const [a,b]=segs[i],[c,d]=segs[j];
+    if(a===c||a===d||b===c||b===d) return false;   // links that share a node always touch — not a crossing
+    const P=pos.get(a),Q=pos.get(b),R=pos.get(c),S=pos.get(d);
+    return o(P,Q,R)!==o(P,Q,S)&&o(R,S,P)!==o(R,S,Q);
+  };
+  const crossesOf=set=>{ let c=0; set.forEach(i=>{ for(let j=0;j<segs.length;j++){ if(!set.has(j)||j>i){ if(cross(i,j)) c++; } } }); return c; };
+  const all=new Set(segs.map((_,i)=>i));
+  let total=0; for(let i=0;i<segs.length;i++) for(let j=i+1;j<segs.length;j++) if(cross(i,j)) total++;
+  if(!total) return 0;
+  const t0=performance.now();
+  let improved=0;
+  while(performance.now()-t0<maxMs&&total>0){
+    const a=ids[Math.random()*ids.length|0], b=ids[Math.random()*ids.length|0];
+    if(a===b) continue;
+    const touched=new Set([...(byNode.get(a)||[]),...(byNode.get(b)||[])]);
+    if(!touched.size) continue;
+    const before=crossesOf(touched);
+    const pa=pos.get(a), pb=pos.get(b);
+    pos.set(a,pb); pos.set(b,pa);
+    const after=crossesOf(touched);
+    if(after<before){ total+=after-before; improved++; }
+    else { pos.set(a,pa); pos.set(b,pb); }
+  }
+  if(improved){
+    nodes.forEach(n=>{ const q=pos.get(n.id); if(q){ n.x=n.fx=q.x; n.y=n.fy=q.y; n.vx=0; n.vy=0; } });
+    loops.forEach(lp=>{ const ln=(lp.nodeIds||[]).map(id=>nodes.find(n=>n.id===id)).filter(Boolean); if(ln.length&&lp.cx!==undefined){ lp.cx=ln.reduce((a,n)=>a+n.x,0)/ln.length; lp.cy=ln.reduce((a,n)=>a+n.y,0)/ln.length; } });
+  }
+  return improved;
 }
 // Push apart any nodes that overlap. Nodes that don't overlap don't move.
 function resolveOverlaps(opts){
@@ -5968,7 +6031,8 @@ function resolveOverlaps(opts){
   _degCache=null; _fieldStatCache={};
   _simpleNow=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&nodes.length>=SIMPLE_THRESHOLD);
   const gap=_simpleNow?3:10;
-  const sn=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:_collR(n)+gap/2}));
+  const labelAware=opts&&opts.labelAware&&!_simpleNow;
+  const sn=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:labelAware?_layoutR(n)+15:_collR(n)+gap/2}));
   const overlapping=()=>{ const q=d3.quadtree(sn,d=>d.x,d=>d.y); let hit=0; const maxR=Math.max(...sn.map(d=>d.r));
     sn.forEach(a=>{ q.visit((nd,x0,y0,x1,y1)=>{ if(!nd.length){ let d=nd; do{ const b=d.data; if(b!==a&&b.id>a.id){ const dx=a.x-b.x,dy=a.y-b.y,rr=a.r+b.r; if(dx*dx+dy*dy<rr*rr*0.995) hit++; } }while(d=d.next); }
       return x0>a.x+a.r+maxR||x1<a.x-a.r-maxR||y0>a.y+a.r+maxR||y1<a.y-a.r-maxR; }); });
@@ -6064,12 +6128,24 @@ function treeLayout(){
 }
 function tidyLayout(){
   if(nodes.length<2) return;
-  layoutImportedNodes(nodes.slice());
-  resolveOverlaps({silent:true});
+  // Keeps your arrangement: only pulls apart nodes closer than the minimum gap (names included),
+  // then reduces crossing lines where a simple swap helps.
+  resolveOverlaps({silent:true,labelAware:true});
+  untangleLayout(350);
   addLog('tidied layout');
   saveState(); markUnsaved(); draw();
   if(typeof fitAll==='function') fitAll();
-  showStatus('Layout tidied. Not what you wanted? Press Undo.');
+  showStatus('Tidied: spacing evened out, crossings reduced where possible. Undo puts it back.');
+}
+function rearrangeLayout(){
+  if(nodes.length<2) return;
+  layoutImportedNodes(nodes.slice());
+  untangleLayout(350);
+  resolveOverlaps({silent:true});
+  addLog('re-arranged layout');
+  saveState(); markUnsaved(); draw();
+  if(typeof fitAll==='function') fitAll();
+  showStatus('Re-arranged from scratch. Undo puts it back.');
 }
 
 // Arrange freshly imported nodes so connected ones sit together, then pin them in place.
@@ -6078,7 +6154,8 @@ function layoutImportedNodes(newNodes){
   const total=nodes.length;
   const simpleAfter=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&total>=SIMPLE_THRESHOLD);
   const isNew=new Set(newNodes.map(n=>n.id));
-  const rad=n=>simpleAfter?_simpleR(n)+6:(nodeDims(n).r||40)+18;
+  // Each node's layout radius covers its name too, plus half of the 30px minimum gap
+  const rad=n=>simpleAfter?_simpleR(n)+6:_layoutR(n)+15;
   const simNodes=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:rad(n),fx:isNew.has(n.id)?null:n.x,fy:isNew.has(n.id)?null:n.y}));
   const byId=new Map(simNodes.map(d=>[d.id,d]));
   const links=[];
@@ -6086,13 +6163,44 @@ function layoutImportedNodes(newNodes){
     const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target;
     if(byId.has(a)&&byId.has(b)&&(isNew.has(a)||isNew.has(b))) links.push({source:a,target:b});
   });
+  // Fresh layout of the whole map: seed positions first — hubs in the middle of their group,
+  // the rest in rings outward, separate groups side by side — so lines start out untangled
+  if(!simpleAfter&&isNew.size===simNodes.length&&simNodes.length>2){
+    const nb=new Map(simNodes.map(d=>[d.id,[]]));
+    links.forEach(l=>{ nb.get(l.source).push(l.target); nb.get(l.target).push(l.source); });
+    const seen=new Set(); const comps=[];
+    simNodes.slice().sort((a,b)=>(nb.get(b.id).length-nb.get(a.id).length)).forEach(seed=>{
+      if(seen.has(seed.id)) return;
+      const ring=new Map([[seed.id,0]]); const q=[seed.id]; seen.add(seed.id);
+      while(q.length){ const u=q.shift(); (nb.get(u)||[]).forEach(v=>{ if(!seen.has(v)){ seen.add(v); ring.set(v,ring.get(u)+1); q.push(v); } }); }
+      comps.push(ring);
+    });
+    const avgR=simNodes.reduce((a,d)=>a+d.r,0)/simNodes.length;
+    let ox=0, rowH=0, oy=0, rowW=0;
+    const rowMax=Math.sqrt(simNodes.length)*avgR*3.2;
+    comps.forEach(ring=>{
+      const depthCount={}; ring.forEach(d=>depthCount[d]=(depthCount[d]||0)+1);
+      const maxDepth=Math.max(0,...[...ring.values()]);
+      const compR=Math.max(avgR,(maxDepth+0.5)*avgR*2.1);
+      if(rowW>rowMax){ oy+=rowH+avgR*1.5; rowW=0; ox=0; rowH=0; }
+      const idxAt={};
+      ring.forEach((depth,id)=>{
+        const d=byId.get(id);
+        const k=idxAt[depth]=(idxAt[depth]||0)+1;
+        const a=(k/depthCount[depth])*2*Math.PI+depth*0.7;
+        const rr=depth*avgR*2.1;
+        d.x=ox+compR+Math.cos(a)*rr; d.y=oy+compR+Math.sin(a)*rr;
+      });
+      ox+=compR*2+avgR*1.5; rowW=ox; rowH=Math.max(rowH,compR*2);
+    });
+  }
   // Systems maps need room between nodes so the arrows read; others stay compact
   const roomy=MAP_TYPE==='systems'&&!simpleAfter;
-  const dist=simpleAfter?34:(roomy?300:150);
+  const dist=simpleAfter?34:(roomy?300:160);
   const fs=d3.forceSimulation(simNodes)
     .force('link',d3.forceLink(links).id(d=>d.id).distance(dist).strength(roomy?0.5:0.7))
     .force('charge',d3.forceManyBody().strength(simpleAfter?-40:(roomy?-1200:-400)).distanceMax(simpleAfter?400:(roomy?3000:1500)))
-    .force('collide',d3.forceCollide(d=>roomy?d.r*1.6:d.r))
+    .force('collide',d3.forceCollide(d=>roomy?d.r*1.2:d.r).strength(0.9))
     .force('x',d3.forceX((W/2-panX)/zoom).strength(0.04))
     .force('y',d3.forceY((H/2-panY)/zoom).strength(0.04))
     .stop();
@@ -6212,7 +6320,7 @@ function confirmImport(){
   const mergedNodeCount=toUpdate.filter(u=>u.isMerge).length;
   if(mergedNodeCount) parts.push(`${mergedNodeCount} node${mergedNodeCount!==1?'s':''} identified as same`);
   const msg=parts.length?parts.join(', ')+'.':'Nothing new to import.';
-  if(added){ layoutImportedNodes(nodes.slice(nodes.length-added)); resolveOverlaps({silent:true}); }
+  if(added){ layoutImportedNodes(nodes.slice(nodes.length-added)); untangleLayout(350); resolveOverlaps({silent:true}); }
   if(added||connsAdded||mergedCount||mergedNodeCount){
     addLog(`imported: ${msg}`);
     buildSim();if(typeof forceOn!=='undefined'&&forceOn&&sim) sim.alpha(0.4).restart();
