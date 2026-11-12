@@ -2438,10 +2438,10 @@ let LOOP_CONNECTION_STYLE = {id:'loop',label:'Loop',colour:'#3B82F6',lineWidth:2
 // Connection styles configuration
 let CONNECTION_STYLES = [
   {id:'strong', label:'Strong', colour:'#1E40AF', lineWidth:4.5, dashPattern:[], arrowScale:1.3},
-  {id:'moderate', label:'Moderate', colour:'#3B82F6', lineWidth:2.2, dashPattern:[], arrowScale:1},
+  {id:'moderate', label:'Moderate', colour:'#0EA5E9', lineWidth:2.2, dashPattern:[], arrowScale:1},
   {id:'weak', label:'Weak', colour:'#888888', lineWidth:1.2, dashPattern:[], arrowScale:0.75},
-  {id:'bold', label:'Bold', colour:'#0F172A', lineWidth:7, dashPattern:[], arrowScale:1.8},
-  {id:'dashed', label:'Dashed', colour:'#64748B', lineWidth:2.2, dashPattern:[8,4], arrowScale:1},
+  {id:'bold', label:'Bold', colour:'#7C3AED', lineWidth:7, dashPattern:[], arrowScale:1.8},
+  {id:'dashed', label:'Dashed', colour:'#EA580C', lineWidth:2.2, dashPattern:[8,4], arrowScale:1},
   {id:'double', label:'Double', colour:'#059669', lineWidth:2, dashPattern:[], arrowScale:1, isDouble:true}
 ];
 
@@ -3322,6 +3322,7 @@ function draw(){
 
   // Edges — start/end at node border, clip through intermediate nodes
   if(_simpleNow) drawSimpleEdges(hasHL,_dark);
+  const _ctFilterOn=typeof msSelected!=='undefined'&&msSelected['conn-type-filter']&&msSelected['conn-type-filter'].size>0;
   edges.forEach((e,i)=>{
     if(_simpleNow) return;
     const a=typeof e.source==='object'?e.source:nodes.find(n=>n.id===e.source);
@@ -3387,7 +3388,8 @@ function draw(){
     ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
     const _pc=_pinEdgeCols.size?_pinEdgeCols.get(i):null;
     const _pcs=_pc?_pc.map(ci=>loopColourOf(ci,_dark)):null;
-    const drawStroke=_pcs?_pcs[0].col:(isHl?'#FF8C8C':edgeCol);
+    const _typeCol=isHl&&_ctFilterOn?(_dark?adaptColourForDark(style.colour):style.colour):null;
+    const drawStroke=_pcs?_pcs[0].col:(_typeCol||(isHl?'#FF8C8C':edgeCol));
 
     // Draw stroke — loop arcs use ctx.arc(), others use quadratic Bezier
     if(loopC){
@@ -4609,7 +4611,7 @@ function renderInsights(){
       lh += I.loops.map((L,li)=>{
         const on=_pinnedLoops.has(loopKey(L));
         const lc=on?loopColourOf(_pinColourIdx.get(loopKey(L))||0,document.documentElement.getAttribute('data-theme')==='dark').col:'';
-        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span><span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span></span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle; Clear or Esc puts it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
+        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span><span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span></span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
       }).join('');
     } else lh += none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
     h += grp('loops','Feedback loops',(I.loopsCapped?I.loops.length+'+':I.loops.length),lh);
@@ -4703,7 +4705,9 @@ function pinLoop(i,on){
 // Click a loop to add it to the highlight; click it again to take it off. Several can be on at once.
 function highlightLoopByIdx(i){
   const L=_insightLoops[i]; if(!L||!L.length) return;
-  pinLoop(i,!_pinnedLoops.has(loopKey(L)));
+  const _on=_pinnedLoops.has(loopKey(L));
+  if(_on&&_loopCircle&&_loopCircle.key===loopKey(L)) revertLoopCircle();
+  pinLoop(i,!_on);
   _afterPinChange(_pinMsg());
 }
 function clearLoopPins(){
@@ -4728,6 +4732,7 @@ function revertLoopCircle(){
 }
 function loopCircleView(i){
   const L=_insightLoops[i]; if(!L||L.length<3) return;
+  if(_loopCircle&&_loopCircle.key===loopKey(L)){ revertLoopCircle(); draw(); showStatus('Circle view off. The map is back as it was.'); return; }
   revertLoopCircle();
   const ns=L.map(o=>nodes.find(x=>x.id===o.id)).filter(Boolean);
   if(ns.length<3) return;
@@ -4739,7 +4744,7 @@ function loopCircleView(i){
     const a=a0+k*2*Math.PI/ns.length;
     n.x=n.fx=ccx+r*Math.cos(a); n.y=n.fy=ccy+r*Math.sin(a); n.pinned=true;
   });
-  _loopCircle={cx:ccx,cy:ccy,r,n:ns.length,order:new Map(ns.map((n,k)=>[n.id,k]))};
+  _loopCircle={cx:ccx,cy:ccy,r,n:ns.length,order:new Map(ns.map((n,k)=>[n.id,k])),key:loopKey(L)};
   pinLoop(i,true); _afterPinChange(_pinMsg());
   showStatus('Loop shown as a circle. Press Clear in the loop list, or Esc, to put it back.');
 }
