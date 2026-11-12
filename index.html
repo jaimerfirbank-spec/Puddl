@@ -1112,8 +1112,7 @@ body.share-mode #present-exit{display:none !important;}
       <div class="dd-menu" id="menu-layout">
         <button onclick="spreadNodes(1.25)" title="Move every node further apart"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg> Spread out</button>
         <button onclick="spreadNodes(0.8)" title="Move every node closer together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg> Pull in</button>
-        <button onclick="tidyLayout()" title="Even out spacing and reduce crossing lines without re-arranging your map"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l2 8M16.5 10l-5 6"/></svg> Tidy layout</button>
-        <button onclick="rearrangeLayout()" title="Rebuild the whole layout from scratch so connected nodes sit together"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg> Re-arrange from scratch</button>
+        <button onclick="rearrangeLayout()" title="Rebuilds the whole layout: connected nodes together, clear space around every name, fewer crossing lines. Undo puts it back."><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8 7l8 1M7.5 8l2 8M16.5 10l-5 6"/></svg> Auto-arrange</button>
         <button id="btn-tree-layout" onclick="treeLayout()" style="display:none;" title="Arrange as a tree: the claim, centre or best-connected node at the top, everything else in rows below"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="17" width="6" height="5" rx="1"/><rect x="16" y="17" width="6" height="5" rx="1"/><path d="M12 7v5M5 17v-5h14v5"/></svg>Tree layout</button>
         <div class="dd-sep"></div>
         <button onclick="rotateMap(-15)" title="Turn the whole map 15 degrees anticlockwise; names stay level"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg> Rotate left</button>
@@ -6142,10 +6141,10 @@ function rearrangeLayout(){
   layoutImportedNodes(nodes.slice());
   untangleLayout(350);
   resolveOverlaps({silent:true});
-  addLog('re-arranged layout');
+  addLog('auto-arranged layout');
   saveState(); markUnsaved(); draw();
   if(typeof fitAll==='function') fitAll();
-  showStatus('Re-arranged from scratch. Undo puts it back.');
+  showStatus('Map auto-arranged. Undo puts it back.');
 }
 
 // Arrange freshly imported nodes so connected ones sit together, then pin them in place.
