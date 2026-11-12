@@ -1272,7 +1272,7 @@ body.share-mode #present-exit{display:none !important;}
         <span>Connections <span id="sec-conn-badge" style="display:none;margin-left:6px;font-size:9.5px;font-weight:700;color:var(--on-ink);background:var(--ink);border-radius:8px;padding:1px 6px;">ON</span></span><span id="sec-conn-arrow">▸</span>
       </button>
       <div id="sec-conn-body" style="display:none;margin-top:6px;">
-        <div id="conn-loops-row" style="display:none;margin-bottom:8px;"><button onclick="highlightAllLoops()" style="width:100%;font-size:11px;height:28px;">↻ Highlight all feedback loops</button></div>
+
         <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-m);">
           <span style="font-weight:600;min-width:52px;">Count</span>
           <input type="number" id="conn-min" min="0" placeholder="from" oninput="applyFilters()" style="width:72px;height:28px;font-size:12px;padding:0 6px;">
@@ -2633,7 +2633,17 @@ let COLOUR_BY='';                // '' | 'connections' | 'field:<id>'
 let _degCache=null;             // node id -> connection count, rebuilt each frame
 let showNodeLabels=true;
 let DEFAULT_NODE_OUTLINE=false; // false=filled, true=outline
-let highlightIds=new Set(),highlightEdges=new Set(),secondaryIds=new Set();
+// A Set whose clear() keeps any pinned items. Pinned feedback loops use this so hovering, scrolling and
+// node clicks don't wipe them; only Clear, clicking the loop again, or clearing the search does.
+class PinSet extends Set{
+  constructor(it){ super(it); this.pins=null; }
+  clear(){ super.clear(); if(this.pins) this.pins.forEach(x=>super.add(x)); }
+  clearAll(){ this.pins=null; super.clear(); }
+}
+let highlightIds=new PinSet(),highlightEdges=new PinSet(),secondaryIds=new Set();
+const LOOP_CAP=100, LOOP_MAX_STEPS=20;
+const _pinnedLoops=new Map();   // loop key -> [node ids]
+let _pinEdgeSig=-1;
 let idCtr=0;
 let history=[],histIdx=-1;
 let modalMode='add',modalNodeId=null,modalNodeType='org';
@@ -3174,6 +3184,7 @@ function setSimpleMode(v){
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function draw(){
+  if(_pinnedLoops.size&&_pinEdgeSig!==edges.length) refreshLoopPins();
   _lblBoxCache=new Map();
   const _tn=thinLinesOn(); if(_tn!==_thinShown){ _thinShown=_tn; syncStrengthLegend(); }
   _degCache=null; _fieldStatCache={};
@@ -4213,7 +4224,7 @@ function toggleSec(key){
   if(key==='insights'&&open) renderInsights();
 }
 function toggleInsights(){ toggleSec('insights'); }
-function _syncLoopRow(){ const lr=document.getElementById('conn-loops-row'); if(lr) lr.style.display=MAP_TYPE==='systems'?'block':'none'; }
+function _syncLoopRow(){}
 function syncSecBadges(){
   const conn=CONN_MIN!==null||CONN_MAX!==null;
   const dates=!!(DATE_ASAT||DATE_FROM||DATE_TO||TIMELINE_ON);
@@ -4222,7 +4233,9 @@ function syncSecBadges(){
 }
 function computeInsights(){
   const people=nodes.filter(n=>n.type!=='centre');
-  const filtered=highlightIds.size>0;
+  // Pinned feedback loops are a highlight, not a filter: they don't narrow the insights
+  const _pins=highlightIds.pins;
+  const filtered=_pins?[...highlightIds].some(id=>!_pins.has(id)):highlightIds.size>0;
   const pool=filtered?people.filter(n=>highlightIds.has(n.id)):people;
   const inPool=new Set(pool.map(n=>n.id));
   const adj=new Map(pool.map(n=>[n.id,new Set()]));
@@ -4348,24 +4361,28 @@ function computeInsights(){
   const drivers=[...pool].filter(n=>outDeg.get(n.id)>0).sort((x,y)=>outDeg.get(y.id)-outDeg.get(x.id)||byLabel(x,y)).slice(0,5);
   const sinks=[...pool].filter(n=>inDeg.get(n.id)>0).sort((x,y)=>inDeg.get(y.id)-inDeg.get(x.id)||byLabel(x,y)).slice(0,5);
 
-  // Feedback loops (systems maps): directed cycles of 3 to 6 nodes, work-capped
-  const loops=[];
+  // Feedback loops (systems maps): directed cycles of 3 to 20 steps. Capped at LOOP_CAP loops and a
+  // work budget so a huge, dense map can't freeze the page. loopsCapped says the list may be incomplete.
+  const loops=[]; let loopsCapped=false;
   if(MAP_TYPE==='systems'&&directedEdges&&pool.length<=2000){
     const idx=new Map(pool.map((n,i)=>[n.id,i]));
     const byId2=new Map(pool.map(n=>[n.id,n]));
-    let budget=150000;
+    const seenKey=new Set();
+    let budget=1500000;
     const dfs=(start,cur,path,onPath)=>{
-      if(budget--<0||loops.length>=5) return;
+      if(budget--<0||loops.length>=LOOP_CAP) return;
       for(const nxt of dirAdj.get(cur)||[]){
-        if(budget<0||loops.length>=5) return;
+        if(budget<0||loops.length>=LOOP_CAP) return;
         if(nxt===start){
-          if(path.length>=3) loops.push(path.map(id=>byId2.get(id)));
-        } else if(!onPath.has(nxt)&&path.length<6&&idx.get(nxt)>idx.get(start)){
+          if(path.length>=3){ const k=path.join('>'); if(!seenKey.has(k)){ seenKey.add(k); loops.push(path.map(id=>byId2.get(id))); } }
+        } else if(!onPath.has(nxt)&&path.length<LOOP_MAX_STEPS&&idx.get(nxt)>idx.get(start)){
           onPath.add(nxt); path.push(nxt); dfs(start,nxt,path,onPath); path.pop(); onPath.delete(nxt);
         }
       }
     };
-    for(const n of pool){ if(loops.length>=5||budget<0) break; dfs(n.id,n.id,[n.id],new Set([n.id])); }
+    for(const n of pool){ if(loops.length>=LOOP_CAP||budget<0) break; dfs(n.id,n.id,[n.id],new Set([n.id])); }
+    loopsCapped=loops.length>=LOOP_CAP||budget<0;
+    loops.sort((a,b)=>a.length-b.length);
   }
 
   // Clusters: separate pieces of the map that don't touch (within this view)
@@ -4399,7 +4416,7 @@ function computeInsights(){
 
   return {filtered,pool,deg,total,most,least,isolated,bridges:bridges.slice(0,5),linked,alone,
           groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length,
-          outDeg,inDeg,drivers,sinks,directedEdges,loops,compCount,compBig,focus,focusGuessed,fD,fCounts,
+          outDeg,inDeg,drivers,sinks,directedEdges,loops,loopsCapped,compCount,compBig,focus,focusGuessed,fD,fCounts,
           arg:MAP_TYPE==='argument'?argumentAnalysis(pool):null};
 }
 // Argument maps: what's for, what's against, and where the gaps are
@@ -4448,7 +4465,7 @@ function insightSummaryLines(I){
       if(I.drivers[0]) S.push(`${I.drivers[0].label} influences the most other factors: ${I.outDeg.get(I.drivers[0].id)} outgoing arrows.`);
       if(I.sinks[0]) S.push(`${I.sinks[0].label} is affected by the most: ${I.inDeg.get(I.sinks[0].id)} incoming arrows.`);
       S.push(I.loops.length
-        ? `${I.loops.length>=5?'At least 5':I.loops.length} feedback loop${I.loops.length===1?'':'s'} found: a chain of effects that circles back on itself.`
+        ? `${I.loopsCapped?'At least '+I.loops.length:I.loops.length} feedback loop${I.loops.length===1?'':'s'} found: a chain of effects that circles back on itself.`
         : 'No feedback loops found in this view: influence flows one way.');
     }
   } else if(MAP_TYPE==='argument'){
@@ -4480,6 +4497,15 @@ function insightSummaryLines(I){
   if(I.compCount>1) S.push(`This view is ${I.compCount} separate clusters that don't touch. The biggest holds ${noun(I.compBig)}.`);
   return S;
 }
+let _insOpen={};
+try{ _insOpen=JSON.parse(localStorage.getItem('puddl-ins-open')||'{}')||{}; }catch(e){ _insOpen={}; }
+function toggleInsGroup(k){
+  _insOpen[k]=!_insOpen[k];
+  try{ localStorage.setItem('puddl-ins-open',JSON.stringify(_insOpen)); }catch(e){}
+  const b=document.getElementById('insg-'+k), a=document.getElementById('insa-'+k);
+  if(b) b.style.display=_insOpen[k]?'block':'none';
+  if(a) a.textContent=_insOpen[k]?'▾':'▸';
+}
 function renderInsights(){
   const body=document.getElementById('sec-insights-body');
   if(!body) return;
@@ -4490,7 +4516,11 @@ function renderInsights(){
   const NOUN=mapNounPack();
   const noun=k=>`${k} ${k===1?NOUN[0]:NOUN[1]}`;
   const plural=(k,w)=>w==='person'?noun(k):`${k} ${w}${k===1?'':'s'}`;
-  const head=t=>`<div style="font-size:10.5px;font-weight:700;letter-spacing:0.04em;color:var(--ink-h);margin:12px 0 4px;">${t}</div>`;
+  const grp=(k,t,count,inner)=>{
+    const on=!!_insOpen[k];
+    const badge=(count!==null&&count!==undefined)?`<span style="font-weight:600;color:var(--ink-m);background:var(--surf-3);border-radius:9px;padding:0 6px;font-size:10px;margin-left:6px;">${count}</span>`:'';
+    return `<div style="border-top:1px solid var(--bdr);margin-top:6px;"><div onclick="toggleInsGroup('${k}')" style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 2px 5px;cursor:pointer;user-select:none;"><span style="font-size:10.5px;font-weight:700;letter-spacing:0.04em;color:var(--ink-h);">${t}${badge}</span><span id="insa-${k}" style="font-size:10px;color:var(--ink-h);">${on?'▾':'▸'}</span></div><div id="insg-${k}" style="display:${on?'block':'none'};padding-bottom:4px;">${inner}</div></div>`;
+  };
   const none=t=>`<div style="color:var(--ink-h);font-size:11px;padding:3px 6px;">${t}</div>`;
   const row=(n,right)=>`<div onclick="selectSearchSuggestion('${esc(n.id)}')" style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`;
   const pair=(a,b)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 6px;"><span>${a}</span><span style="color:var(--ink-h);">${b}</span></div>`;
@@ -4506,102 +4536,133 @@ function renderInsights(){
 
   if(I.filtered) h += `<div style="font-size:10.5px;color:var(--ink-h);margin-top:4px;">Lists show each ${NOUN[0]}'s total connections across the whole map.</div>`;
   if(MAP_TYPE==='stakeholder'&&I.focus){
-    h += head(`Directly linked to ${esc(I.focus.label)}`);
-    const direct=I.pool.filter(n=>I.fD&&I.fD.get(n.id)===1).sort((a,b)=>I.total.get(b.id)-I.total.get(a.id)).slice(0,5);
-    h += direct.length ? direct.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('Nothing is linked to the centre yet.');
+    const direct=I.pool.filter(n=>I.fD&&I.fD.get(n.id)===1).sort((a,b)=>I.total.get(b.id)-I.total.get(a.id));
+    h += grp('focus',`Directly linked to ${esc(I.focus.label)}`,direct.length,
+      direct.length ? direct.slice(0,10).map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('Nothing is linked to the centre yet.'));
   }
   if(MAP_TYPE==='argument'&&I.arg){
     const A=I.arg;
-    h += head('Reasons with no evidence');
-    h += A.noEvidence.length ? A.noEvidence.slice(0,8).map(n=>row(n,'no evidence')).join('') : none(A.reasons.length?'Every reason has evidence.':'No reasons yet.');
-    h += head('Objections not answered');
-    h += A.unanswered.length ? A.unanswered.slice(0,8).map(n=>row(n,'no rebuttal')).join('') : none(A.objections.length?'Every objection has a rebuttal.':'No objections yet.');
-    h += head('Best backed');
-    h += A.branches.length ? A.branches.map(b=>row(b.node,`${b.ev} evidence`)).join('') : none('No evidence linked yet.');
+    h += grp('argnoev','Reasons with no evidence',A.noEvidence.length,
+      A.noEvidence.length ? A.noEvidence.map(n=>row(n,'no evidence')).join('') : none(A.reasons.length?'Every reason has evidence.':'No reasons yet.'));
+    h += grp('argunans','Objections not answered',A.unanswered.length,
+      A.unanswered.length ? A.unanswered.map(n=>row(n,'no rebuttal')).join('') : none(A.objections.length?'Every objection has a rebuttal.':'No objections yet.'));
+    h += grp('argbest','Best backed',A.branches.length,
+      A.branches.length ? A.branches.map(b=>row(b.node,`${b.ev} evidence`)).join('') : none('No evidence linked yet.'));
   }
   if(MAP_TYPE==='systems'&&I.directedEdges){
-    h += head('Drivers: most outgoing influence');
-    h += I.drivers.length ? I.drivers.map(n=>row(n,`${I.outDeg.get(n.id)} out`)).join('') : none('No arrows in this view.');
-    h += head('Most affected: incoming influence');
-    h += I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows in this view.');
-    h += head('Feedback loops');
+    h += grp('drivers','Drivers: most outgoing influence',null,
+      I.drivers.length ? I.drivers.map(n=>row(n,`${I.outDeg.get(n.id)} out`)).join('') : none('No arrows in this view.'));
+    h += grp('sinks','Most affected: incoming influence',null,
+      I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows in this view.'));
     _insightLoops=I.loops;
-    h += I.loops.length ? I.loops.map((L,li)=>`<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:3px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''" title="Click to highlight this loop on the map"><span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)}</span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle; Esc puts it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`).join('') : none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
+    let lh='';
+    if(I.loops.length){
+      const anyPin=I.loops.some(L=>_pinnedLoops.has(loopKey(L)));
+      lh += `<div style="display:flex;gap:6px;margin:2px 0 6px;"><button onclick="highlightAllLoops()" style="flex:1;font-size:10.5px;height:26px;">↻ Highlight all</button>${anyPin?`<button onclick="clearLoopPins()" style="font-size:10.5px;height:26px;padding:0 10px;">Clear</button>`:''}</div>`;
+      lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Click loops to highlight them. Click again to remove one.${I.loopsCapped?' Showing the first '+I.loops.length+'.':''}</div>`;
+      lh += I.loops.map((L,li)=>{
+        const on=_pinnedLoops.has(loopKey(L));
+        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?'background:var(--surf-3);box-shadow:inset 3px 0 0 #f59e0b;':''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:#f59e0b;font-weight:700;">${on?'✓':''}</span><span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span></span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle; Clear or Esc puts it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
+      }).join('');
+    } else lh += none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
+    h += grp('loops','Feedback loops',(I.loopsCapped?I.loops.length+'+':I.loops.length),lh);
   } else {
-    h += head('Most connected');
-    h += I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.');
-    h += head('Fewest connections');
-    h += I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('');
+    h += grp('most','Most connected',null,
+      I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.'));
+    h += grp('least','Fewest connections',null, I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') || none('None yet.'));
   }
-  h += head(MAP_TYPE==='systems' ? 'Choke points: removing one factor cuts others off' : `Bridges: removing one ${NOUN[0]} cuts others off`);
-  h += I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none(`No single ${NOUN[0]} links separate groups.`);
+  h += grp('bridges', MAP_TYPE==='systems' ? 'Choke points' : 'Bridges', I.bridges.length,
+    `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Removing one ${NOUN[0]} cuts others off.</div>`+
+    (I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none(`No single ${NOUN[0]} links separate groups.`)));
 
-  h += head('Groups');
-  h += pair(plural(I.linked.length,'linked group'), plural(I.alone,'person')+' on their own');
-  h += I.linked.slice(0,5).map(g=>row(g.best,`group of ${g.size}`)).join('');
+  h += grp('groups','Groups',I.linked.length,
+    pair(plural(I.linked.length,'linked group'), plural(I.alone,'person')+' on their own') + I.linked.slice(0,5).map(g=>row(g.best,`group of ${g.size}`)).join(''));
 
-  h += head('By category');
   const cEntries=Object.entries(I.cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const cMax=cEntries.length?cEntries[0][1]:1;
-  h += cEntries.map(([k,v])=>`<div style="padding:3px 6px 0;display:flex;justify-content:space-between;font-size:11.5px;"><span>${esc(k)}</span><span style="color:var(--ink-h);">${v}</span></div>${bar(v/cMax*100)}`).join('') || none('Nothing to count yet.');
+  h += grp('cats','By category',null,
+    cEntries.map(([k,v])=>`<div style="padding:3px 6px 0;display:flex;justify-content:space-between;font-size:11.5px;"><span>${esc(k)}</span><span style="color:var(--ink-h);">${v}</span></div>${bar(v/cMax*100)}`).join('') || none('Nothing to count yet.'));
 
-  h += head('By field');
-  if(!I.fieldSummaries.length) h += none('No field values filled in yet.');
+  let fh='';
+  if(!I.fieldSummaries.length) fh += none('No field values filled in yet.');
   I.fieldSummaries.forEach(f=>{
-    h += `<div style="padding:4px 6px 0;font-size:11px;font-weight:600;color:var(--ink-h);">${esc(f.name)} <span style="font-weight:400;">(${f.filled} filled in)</span></div>`;
-    h += f.top.map(([k,v])=>pair(esc(k),v)).join('');
+    fh += `<div style="padding:4px 6px 0;font-size:11px;font-weight:600;color:var(--ink-h);">${esc(f.name)} <span style="font-weight:400;">(${f.filled} filled in)</span></div>`;
+    fh += f.top.map(([k,v])=>pair(esc(k),v)).join('');
   });
+  h += grp('fields','By field',I.fieldSummaries.length||null,fh);
 
-  h += head('Connection types');
   const tEntries=Object.entries(I.types).sort((a,b)=>b[1]-a[1]);
-  h += tEntries.length ? tEntries.map(([k,v])=>pair(esc(I.typeLabel(k)),v)).join('') : none('No connections in this view.');
+  h += grp('types','Connection types',null,
+    tEntries.length ? tEntries.map(([k,v])=>pair(esc(I.typeLabel(k)),v)).join('') : none('No connections in this view.'));
 
-  h += head('Growth by year');
   const ys=Object.keys(I.years).sort();
+  let yh='';
   if(!ys.length){
-    h += none('No dates yet. Import a "Date added" column, or new items get today\'s date.');
+    yh += none('No dates yet. Import a "Date added" column, or new items get today\'s date.');
   } else {
     const yMax=Math.max(...ys.map(y=>I.years[y].p+I.years[y].c),1);
-    h += ys.map(y=>`<div style="padding:3px 6px 0;display:flex;justify-content:space-between;font-size:11.5px;"><span>${y}</span><span style="color:var(--ink-h);">${I.years[y].p} ${NOUN[1]}, ${I.years[y].c} connections</span></div>${bar((I.years[y].p+I.years[y].c)/yMax*100)}`).join('');
+    yh += ys.map(y=>`<div style="padding:3px 6px 0;display:flex;justify-content:space-between;font-size:11.5px;"><span>${y}</span><span style="color:var(--ink-h);">${I.years[y].p} ${NOUN[1]}, ${I.years[y].c} connections</span></div>${bar((I.years[y].p+I.years[y].c)/yMax*100)}`).join('');
   }
+  h += grp('growth','Growth by year',null,yh);
 
   h += `<div style="margin-top:10px;display:flex;justify-content:space-between;gap:6px;"><button onclick="renderInsights()" style="font-size:11px;height:26px;padding:0 10px;">Refresh</button><button onclick="openReport()" title="The matrix, strength and version views" style="font-size:11px;height:26px;padding:0 10px;">Full report</button></div>`;
   body.innerHTML=h;
 }
 let _insightLoops=[];
-function highlightLoopByIdx(i){
-  const L=_insightLoops[i]; if(!L||!L.length) return;
-  highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
-  const ids=L.map(n=>n.id);
-  ids.forEach(id=>highlightIds.add(id));
-  for(let k=0;k<ids.length;k++){
-    const a=ids[k], b=ids[(k+1)%ids.length];
+function loopKey(L){ return L.map(n=>String(n.id)).join('>'); }
+// Rebuild the pinned node and edge sets from the pinned loops (edge positions change when links are added or removed)
+function refreshLoopPins(){
+  if(!(highlightIds instanceof PinSet)) highlightIds=new PinSet(highlightIds);
+  if(!(highlightEdges instanceof PinSet)) highlightEdges=new PinSet(highlightEdges);
+  const pn=new Set(), pe=new Set();
+  if(_pinnedLoops.size){
+    const pairs=new Set();
+    _pinnedLoops.forEach(ids=>{
+      ids.forEach(id=>pn.add(id));
+      for(let k=0;k<ids.length;k++){ const a=String(ids[k]), b=String(ids[(k+1)%ids.length]); pairs.add(a+'|'+b); pairs.add(b+'|'+a); }
+    });
     edges.forEach((e,ei)=>{
-      const es=typeof e.source==='object'?e.source.id:e.source;
-      const et=typeof e.target==='object'?e.target.id:e.target;
-      if((es===a&&et===b)||(es===b&&et===a)) highlightEdges.add(ei);
+      const a=String(typeof e.source==='object'?e.source.id:e.source), b=String(typeof e.target==='object'?e.target.id:e.target);
+      if(pairs.has(a+'|'+b)) pe.add(ei);
     });
   }
-  draw();
-  showStatus('Feedback loop: '+L.map(n=>n.label).join(' → ')+' → '+L[0].label+'. Esc clears.');
+  highlightIds.pins=pn.size?pn:null; highlightEdges.pins=pe.size?pe:null;
+  pn.forEach(x=>Set.prototype.add.call(highlightIds,x)); pe.forEach(x=>Set.prototype.add.call(highlightEdges,x));
+  _pinEdgeSig=edges.length;
+}
+function _afterPinChange(msg){
+  Set.prototype.clear.call(highlightIds); Set.prototype.clear.call(highlightEdges); secondaryIds.clear();
+  refreshLoopPins(); draw();
+  if(typeof refreshInsightsIfOpen==='function') refreshInsightsIfOpen();
+  if(msg) showStatus(msg);
+}
+function _pinMsg(){
+  const k=_pinnedLoops.size;
+  return k?`${k} feedback loop${k===1?'':'s'} highlighted. Click a loop again to remove it, or press Clear.`:'Loop highlights cleared.';
+}
+function pinLoop(i,on){
+  const L=_insightLoops[i]; if(!L||!L.length) return;
+  const key=loopKey(L);
+  if(on) _pinnedLoops.set(key,L.map(n=>n.id)); else _pinnedLoops.delete(key);
+}
+// Click a loop to add it to the highlight; click it again to take it off. Several can be on at once.
+function highlightLoopByIdx(i){
+  const L=_insightLoops[i]; if(!L||!L.length) return;
+  pinLoop(i,!_pinnedLoops.has(loopKey(L)));
+  _afterPinChange(_pinMsg());
+}
+function clearLoopPins(){
+  revertLoopCircle();
+  _pinnedLoops.clear();
+  _afterPinChange('Loop highlights cleared.');
 }
 function highlightLoopFromReport(i){ closeReport(); highlightLoopByIdx(i); }
 function highlightAllLoops(){
   const I=computeInsights(); _insightLoops=I.loops||[];
   if(!_insightLoops.length){ showStatus(I.directedEdges?'No feedback loops in this view.':"No arrows set, so loops can't be found. Give connections arrows first."); return; }
   revertLoopCircle();
-  highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
-  _insightLoops.forEach(L=>{
-    const ids=L.map(n=>String(n.id));
-    L.forEach(n=>highlightIds.add(n.id));
-    edges.forEach((e,ei)=>{
-      const a=String(typeof e.source==='object'?e.source.id:e.source);
-      const b=String(typeof e.target==='object'?e.target.id:e.target);
-      for(let k=0;k<ids.length;k++){ const x=ids[k],y=ids[(k+1)%ids.length]; if((a===x&&b===y)||(a===y&&b===x)){ highlightEdges.add(ei); break; } }
-    });
-  });
-  draw();
-  showStatus(_insightLoops.length+' feedback loop'+(_insightLoops.length===1?'':'s')+' highlighted. Esc clears.');
+  _insightLoops.forEach((L,i)=>pinLoop(i,true));
+  _afterPinChange(_pinMsg());
 }
 // Temporary circle view of one loop: positions revert when the highlight clears
 let _loopCirclePrev=null;
@@ -4623,7 +4684,7 @@ function loopCircleView(i){
     const a=a0+k*2*Math.PI/ns.length;
     n.x=n.fx=ccx+r*Math.cos(a); n.y=n.fy=ccy+r*Math.sin(a); n.pinned=true;
   });
-  highlightLoopByIdx(i);
+  pinLoop(i,true); _afterPinChange(_pinMsg());
   showStatus('Loop shown as a circle. Esc or a click on the background puts it back.');
 }
 function refreshInsightsIfOpen(){
@@ -4664,7 +4725,12 @@ function clearSearch(){
 function clearHighlight(){
   clearKnock();
   if(typeof revertLoopCircle==='function') revertLoopCircle();
-  highlightIds.clear();highlightEdges.clear();secondaryIds.clear();
+  const _hadPins=_pinnedLoops.size>0;
+  _pinnedLoops.clear();
+  if(highlightIds.clearAll) highlightIds.clearAll(); else highlightIds.clear();
+  if(highlightEdges.clearAll) highlightEdges.clearAll(); else highlightEdges.clear();
+  secondaryIds.clear();
+  if(_hadPins&&typeof refreshInsightsIfOpen==='function') setTimeout(refreshInsightsIfOpen,0);
   const el=document.getElementById('filter-count');
   if(el) el.style.display='none';
   draw();
