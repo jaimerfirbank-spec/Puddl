@@ -2565,7 +2565,7 @@ const MAP_TYPES=['general','network','systems','stakeholder','argument'];
 // Argument maps: each node plays one part. Links are Supports or Opposes, pointing from the
 // smaller point (evidence) up to the bigger one (the claim).
 const ARG_PARTS=[
-  {id:'claim',     label:'Claim',     colour:'#1E3A8A', hint:'The main statement being argued'},
+  {id:'claim',     label:'Claim',     colour:'#4F46E5', hint:'The main statement being argued'},
   {id:'reason',    label:'Reason',    colour:'#16A34A', hint:'A reason for'},
   {id:'objection', label:'Objection', colour:'#DC2626', hint:'A reason against'},
   {id:'evidence',  label:'Evidence',  colour:'#2563EB', hint:'Facts or data that back a point'},
@@ -2622,7 +2622,8 @@ function syncStrengthLegend(){
       const dash=(st.dashPattern&&st.dashPattern.length)?'dashed':'solid';
       const h=st.isDouble?'4px double':'';
       const bw=st.isDouble?'3px double':thinWidth(st)+'px '+dash;
-      return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;"><span style="width:36px;border-top:${bw} ${st.colour};display:inline-block;"></span><span>${st.label}</span></div>`;
+      const _sc=document.documentElement.getAttribute('data-theme')==='dark'?adaptColourForDark(st.colour):st.colour;
+      return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;"><span style="width:36px;border-top:${bw} ${_sc};display:inline-block;"></span><span>${st.label}</span></div>`;
     }).join('');
   el.style.display='block';
 }      // nodes at which 'auto' switches to simple drawing
@@ -2843,7 +2844,7 @@ function edgeAt(sx,sy){
     const b=typeof e.target==='object'?e.target:nodes.find(n=>n.id===e.target);
     if(!a||!b) continue;
     const dx=b.x-a.x, dy=b.y-a.y, dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=Math.min(dist*0.18,45);
+    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
     const mx=(a.x+b.x)/2-dy/dist*curve;
     const my=(a.y+b.y)/2+dx/dist*curve;
     // Sample points along the quadratic bezier
@@ -2951,7 +2952,10 @@ function restoreSnap(s){
   NODE_SIZE_MODE=['auto','always','never'].includes(d.nodeSizeMode)?d.nodeSizeMode:'auto';
   NODE_RING=d.nodeRing===true;
   MAP_TYPE=MAP_TYPES.includes(d.mapType)?d.mapType:'general';
-  if(MAP_TYPE==='argument') ensureArgStyles();
+  if(MAP_TYPE==='argument'){
+    ensureArgStyles();
+    nodes.forEach(n=>{ if(n.argPart==='claim'&&String(n.colour).toUpperCase()==='#1E3A8A') n.colour='#4F46E5'; });
+  }
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
@@ -2981,6 +2985,64 @@ function undo(){
 function redo(){if(histIdx>=history.length-1)return;histIdx++;restoreSnap(history[histIdx]);updateHistBtns();showStatus('Redone.');}
 
 // ── Adapt a hex colour for dark-mode canvas rendering (boosts lightness to ≥72%) ──
+// Relative luminance of a hex colour (0 = black, 1 = white); null if not a hex colour
+function hexLum(col){
+  const m=String(col||'').match(/^#([0-9a-f]{6}|[0-9a-f]{3})$/i); if(!m) return null;
+  const h=m[1].length===3?m[1].split('').map(c=>c+c).join(''):m[1];
+  const ch=i=>{ const v=parseInt(h.slice(i,i+2),16)/255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); };
+  return 0.2126*ch(0)+0.7152*ch(2)+0.0722*ch(4);
+}
+// Would this fill disappear into the background? Dark fills on dark mode, near-white fills on light mode.
+function fillHardToSee(col,dark){
+  const L=hexLum(col); if(L===null) return false;
+  return dark?L<0.07:L>0.86;
+}
+// Argument maps draw labels inside their boxes; elsewhere it follows the label setting
+function insideLabel(n){
+  return NODE_LABEL_POSITION!=='below'||(MAP_TYPE==='argument'&&(n.shape||'circle')==='rectangle');
+}
+// Split a label into lines that fit maxW; the last line gets an ellipsis if it runs over
+function wrapLabel(c,text,maxW,maxLines){
+  const words=String(text||'').split(/\s+/).filter(Boolean);
+  if(!words.length) return [''];
+  const lines=[]; let cur='';
+  words.forEach(w=>{
+    const t=cur?cur+' '+w:w;
+    if(cur&&c.measureText(t).width>maxW){ lines.push(cur); cur=w; } else cur=t;
+  });
+  if(cur) lines.push(cur);
+  if(lines.length>maxLines){
+    const keep=lines.slice(0,maxLines);
+    let last=keep[maxLines-1]+' '+lines.slice(maxLines).join(' ');
+    while(last.length>1&&c.measureText(last+'…').width>maxW) last=last.slice(0,-1);
+    keep[maxLines-1]=last.trimEnd()+'…';
+    return keep;
+  }
+  return lines;
+}
+// The box a below-the-node label takes up, in map units. Used to keep lines off labels.
+let _lblBoxCache=new Map(), _bgColNow='#ffffff';
+function labelBelowBox(n){
+  const _c=_lblBoxCache.get(n.id); if(_c&&_c.nx===n.x&&_c.ny===n.y) return _c;
+  const d=nodeDims(n), r=d.r||40, fs=d.FS;
+  ctx.save();
+  ctx.font=`400 ${fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+  const sh=n.shape||'circle';
+  const bottom=sh==='triangle'?n.y+r*0.5:sh==='rectangle'?n.y+r*0.85:sh==='pill'?n.y+r*0.65:sh==='star'?n.y+r*0.81:sh==='hexagon'?n.y+r*0.87:n.y+r;
+  const top=bottom+5/zoom, maxW=r*3.5, lh=fs+2;
+  let lines=[n.label||''];
+  if(ctx.measureText(n.label||'').width>maxW&&String(n.label).includes(' ')){
+    const w=n.label.split(' '), mid=Math.ceil(w.length/2);
+    lines=[w.slice(0,mid).join(' '),w.slice(mid).join(' ')];
+  }
+  const tw=Math.min(maxW,Math.max(...lines.map(t=>ctx.measureText(t).width)));
+  ctx.restore();
+  const pad=3/zoom;
+  const box={x0:n.x-tw/2-pad,x1:n.x+tw/2+pad,y0:top-pad*0.6,y1:top+lines.length*lh+pad*0.4,lines,lh,top,maxW,fs,nx:n.x,ny:n.y};
+  _lblBoxCache.set(n.id,box);
+  return box;
+}
+
 function adaptColourForDark(col){
   const m=col.match(/^#([0-9a-f]{6})$/i)||col.match(/^#([0-9a-f]{3})$/i);
   if(!m) return 'rgba(255,255,255,0.55)';
@@ -3112,6 +3174,7 @@ function setSimpleMode(v){
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function draw(){
+  _lblBoxCache=new Map();
   const _tn=thinLinesOn(); if(_tn!==_thinShown){ _thinShown=_tn; syncStrengthLegend(); }
   _degCache=null; _fieldStatCache={};
   _simpleNow=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&nodes.length>=SIMPLE_THRESHOLD);
@@ -3121,6 +3184,7 @@ function draw(){
     if(forceOn) sim.alpha(Math.max(sim.alpha(),0.3)).restart();
   }
   const _dark=document.documentElement.getAttribute('data-theme')==='dark';
+  _bgColNow=_dark?(getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()||'#16161f'):'#ffffff';
   const dpr=window.devicePixelRatio||1;
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,W,H);
@@ -3159,6 +3223,19 @@ function draw(){
   }
 
   // Find point on a node's actual shape border toward (tx,ty)
+  // Like nodeEdgePt, but if the line would run through the node's own label, it stops at the label's edge instead
+  function edgePtClearOfLabel(node,tx,ty){
+    const p=nodeEdgePt(node,tx,ty);
+    if(!showNodeLabels||node.type==='centre'||insideLabel(node)) return p;
+    const B=labelBelowBox(node);
+    const dx=tx-node.x, dy=ty-node.y, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L;
+    let t0=-Infinity, t1=Infinity;
+    const slab=(o,u,lo,hi)=>{ if(Math.abs(u)<1e-9){ if(o<lo||o>hi){ t0=Infinity; t1=-Infinity; } return; } let a=(lo-o)/u, b=(hi-o)/u; if(a>b){ const t=a; a=b; b=t; } t0=Math.max(t0,a); t1=Math.min(t1,b); };
+    slab(node.x,ux,B.x0,B.x1); slab(node.y,uy,B.y0,B.y1);
+    const pd=Math.hypot(p.x-node.x,p.y-node.y);
+    if(t0<=t1&&t1>pd&&t1<L-4/zoom) return {x:node.x+ux*(t1+1.5/zoom), y:node.y+uy*(t1+1.5/zoom)};
+    return p;
+  }
   function nodeEdgePt(node,tx,ty){
     const dx=tx-node.x,dy=ty-node.y;
     const dist=Math.sqrt(dx*dx+dy*dy)||1;
@@ -3246,11 +3323,11 @@ function draw(){
     // Arrow size by type
     const arrowScale = style.arrowScale;
 
-    const ap=nodeEdgePt(a,b.x,b.y);
-    const bp=nodeEdgePt(b,a.x,a.y);
+    const ap=edgePtClearOfLabel(a,b.x,b.y);
+    const bp=edgePtClearOfLabel(b,a.x,a.y);
 
     const dx=bp.x-ap.x,dy=bp.y-ap.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=Math.min(dist*0.18,45);
+    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
     // For loop edges: P = 2·arcMid − midEdgePt
     // This is the exact control point that forces B(0.5) through the true arc midpoint
     // on the stored circle, regardless of node size. Works for any N.
@@ -3555,16 +3632,17 @@ function draw(){
     if(isHl){ctx.shadowColor='rgba(0,0,0,0.18)';ctx.shadowBlur=18/zoom;}
     drawNodeShape(ctx,n.x,n.y,r,n.shape,zoom);
     const nodeCol=nodeFill(n);
+    const _hard=fillHardToSee(nodeCol,_dark);
     if(n.outline){
       ctx.fillStyle='rgba(0,0,0,0)';
       ctx.fill();
-      ctx.strokeStyle=nodeCol;
+      ctx.strokeStyle=_hard?(_dark?adaptColourForDark(nodeCol):'#a1a1aa'):nodeCol;
       ctx.lineWidth=2.5/zoom;
       ctx.stroke();
     } else if(n.iconId){
       ctx.fillStyle=_dark?'#1e1e2e':'#ffffff';
       ctx.fill();
-      ctx.strokeStyle=nodeCol;
+      ctx.strokeStyle=_hard?(_dark?adaptColourForDark(nodeCol):'#a1a1aa'):nodeCol;
       ctx.lineWidth=2/zoom;
       ctx.stroke();
     } else {
@@ -3576,9 +3654,10 @@ function draw(){
         ctx.strokeStyle=isHl?'#f59e0b':(n.colour||'#888');
         ctx.lineWidth=(isHl?4:3)/zoom;
       } else {
-        // Subtle border, slightly darker than fill
-        ctx.strokeStyle=_dark?'rgba(255,255,255,0.18)':'rgba(0,0,0,0.12)';
-        ctx.lineWidth=(isHl?2.5:1.5)/zoom;
+        // Subtle border, slightly darker than fill. A fill that would vanish into the background gets a clear ring.
+        const _vanish=!_ink&&_hard;
+        ctx.strokeStyle=_vanish?(_dark?'rgba(255,255,255,0.75)':'rgba(0,0,0,0.45)'):(_dark?'rgba(255,255,255,0.18)':'rgba(0,0,0,0.12)');
+        ctx.lineWidth=(_vanish?2:(isHl?2.5:1.5))/zoom;
       }
       ctx.stroke();
     }
@@ -3607,8 +3686,15 @@ function draw(){
       ctx.restore();
     }
     // ── Label: below or inside node ──────────────────────────────────────────
-    if(showNodeLabels && NODE_LABEL_POSITION==='below'){
+    if(showNodeLabels && !insideLabel(n)){
     ctx.save();
+    { // Backing in the background colour so connectors never show through the label
+      const B=labelBelowBox(n);
+      ctx.fillStyle=_bgColNow;
+      const _ga=ctx.globalAlpha; ctx.globalAlpha=_ga*0.9;
+      ctx.beginPath(); rr(ctx,B.x0,B.y0,B.x1-B.x0,B.y1-B.y0,3/zoom); ctx.fill();
+      ctx.globalAlpha=_ga;
+    }
     ctx.textAlign='center';ctx.textBaseline='top';
     const _dark2=document.documentElement.getAttribute('data-theme')==='dark';
     ctx.fillStyle=_dark2?'#ffffff':'#1a1a1a';
@@ -3634,16 +3720,12 @@ function draw(){
     ctx.fillStyle=n.outline?(_dark?'#ffffff':'#18181b'):getTextColour(nodeCol);
     const _fs=d.FS;
     ctx.font=`500 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
-    const _maxW=(r*2*0.80)|0;
+    const _isRect=(n.shape||'circle')==='rectangle';
+    const _maxW=_isRect?(r*2.6)|0:(r*2*0.80)|0;
     const _lh=_fs+2;
-    if(ctx.measureText(n.label).width>_maxW&&n.label.includes(' ')){
-      const _words=n.label.split(' ');
-      const _mid=Math.ceil(_words.length/2);
-      ctx.fillText(_words.slice(0,_mid).join(' '),Math.round(n.x),Math.round(n.y-_lh/2),_maxW);
-      ctx.fillText(_words.slice(_mid).join(' '),Math.round(n.x),Math.round(n.y+_lh/2),_maxW);
-    } else {
-      ctx.fillText(n.label,Math.round(n.x),Math.round(n.y),_maxW);
-    }
+    const _ls=wrapLabel(ctx,n.label,_maxW,_isRect?3:2);
+    const _y0=n.y-(_ls.length-1)*_lh/2;
+    _ls.forEach((t,i)=>ctx.fillText(t,Math.round(n.x),Math.round(_y0+i*_lh),_maxW));
     ctx.restore();
     }
 
@@ -5944,7 +6026,7 @@ function confirmImport(){
       lastUpdated:Date.now(),
       history:[{ts:Date.now(),text:'Imported from spreadsheet'}]
     };
-    if(r.part){ node.argPart=r.part; if(!(r.colour&&/^#[0-9a-fA-F]{3,6}$/.test(r.colour))) node.colour=argPartOf(node).colour; if(r.part==='claim') node.nodeSize='large'; }
+    if(r.part){ node.argPart=r.part; if(!(r.colour&&/^#[0-9a-fA-F]{3,6}$/.test(r.colour))) node.colour=argPartOf(node).colour; node.shape='rectangle'; if(r.part==='claim') node.nodeSize='large'; }
     node.customFields={};
     Object.entries(r.fields||{}).forEach(([fname,v])=>{ const f=addFieldDef(fname); if(f) node.customFields[f.id]=v; });
     nodes.push(node);
@@ -6065,7 +6147,7 @@ function openEdgeEditPopup(idx, sx, sy){
   document.getElementById('edge-popup-label').textContent=(a&&b)?`${a.label} ↔ ${b.label}`:'Connection';
 
   // Render style buttons with current style highlighted
-  renderEdgeStyleList(e.strength||'moderate');
+  _connShowAll=false; renderEdgeStyleList(e.strength||'moderate');
   renderEdgeArrowBtns(arrowOf(e));
 
   // Position near click
@@ -6511,7 +6593,8 @@ function openAddModal(){
   if(MAP_TYPE==='argument'){
     selectedArgPart=nodes.some(n=>n.argPart==='claim')?'reason':'claim';
     selectedModalColour=argPartOf({argPart:selectedArgPart}).colour;
-    buildColourPicker();
+    selectedModalShape='rectangle';
+    buildColourPicker(); buildShapeSelector();
   }
   buildArgPartSelector();
   document.getElementById('modal-view-panel').style.display='none';
@@ -6814,7 +6897,7 @@ canvas.addEventListener('dblclick',e=>{
     const b=typeof ed.target==='object'?ed.target:nodes.find(nd=>nd.id===ed.target);
     if(!a||!b) return;
     const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=Math.min(dist*0.18,45);
+    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
     const mx=(a.x+b.x)/2-dy/dist*curve, my=(a.y+b.y)/2+dx/dist*curve;
     for(let t=0;t<=1;t+=0.04){
       const qx=(1-t)**2*a.x+2*(1-t)*t*mx+t*t*b.x;
@@ -7145,7 +7228,7 @@ canvas.addEventListener('click',e=>{
       const b=typeof ed.target==='object'?ed.target:nodes.find(n=>n.id===ed.target);
       if(!a||!b) return;
       const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-      const curve=Math.min(dist*0.18,45);
+      const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
       const mx=(a.x+b.x)/2-dy/dist*curve,my=(a.y+b.y)/2+dx/dist*curve;
       for(let t=0;t<=1;t+=0.04){
         const qx=(1-t)**2*a.x+2*(1-t)*t*mx+t*t*b.x;
@@ -7454,11 +7537,21 @@ function selectConnType(type){
     b.style.borderColor = b.id === 'ctype-' + type ? 'var(--ink)' : 'var(--bdr-m)';
   });
 }
+let _connShowAll=false;
+function connStylesForPicker(current){
+  if(MAP_TYPE!=='argument'||_connShowAll) return CONNECTION_STYLES;
+  const f=CONNECTION_STYLES.filter(st=>st.id==='supports'||st.id==='opposes');
+  if(!f.length||(current&&!f.some(st=>st.id===current))) return CONNECTION_STYLES;
+  return f;
+}
+function _moreStylesBtn(fn){
+  return (MAP_TYPE==='argument'&&!_connShowAll)?`<button type="button" onclick="_connShowAll=true;${fn}" style="font-size:11px;height:26px;padding:0 10px;border:none;background:none;color:var(--ink-h);text-decoration:underline;justify-content:flex-start;">More styles</button>`:'';
+}
 function renderConnectionTypeList(){
   const container = document.getElementById('conn-type-list');
   if(!container) return;
   
-  container.innerHTML = CONNECTION_STYLES.map(style => {
+  container.innerHTML = connStylesForPicker().map(style => {
     const isSelected = style.id === selectedConnType;
     return `
       <button onclick="pickAndConfirmConn('${style.id}')" id="ctype-${style.id}" style="display:flex;align-items:center;gap:12px;padding:9px 12px;text-align:left;border-radius:var(--radius);${isSelected ? 'background:var(--surf-3);border-color:var(--ink);' : ''}">
@@ -7468,13 +7561,14 @@ function renderConnectionTypeList(){
         </div>
       </button>
     `;
-  }).join('');
+  }).join('') + _moreStylesBtn('renderConnectionTypeList()');
 }
 
 function renderEdgeStyleList(currentStrength){
   const container=document.getElementById('edge-style-list');
   if(!container) return;
-  container.innerHTML=CONNECTION_STYLES.map(style=>{
+  window._edgeListCur=currentStrength;
+  container.innerHTML=connStylesForPicker(currentStrength).map(style=>{
     const isSelected=style.id===currentStrength;
     return `
       <button onclick="pickEdgeStyle('${style.id}')" style="display:flex;align-items:center;gap:12px;padding:8px 10px;text-align:left;border-radius:var(--radius);width:100%;${isSelected?'background:var(--surf-3);border-color:var(--ink);':''}">
@@ -7483,7 +7577,7 @@ function renderEdgeStyleList(currentStrength){
           <div style="font-size:12px;font-weight:600;">${style.label}</div>
         </div>
       </button>`;
-  }).join('');
+  }).join('') + _moreStylesBtn('renderEdgeStyleList(window._edgeListCur)');
 }
 function pickEdgeStyle(type){
   const style=CONNECTION_STYLES.find(s=>s.id===type);
@@ -7495,7 +7589,8 @@ function pickEdgeStyle(type){
   closeEdgeEditPopup();
 }
 function renderConnectionStyleIcon(style) {
-  const colour = style.colour || '#18181b';
+  const _dk=document.documentElement.getAttribute('data-theme')==='dark';
+  const colour = _dk ? adaptColourForDark(style.colour || '#18181b') : (style.colour || '#18181b');
   const width = style.lineWidth || 2.2;
   const dashArray = style.dashPattern && style.dashPattern.length ? style.dashPattern.join(',') : '';
   const isDouble = style.isDouble || false;
@@ -7516,6 +7611,7 @@ function renderConnectionStyleIcon(style) {
 
 
 function openConnModal(){
+  _connShowAll=false;
   // Reset to default style
   const _ag=pendingConnection?argEdgeFor(pendingConnection.from,pendingConnection.to):null;
   const defaultStyle = CONNECTION_STYLES.find(s => s.id === (_ag?_ag.strength:'moderate')) || CONNECTION_STYLES[0];
@@ -9242,7 +9338,7 @@ function confirmWho(){
       const cname=(ci?ci.value.trim():'');
       if(cname){
         const fx=W/2/zoom-panX/zoom, fy=H/2/zoom-panY/zoom;
-        nodes.push({id:++idCtr,x:fx,y:fy,fx:fx,fy:fy,pinned:true,label:cname,colour:argPartOf({argPart:'claim'}).colour,shape:'circle',nodeSize:'large',titleSize:'large',notes:'',videoUrl:'',customFields:{},date:new Date().toISOString().slice(0,10),type:'process',argPart:'claim'});
+        nodes.push({id:++idCtr,x:fx,y:fy,fx:fx,fy:fy,pinned:true,label:cname,colour:argPartOf({argPart:'claim'}).colour,shape:'rectangle',nodeSize:'large',titleSize:'large',notes:'',videoUrl:'',customFields:{},date:new Date().toISOString().slice(0,10),type:'process',argPart:'claim'});
       }
       setTimeout(()=>showStatus('Add reasons, objections and evidence with + Add node, then link them. Layout > Tree layout tidies it.'),400);
     }
