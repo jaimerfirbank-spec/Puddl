@@ -504,8 +504,8 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   width:clamp(320px,33vw,520px);max-width:none;max-height:none;
   border-radius:0;border-top:none;border-right:none;box-shadow:var(--shadow-xl);
 }
-#hover-panel.docked #hover-panel-title{font-size:15px;}
-#hover-panel.docked #hover-panel-body{padding:14px 16px 10px;}
+#hover-panel.docked #hover-panel-title{font-size:13.5px;}
+#hover-panel.docked #hover-panel-body{padding:8px 12px 6px;}
 .zoom-btns{transition:right .2s ease;}
 #canvas-area.hp-docked .zoom-btns{right:calc(clamp(320px,33vw,520px) + 14px);}
 .hp-hdr-btn{border:none;background:none;padding:2px 6px;height:24px;font-size:13px;line-height:1;cursor:pointer;color:var(--ink-h);border-radius:5px;flex-shrink:0;}
@@ -515,7 +515,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 #hover-panel-footer button{pointer-events:auto;cursor:pointer;}
 #hover-panel-header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:10px 12px 8px;
+  padding:7px 11px 6px;
   border-bottom:1px solid var(--bdr);flex-shrink:0;
   background:var(--surf);
 }
@@ -525,9 +525,9 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   text-overflow:ellipsis;white-space:nowrap;
   letter-spacing:-0.02em;
 }
-#hover-panel-body{overflow-y:auto;padding:10px 12px 6px;}
+#hover-panel-body{overflow-y:auto;padding:7px 11px 5px;}
 #hover-panel-footer{
-  display:flex;gap:6px;padding:7px 10px;
+  display:flex;gap:6px;padding:5px 10px;
   border-top:1px solid var(--bdr);flex-shrink:0;
   background:var(--surf-2);
 }
@@ -543,10 +543,10 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 .mf-input{width:100%;height:30px;font-size:12px;padding:0 9px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;font-family:'DM Sans',sans-serif;}
 .mf-rename{width:100%;height:18px;font-size:11px;padding:0 4px;border-radius:4px;border:1px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;}
 /* ── Side panel fields ────────────────────────────────────────────────────── */
-.sp-field{margin-bottom:7px;}
+.sp-field{margin-bottom:5px;}
 .sp-label{
   font-size:9px;font-weight:700;text-transform:uppercase;
-  letter-spacing:0.07em;color:var(--ink-h);margin-bottom:2px;
+  letter-spacing:0.07em;color:var(--ink-h);margin-bottom:1px;
 }
 .sp-value{font-size:11px;color:var(--ink);line-height:1.4;}
 .sp-chip{
@@ -3974,14 +3974,15 @@ let isViewMode=false;
 let hoverPanelEnabled=true; // toggle for info popups
 
 function toggleHoverPanelEnabled(){
-  showNodeLabels=!showNodeLabels;
+  hoverPanelEnabled=!hoverPanelEnabled;
   const btn=document.getElementById('btn-hover-toggle');
   if(btn){
-    btn.style.background=showNodeLabels?'':'var(--surf-3)';
-    btn.style.opacity=showNodeLabels?'1':'0.45';
-    btn.title=showNodeLabels?'Hide node labels':'Show node labels';
+    btn.style.background=hoverPanelEnabled?'':'var(--surf-3)';
+    btn.style.opacity=hoverPanelEnabled?'1':'0.45';
+    btn.title=hoverPanelEnabled?'Turn node info popups off':'Turn node info popups on';
   }
-  draw();
+  if(!hoverPanelEnabled&&typeof hideHoverPanel==='function') hideHoverPanel(true);
+  showStatus(hoverPanelEnabled?'Node popups on.':'Node popups off. Press the same button to turn them back on.');
 }
 function toggleViewEditMode(){
   isViewMode=!isViewMode;
