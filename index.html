@@ -2644,6 +2644,15 @@ let highlightIds=new PinSet(),highlightEdges=new PinSet(),secondaryIds=new Set()
 const LOOP_CAP=100, LOOP_MAX_STEPS=20;
 const _pinnedLoops=new Map();   // loop key -> [node ids]
 let _pinEdgeSig=-1;
+// Each highlighted loop gets its own colour, kept until it's removed. Past 10 the colours repeat, dashed.
+const LOOP_COLOURS=['#E11D48','#2563EB','#16A34A','#D97706','#9333EA','#0D9488','#EA580C','#DB2777','#65A30D','#92400E'];
+const _pinColourIdx=new Map();  // loop key -> colour number
+let _pinEdgeCols=new Map(), _pinNodeCols=new Map();  // edge index / node id -> [colour numbers]
+let _loopCircle=null;           // {cx,cy,r,order:Map(id->position),n} while a loop is shown as a circle
+function loopColourOf(idx,dark){
+  const c=LOOP_COLOURS[idx%LOOP_COLOURS.length];
+  return {col:dark?adaptColourForDark(c):c, raw:c, dash:Math.floor(idx/LOOP_COLOURS.length)%2===1};
+}
 let idCtr=0;
 let history=[],histIdx=-1;
 let modalMode='add',modalNodeId=null,modalNodeType='org';
@@ -3334,8 +3343,19 @@ function draw(){
     // Arrow size by type
     const arrowScale = style.arrowScale;
 
-    const ap=edgePtClearOfLabel(a,b.x,b.y);
-    const bp=edgePtClearOfLabel(b,a.x,a.y);
+    // In circle view, links between neighbours on the circle bow outward along the circle, not inward
+    let _arc=null;
+    if(_loopCircle&&_loopCircle.order.has(a.id)&&_loopCircle.order.has(b.id)){
+      const ia=_loopCircle.order.get(a.id), ib=_loopCircle.order.get(b.id), N=_loopCircle.n;
+      if(Math.abs(ia-ib)===1||Math.abs(ia-ib)===N-1){
+        const C=_loopCircle, mxc=(a.x+b.x)/2-C.cx, myc=(a.y+b.y)/2-C.cy, md=Math.hypot(mxc,myc)||1;
+        const R=Math.hypot(a.x-C.cx,a.y-C.cy)||C.r;
+        const k=2*R-md;   // puts the curve's middle exactly on the circle, so the link follows the arc
+        _arc={x:C.cx+mxc/md*k, y:C.cy+myc/md*k};
+      }
+    }
+    const ap=_arc?edgePtClearOfLabel(a,_arc.x,_arc.y):edgePtClearOfLabel(a,b.x,b.y);
+    const bp=_arc?edgePtClearOfLabel(b,_arc.x,_arc.y):edgePtClearOfLabel(b,a.x,a.y);
 
     const dx=bp.x-ap.x,dy=bp.y-ap.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
     const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
@@ -3354,6 +3374,8 @@ function draw(){
       const midCD=Math.hypot(midCX,midCY)||1;
       mx=loopC.x+(midCX/midCD)*loopC.r;
       my=loopC.y+(midCY/midCD)*loopC.r;
+    } else if(_arc){
+      mx=_arc.x; my=_arc.y;
     } else {
       mx=(ap.x+bp.x)/2-dy/dist*curve;
       my=(ap.y+bp.y)/2+dx/dist*curve;
@@ -3363,7 +3385,9 @@ function draw(){
     // Edges pass under nodes — no clipping needed (nodes drawn on top in render order)
 
     ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
-    const drawStroke=isHl?'#FF8C8C':edgeCol;
+    const _pc=_pinEdgeCols.size?_pinEdgeCols.get(i):null;
+    const _pcs=_pc?_pc.map(ci=>loopColourOf(ci,_dark)):null;
+    const drawStroke=_pcs?_pcs[0].col:(isHl?'#FF8C8C':edgeCol);
 
     // Draw stroke — loop arcs use ctx.arc(), others use quadratic Bezier
     if(loopC){
@@ -3402,7 +3426,18 @@ function draw(){
         rPx=-rNy;rPy=rNx; // perp at ap (t=0)
         apS={x:ap.x+as*rNx,y:ap.y+as*rNy}; // stroke start = reverse arrowhead base
       }
-      if(style.isDouble&&!dimmed){
+      if(_pcs){
+        // One strand per loop, side by side, each in its loop's colour (dashed after the first ten colours)
+        const gap=3.4/zoom, n=_pcs.length;
+        _pcs.forEach((pc,k)=>{
+          const off=(k-(n-1)/2)*gap, px=-dy/dist*off, py=dx/dist*off;
+          ctx.beginPath();
+          ctx.moveTo(apS.x+px,apS.y+py);
+          ctx.quadraticCurveTo(mx+px,my+py,bpS.x+px,bpS.y+py);
+          ctx.strokeStyle=pc.col; ctx.lineWidth=(n>1?2.4:3)/zoom;
+          ctx.setLineDash(pc.dash?[7/zoom,4/zoom]:[]); ctx.stroke(); ctx.setLineDash([]);
+        });
+      } else if(style.isDouble&&!dimmed){
         const offset=3/zoom;
         const perp={x:-dy/dist*offset,y:dx/dist*offset};
         [1,-1].forEach(side=>{
@@ -3673,6 +3708,17 @@ function draw(){
       ctx.stroke();
     }
     ctx.shadowBlur=0;
+    if(_pinNodeCols.size&&_pinNodeCols.has(n.id)){
+      const cl=_pinNodeCols.get(n.id).slice(0,4);
+      ctx.save();
+      cl.forEach((ci,k)=>{
+        const pc=loopColourOf(ci,_dark);
+        drawNodeShape(ctx,n.x,n.y,r+(4+k*4.5)/zoom,n.shape,zoom);
+        ctx.strokeStyle=pc.col; ctx.lineWidth=3/zoom;
+        ctx.setLineDash(pc.dash?[6/zoom,3/zoom]:[]); ctx.stroke(); ctx.setLineDash([]);
+      });
+      ctx.restore();
+    }
     // Phase 5: Health ring — amber dashed ring for stale nodes (>90 days)
     if(n.lastUpdated&&isNodeStale(n)){
       ctx.save();
@@ -4562,7 +4608,8 @@ function renderInsights(){
       lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Click loops to highlight them. Click again to remove one.${I.loopsCapped?' Showing the first '+I.loops.length+'.':''}</div>`;
       lh += I.loops.map((L,li)=>{
         const on=_pinnedLoops.has(loopKey(L));
-        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?'background:var(--surf-3);box-shadow:inset 3px 0 0 #f59e0b;':''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:#f59e0b;font-weight:700;">${on?'✓':''}</span><span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span></span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle; Clear or Esc puts it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
+        const lc=on?loopColourOf(_pinColourIdx.get(loopKey(L))||0,document.documentElement.getAttribute('data-theme')==='dark').col:'';
+        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span><span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span></span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle; Clear or Esc puts it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
       }).join('');
     } else lh += none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
     h += grp('loops','Feedback loops',(I.loopsCapped?I.loops.length+'+':I.loops.length),lh);
@@ -4615,15 +4662,20 @@ function refreshLoopPins(){
   if(!(highlightIds instanceof PinSet)) highlightIds=new PinSet(highlightIds);
   if(!(highlightEdges instanceof PinSet)) highlightEdges=new PinSet(highlightEdges);
   const pn=new Set(), pe=new Set();
+  _pinEdgeCols=new Map(); _pinNodeCols=new Map();
   if(_pinnedLoops.size){
-    const pairs=new Set();
-    _pinnedLoops.forEach(ids=>{
-      ids.forEach(id=>pn.add(id));
-      for(let k=0;k<ids.length;k++){ const a=String(ids[k]), b=String(ids[(k+1)%ids.length]); pairs.add(a+'|'+b); pairs.add(b+'|'+a); }
+    const pairs=new Map();   // "a|b" -> [colour numbers]
+    _pinnedLoops.forEach((ids,key)=>{
+      const ci=_pinColourIdx.has(key)?_pinColourIdx.get(key):0;
+      ids.forEach(id=>{ pn.add(id); const l=_pinNodeCols.get(id)||[]; if(!l.includes(ci)) l.push(ci); _pinNodeCols.set(id,l); });
+      for(let k=0;k<ids.length;k++){
+        const a=String(ids[k]), b=String(ids[(k+1)%ids.length]);
+        [a+'|'+b,b+'|'+a].forEach(pk=>{ const l=pairs.get(pk)||[]; if(!l.includes(ci)) l.push(ci); pairs.set(pk,l); });
+      }
     });
     edges.forEach((e,ei)=>{
       const a=String(typeof e.source==='object'?e.source.id:e.source), b=String(typeof e.target==='object'?e.target.id:e.target);
-      if(pairs.has(a+'|'+b)) pe.add(ei);
+      const l=pairs.get(a+'|'+b); if(l){ pe.add(ei); _pinEdgeCols.set(ei,l.slice(0,4)); }
     });
   }
   highlightIds.pins=pn.size?pn:null; highlightEdges.pins=pe.size?pe:null;
@@ -4643,7 +4695,10 @@ function _pinMsg(){
 function pinLoop(i,on){
   const L=_insightLoops[i]; if(!L||!L.length) return;
   const key=loopKey(L);
-  if(on) _pinnedLoops.set(key,L.map(n=>n.id)); else _pinnedLoops.delete(key);
+  if(on){
+    _pinnedLoops.set(key,L.map(n=>n.id));
+    if(!_pinColourIdx.has(key)){ const used=new Set(_pinColourIdx.values()); let c=0; while(used.has(c)) c++; _pinColourIdx.set(key,c); }
+  } else { _pinnedLoops.delete(key); _pinColourIdx.delete(key); }
 }
 // Click a loop to add it to the highlight; click it again to take it off. Several can be on at once.
 function highlightLoopByIdx(i){
@@ -4653,7 +4708,7 @@ function highlightLoopByIdx(i){
 }
 function clearLoopPins(){
   revertLoopCircle();
-  _pinnedLoops.clear();
+  _pinnedLoops.clear(); _pinColourIdx.clear();
   _afterPinChange('Loop highlights cleared.');
 }
 function highlightLoopFromReport(i){ closeReport(); highlightLoopByIdx(i); }
@@ -4669,7 +4724,7 @@ let _loopCirclePrev=null;
 function revertLoopCircle(){
   if(!_loopCirclePrev) return;
   _loopCirclePrev.forEach(pv=>{ const n=nodes.find(x=>x.id===pv.id); if(n){ n.x=pv.x; n.y=pv.y; n.fx=pv.fx; n.fy=pv.fy; n.pinned=pv.pinned; } });
-  _loopCirclePrev=null;
+  _loopCirclePrev=null; _loopCircle=null;
 }
 function loopCircleView(i){
   const L=_insightLoops[i]; if(!L||L.length<3) return;
@@ -4684,8 +4739,9 @@ function loopCircleView(i){
     const a=a0+k*2*Math.PI/ns.length;
     n.x=n.fx=ccx+r*Math.cos(a); n.y=n.fy=ccy+r*Math.sin(a); n.pinned=true;
   });
+  _loopCircle={cx:ccx,cy:ccy,r,n:ns.length,order:new Map(ns.map((n,k)=>[n.id,k]))};
   pinLoop(i,true); _afterPinChange(_pinMsg());
-  showStatus('Loop shown as a circle. Esc or a click on the background puts it back.');
+  showStatus('Loop shown as a circle. Press Clear in the loop list, or Esc, to put it back.');
 }
 function refreshInsightsIfOpen(){
   const body=document.getElementById('sec-insights-body');
@@ -4726,7 +4782,7 @@ function clearHighlight(){
   clearKnock();
   if(typeof revertLoopCircle==='function') revertLoopCircle();
   const _hadPins=_pinnedLoops.size>0;
-  _pinnedLoops.clear();
+  _pinnedLoops.clear(); _pinColourIdx.clear(); _pinEdgeCols=new Map(); _pinNodeCols=new Map();
   if(highlightIds.clearAll) highlightIds.clearAll(); else highlightIds.clear();
   if(highlightEdges.clearAll) highlightEdges.clearAll(); else highlightEdges.clear();
   secondaryIds.clear();
