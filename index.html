@@ -1324,7 +1324,6 @@ body.share-mode #present-exit{display:none !important;}
   </div>
 
   <div id="knock-banner" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:16;align-items:center;gap:6px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:7px 12px;font-size:12px;color:var(--ink);max-width:min(620px,calc(100% - 240px));"></div>
-  <div id="strength-legend" style="display:none;position:absolute;left:12px;bottom:12px;z-index:12;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:8px 10px;font-size:11px;color:var(--ink);pointer-events:none;"></div>
   <div id="timeline-year" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:44px;font-weight:800;letter-spacing:-0.02em;color:var(--ink);opacity:0.16;pointer-events:none;z-index:5;font-variant-numeric:tabular-nums;"></div>
   <div id="timeline-bar" style="display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:32px;z-index:15;align-items:center;gap:8px;background:var(--surf);border:1px solid var(--bdr);border-radius:9px;box-shadow:var(--shadow-lg);padding:3px 10px;width:min(640px,calc(100% - 200px));">
     <button id="timeline-play" onclick="timelinePlay()" title="Play the map changing over time" style="width:24px;height:20px;padding:0;font-size:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1;">▶</button>
@@ -1487,7 +1486,7 @@ body.share-mode #present-exit{display:none !important;}
   </div>
 
   <!-- Legend toggle button + panel -->
-  <div id="legend-wrap" style="position:absolute;bottom:52px;left:14px;z-index:10;">
+  <div id="legend-wrap" style="position:absolute;bottom:52px;left:14px;z-index:10;display:none;">
     <button id="btn-legend-toggle" onclick="toggleLegend()" title="Toggle legend"
       style="width:auto;height:30px;padding:0 10px;font-size:11px;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius);box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:5px;color:var(--ink-m);">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="flex-shrink:0;">
@@ -1499,8 +1498,8 @@ body.share-mode #present-exit{display:none !important;}
       <span id="legend-btn-label">Legend</span>
     </button>
     <div id="legend-panel-inner" class="legend-panel" style="display:none;position:static;margin-top:4px;">
-      <div class="l-title">Legend</div>
-      <div id="colour-legend"></div>
+      <div id="legend-node-sec"><div class="l-title">Node colours</div><div id="colour-legend"></div></div>
+      <div id="legend-conn-sec" style="margin-top:10px;"><div class="l-title">Connection strength</div><div id="strength-legend"></div></div>
     </div>
   </div>
   <div class="status hide" id="status"></div>
@@ -2611,21 +2610,53 @@ function nodeInk(n){
 // Fixed fine widths for big maps, in screen-independent world units (before zoom).
 const THIN_WIDTH={strong:1.4,bold:1.2,moderate:1.0,weak:0.8,dashed:1.0,double:1.0};
 function thinWidth(st){ return THIN_WIDTH[st.id]||1.0; }
-let _thinShown=null;
+let _legSig='', _legSigT=0, _legPend=null;
+// Rebuild the connection key when what it shows changes. Checked at most every 400ms, with a trailing check so the last change is never missed.
+function _checkLegend(){
+  const t=performance.now();
+  if(t-_legSigT<400){ if(!_legPend) _legPend=setTimeout(()=>{ _legPend=null; _checkLegend(); },420); return; }
+  _legSigT=t;
+  const sg=_legendSig(); if(sg!==_legSig){ _legSig=sg; syncStrengthLegend(); }
+}
+function _usedStyleIds(){
+  const u=new Set();
+  edges.forEach(e=>{ if(!(e.isLoop||e.strength==='loop')) u.add(e.strength||'moderate'); });
+  return u;
+}
+function _legendSig(){
+  const u=[..._usedStyleIds()].sort().join(',');
+  return u+'|'+document.documentElement.getAttribute('data-theme')+'|'+thinLinesOn()+'|'+CONNECTION_STYLES.map(st=>st.id+st.label+st.colour).join('');
+}
+// Connection key inside the Legend panel. Lists only the styles used on this map, and only when there are two or more.
 function syncStrengthLegend(){
   const el=document.getElementById('strength-legend');
   if(!el) return;
-  const on=thinLinesOn();
-  if(!on){ el.style.display='none'; return; }
-  el.innerHTML='<div style="font-weight:700;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink-h);margin-bottom:6px;">Connection strength</div>'+
-    CONNECTION_STYLES.filter(st=>st.id!=='loop').map(st=>{
-      const dash=(st.dashPattern&&st.dashPattern.length)?'dashed':'solid';
-      const h=st.isDouble?'4px double':'';
-      const bw=st.isDouble?'3px double':thinWidth(st)+'px '+dash;
-      const _sc=document.documentElement.getAttribute('data-theme')==='dark'?adaptColourForDark(st.colour):st.colour;
-      return `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;"><span style="width:36px;border-top:${bw} ${_sc};display:inline-block;"></span><span>${st.label}</span></div>`;
-    }).join('');
-  el.style.display='block';
+  const used=_usedStyleIds();
+  const list=CONNECTION_STYLES.filter(st=>st.id!=='loop'&&used.has(st.id));
+  if(list.length<2){ el.innerHTML=''; syncLegendVisibility(); return; }
+  const thin=thinLinesOn(), dark=document.documentElement.getAttribute('data-theme')==='dark';
+  el.innerHTML=list.map(st=>{
+    const dash=(st.dashPattern&&st.dashPattern.length)?'dashed':'solid';
+    const w=thin?thinWidth(st):Math.max(1.5,Math.min(3,(st.lineWidth||2)*0.6));
+    const bw=st.isDouble?'3px double':w+'px '+dash;
+    const sc=escHtml(dark?adaptColourForDark(st.colour):st.colour);
+    return `<div class="l-row"><span style="width:30px;border-top:${bw} ${sc};display:inline-block;flex-shrink:0;"></span><span>${escHtml(st.label)}</span></div>`;
+  }).join('');
+  syncLegendVisibility();
+}
+// Show each Legend section only when it has content; hide the Legend button when neither does.
+function syncLegendVisibility(){
+  const nodeEl=document.getElementById('colour-legend'), connEl=document.getElementById('strength-legend');
+  const hasNode=!!(nodeEl&&nodeEl.innerHTML.trim()), hasConn=!!(connEl&&connEl.innerHTML.trim());
+  const ns=document.getElementById('legend-node-sec'), cs=document.getElementById('legend-conn-sec');
+  if(ns) ns.style.display=hasNode?'block':'none';
+  if(cs){ cs.style.display=hasConn?'block':'none'; cs.style.marginTop=hasNode?'10px':'0'; }
+  const wrap=document.getElementById('legend-wrap');
+  if(wrap) wrap.style.display=(hasNode||hasConn)?'block':'none';
+  if(!hasNode&&!hasConn){
+    const panel=document.getElementById('legend-panel-inner');
+    if(panel&&panel.style.display!=='none') toggleLegend();
+  }
 }      // nodes at which 'auto' switches to simple drawing
 let _simpleNow=false;
 let SIZE_BY='';                  // '' | 'connections' | 'field:<id>'
@@ -3195,7 +3226,7 @@ function setSimpleMode(v){
 function draw(){
   if(_pinnedLoops.size&&_pinEdgeSig!==edges.length) refreshLoopPins();
   _lblBoxCache=new Map();
-  const _tn=thinLinesOn(); if(_tn!==_thinShown){ _thinShown=_tn; syncStrengthLegend(); }
+  _checkLegend();
   _degCache=null; _fieldStatCache={};
   _simpleNow=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&nodes.length>=SIMPLE_THRESHOLD);
   if(SIZE_BY_CONNECTIONS&&sim&&edges.length!==_sizeSigEdges){
@@ -4781,7 +4812,13 @@ function clearSearch(){
   updateFilterCount(0,false);
   clearHighlight();
   syncSecBadges();
-  refreshInsightsIfOpen();
+  // Put the panel back to how it first looks: every section and Insights dropdown closed
+  ['conn','dates','insights'].forEach(k=>{
+    const b=document.getElementById('sec-'+k+'-body'), a=document.getElementById('sec-'+k+'-arrow');
+    if(b) b.style.display='none';
+    if(a){ a.textContent='▸'; const btn=a.closest('button'); if(btn) btn.setAttribute('aria-expanded','false'); }
+  });
+  _insOpen={}; try{ localStorage.setItem('puddl-ins-open','{}'); }catch(e){}
 }
 function clearHighlight(){
   clearKnock();
@@ -6463,7 +6500,8 @@ function openEdgeNoteModal(edgeIdx){
   selectedEdgeIdx=null;
 }
 
-function updateColourLegend(){
+function updateColourLegend(){ _updateColourLegend(); syncLegendVisibility(); }
+function _updateColourLegend(){
   const el=document.getElementById('colour-legend');
   if(!el) return;
   el.innerHTML='';
@@ -6501,7 +6539,7 @@ function updateColourLegend(){
   [...seen.entries()].sort((a,b)=>a[0].localeCompare(b[0])).forEach(([label,colour])=>{
     const row=document.createElement('div');
     row.className='l-row';
-    row.innerHTML=`<div class="l-dot" style="background:${colour};"></div> ${label}`;
+    row.innerHTML=`<div class="l-dot" style="background:${escHtml(colour)};"></div> ${escHtml(label)}`;
     el.appendChild(row);
   });
 }
