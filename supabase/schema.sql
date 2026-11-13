@@ -5,9 +5,16 @@
 --   A TEAM is the thing that gets sold. £1,000 buys one team 12 months and
 --   5 seats. Teams hold their own budgets, so a team that buys must not be
 --   able to hand access to another department.
---   Inside a team, each person has their own private maps, and the team also
---   shares maps everyone can add to (a network map that grows as the team
---   meets people).
+--   Inside a team, each person's maps are their own.
+--
+--   SHARED TEAM MAPS ARE DEFERRED (decided 13 Nov 2026). The scope column and
+--   the policies below already support them, but nothing in index.html turns
+--   them on. Before enabling: Puddl autosaves the whole map as one blob, so
+--   two people editing one map would silently overwrite each other. That needs
+--   a stale-write guard first.
+--
+--   Distribution today is by view-only HTML export (saveShareFile) and PNG
+--   snapshot, not by shared editing.
 --
 -- This mirrors the personal / team / combined modes already in index.html.
 --
