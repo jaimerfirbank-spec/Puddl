@@ -4066,8 +4066,9 @@ function fitZoomLevel(){
   return Math.min(W/cw,H/ch);
 }
 function minZoomAllowed(){ return Math.max(0.0005, Math.min(0.02, fitZoomLevel()*0.8)); }
+const MAX_ZOOM=32;   // was 8, too shallow to read a node on a big map
 function zoomBy(f){
-  const oz=zoom;zoom=Math.max(minZoomAllowed(),Math.min(8,zoom*f));
+  const oz=zoom;zoom=Math.max(minZoomAllowed(),Math.min(MAX_ZOOM,zoom*f));
   panX=W/2-(W/2-panX)*(zoom/oz);panY=H/2-(H/2-panY)*(zoom/oz);draw();
 }
 function zoomReset(){zoom=1;panX=W/2;panY=H/2;fitAll();}
@@ -5946,7 +5947,27 @@ function edgeHiddenByDate(e,a,b){
 }
 function recomputeDateHidden(){
   _dateHidden.clear();
-  if(DATE_ASAT) nodes.forEach(n=>{ if(n.date&&n.date>DATE_ASAT) _dateHidden.add(n.id); });
+  if(!DATE_ASAT) return;
+  // Step 1: hide anything dated after the chosen date.
+  nodes.forEach(n=>{ if(n.date&&n.date>DATE_ASAT) _dateHidden.add(n.id); });
+  // Step 2: a node should arrive together with its first connection. You add a
+  // person to a network because you met them, so showing them floating alone
+  // for months until the other end of the line turns up reads wrong. A node
+  // with connections waits until at least one of them has both ends present.
+  // Nodes with no connections at all still show on their own date, otherwise
+  // they could never appear.
+  const hasEdge=new Set(), hasLiveEdge=new Set();
+  edges.forEach(e=>{
+    const a=typeof e.source==='object'?e.source.id:e.source;
+    const b=typeof e.target==='object'?e.target.id:e.target;
+    hasEdge.add(a); hasEdge.add(b);
+    if(!_dateHidden.has(a)&&!_dateHidden.has(b)){ hasLiveEdge.add(a); hasLiveEdge.add(b); }
+  });
+  nodes.forEach(n=>{
+    if(_dateHidden.has(n.id)) return;
+    if(n.type==='centre') return;              // the centre anchors the map
+    if(hasEdge.has(n.id)&&!hasLiveEdge.has(n.id)) _dateHidden.add(n.id);
+  });
 }
 function mapDateRange(){
   let lo='',hi='';
@@ -7185,7 +7206,7 @@ function confirmModal(){
 canvas.addEventListener('wheel',e=>{
   e.preventDefault();
   const f=e.deltaY<0?1.1:0.91,oz=zoom;
-  zoom=Math.max(minZoomAllowed(),Math.min(8,zoom*f));
+  zoom=Math.max(minZoomAllowed(),Math.min(MAX_ZOOM,zoom*f));
   panX=e.offsetX-(e.offsetX-panX)*(zoom/oz);
   panY=e.offsetY-(e.offsetY-panY)*(zoom/oz);
   draw();
