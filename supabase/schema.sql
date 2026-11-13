@@ -1,53 +1,123 @@
--- Puddl — server-side map storage
+-- Puddl — server-side storage, teams and access rules
 -- Run once in the Supabase SQL Editor. Safe to re-run.
 --
--- Today every map lives in the browser's localStorage. That means a cleared
--- browser destroys a customer's work, maps do not follow them between devices,
--- and anyone using that machine can read another account's maps in devtools.
--- This moves maps into Postgres, where access is enforced by the database
--- rather than by the login screen.
+-- Commercial model this encodes:
+--   A TEAM is the thing that gets sold. £1,000 buys one team 12 months and
+--   5 seats. Teams hold their own budgets, so a team that buys must not be
+--   able to hand access to another department.
+--   Inside a team, each person has their own private maps, and the team also
+--   shares maps everyone can add to (a network map that grows as the team
+--   meets people).
+--
+-- This mirrors the personal / team / combined modes already in index.html.
+--
+-- Teams and subscriptions are created by you, not by customers: there is
+-- deliberately no policy letting anyone insert a team or edit seats and
+-- renewal dates. Do that from the Supabase dashboard, which bypasses these
+-- rules. Otherwise a customer could grant themselves 50 seats.
 
 -- ──────────────────────────────────────────────────────────────────────────
--- 1. The table
+-- 1. Teams — the billable unit
+-- ──────────────────────────────────────────────────────────────────────────
+
+create table if not exists public.teams (
+  id                   uuid primary key default gen_random_uuid(),
+  name                 text not null,
+  seats                int  not null default 5 check (seats > 0),
+  -- null means no expiry. Set this 12 months out when an invoice is paid.
+  subscription_ends_at timestamptz,
+  created_at           timestamptz not null default now()
+);
+
+create table if not exists public.team_members (
+  team_id  uuid not null references public.teams(id)   on delete cascade,
+  user_id  uuid not null references auth.users(id)     on delete cascade,
+  -- 'owner' is the person who can add and remove colleagues and delete the
+  -- shared maps. Everyone else is 'member'.
+  role     text not null default 'member' check (role in ('owner','member')),
+  added_at timestamptz not null default now(),
+  primary key (team_id, user_id)
+);
+
+-- ──────────────────────────────────────────────────────────────────────────
+-- 2. Helpers
+-- ──────────────────────────────────────────────────────────────────────────
+-- security definer so these can read team_members without triggering that
+-- table's own RLS, which would recurse. search_path is pinned, which is the
+-- standard precaution for a definer function.
+
+create or replace function public.is_team_member(p_team uuid)
+returns boolean language sql security definer set search_path = public stable as $$
+  select exists (select 1 from public.team_members
+                 where team_id = p_team and user_id = auth.uid());
+$$;
+
+create or replace function public.is_team_owner(p_team uuid)
+returns boolean language sql security definer set search_path = public stable as $$
+  select exists (select 1 from public.team_members
+                 where team_id = p_team and user_id = auth.uid() and role = 'owner');
+$$;
+
+create or replace function public.team_subscription_active(p_team uuid)
+returns boolean language sql security definer set search_path = public stable as $$
+  select coalesce((select subscription_ends_at is null or subscription_ends_at > now()
+                   from public.teams where id = p_team), false);
+$$;
+
+-- Enforce the 5-seat limit in the database, not in the app, so it holds even
+-- if someone calls the API directly.
+create or replace function public.enforce_seat_limit()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare used int; allowed int;
+begin
+  select count(*) into used    from public.team_members where team_id = new.team_id;
+  select seats    into allowed from public.teams        where id      = new.team_id;
+  if used >= allowed then
+    raise exception 'Team is full: % of % seats used', used, allowed
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists team_members_seat_limit on public.team_members;
+create trigger team_members_seat_limit
+  before insert on public.team_members
+  for each row execute function public.enforce_seat_limit();
+
+-- ──────────────────────────────────────────────────────────────────────────
+-- 3. Maps
 -- ──────────────────────────────────────────────────────────────────────────
 
 create table if not exists public.maps (
   id         uuid primary key default gen_random_uuid(),
 
-  -- Who owns this map. on delete cascade means deleting the account removes
-  -- their maps too, which is what GDPR erasure requests will need.
-  user_id    uuid not null references auth.users(id) on delete cascade,
+  -- Every map belongs to exactly one team. This is what stops a team sharing
+  -- its licence with the department next door.
+  team_id    uuid not null references public.teams(id) on delete cascade,
 
+  -- Nullable on purpose: 'set null' rather than cascade, so a shared team map
+  -- survives the person who created it leaving the council.
+  -- NOTE: a 'personal' map whose owner is removed becomes invisible to
+  -- everyone. Before removing a member, reassign or promote their personal
+  -- maps to team scope.
+  owner_id   uuid references auth.users(id) on delete set null,
+
+  scope      text not null default 'personal' check (scope in ('personal','team')),
   title      text not null default 'Untitled map',
-
-  -- Matches the five choices on Puddl's "What kind of map is this?" screen.
   kind       text not null default 'general'
              check (kind in ('general','network','systems','stakeholder','argument')),
-
-  -- The whole map: nodes, edges, loops, categories, styles. jsonb because the
-  -- shape changes as Puddl grows and a rigid schema would fight every release.
   data       jsonb not null default '{}'::jsonb,
-
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
--- Listing a user's maps newest-first is the one query the app runs constantly.
-create index if not exists maps_user_updated_idx
-  on public.maps (user_id, updated_at desc);
-
--- ──────────────────────────────────────────────────────────────────────────
--- 2. Keep updated_at honest
--- ──────────────────────────────────────────────────────────────────────────
+create index if not exists maps_team_scope_idx on public.maps (team_id, scope, updated_at desc);
+create index if not exists maps_owner_idx      on public.maps (owner_id, updated_at desc);
 
 create or replace function public.touch_updated_at()
-returns trigger
-language plpgsql
-as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
+returns trigger language plpgsql as $$
+begin new.updated_at = now(); return new; end;
 $$;
 
 drop trigger if exists maps_touch_updated_at on public.maps;
@@ -56,71 +126,122 @@ create trigger maps_touch_updated_at
   for each row execute function public.touch_updated_at();
 
 -- ──────────────────────────────────────────────────────────────────────────
--- 3. Row Level Security — the part that actually enforces privacy
+-- 4. Row Level Security
 -- ──────────────────────────────────────────────────────────────────────────
--- Without this, the anon key in Puddl's page source lets anyone read every
--- row. With it, Postgres silently filters every query to the signed-in user,
--- so a bug in the app cannot leak another customer's maps.
+-- Postgres filters every query to what the signed-in user may see, so a bug
+-- in index.html cannot leak another team's maps.
 
-alter table public.maps enable row level security;
+alter table public.teams        enable row level security;
+alter table public.team_members enable row level security;
+alter table public.maps         enable row level security;
 
-drop policy if exists "owner selects own maps" on public.maps;
-create policy "owner selects own maps"
+-- Teams: members may look at their own team. Nobody may create or edit one
+-- through the app; that is yours to do when an invoice is paid.
+drop policy if exists "members read their team" on public.teams;
+create policy "members read their team"
+  on public.teams for select using (is_team_member(id));
+
+-- Team members: visible to the team; managed by the team's owner.
+drop policy if exists "members read the roster" on public.team_members;
+create policy "members read the roster"
+  on public.team_members for select using (is_team_member(team_id));
+
+drop policy if exists "owner adds colleagues" on public.team_members;
+create policy "owner adds colleagues"
+  on public.team_members for insert with check (is_team_owner(team_id));
+
+drop policy if exists "owner removes colleagues" on public.team_members;
+create policy "owner removes colleagues"
+  on public.team_members for delete using (is_team_owner(team_id));
+
+-- Maps: your own private maps, plus every shared map in your team.
+drop policy if exists "read own and team maps" on public.maps;
+create policy "read own and team maps"
   on public.maps for select
-  using (auth.uid() = user_id);
+  using (is_team_member(team_id) and (scope = 'team' or owner_id = auth.uid()));
 
-drop policy if exists "owner inserts own maps" on public.maps;
-create policy "owner inserts own maps"
+-- Creating requires a live subscription. Reading does not: when a council
+-- forgets to renew, they keep access to their work and lose the ability to
+-- change it. Flip team_subscription_active() into the select policy above if
+-- you would rather lock them out entirely.
+drop policy if exists "create maps in your team" on public.maps;
+create policy "create maps in your team"
   on public.maps for insert
-  with check (auth.uid() = user_id);
+  with check (is_team_member(team_id)
+              and owner_id = auth.uid()
+              and team_subscription_active(team_id));
 
--- update needs BOTH clauses. "using" decides which rows you may touch;
--- "with check" stops you handing a row to somebody else by rewriting user_id.
-drop policy if exists "owner updates own maps" on public.maps;
-create policy "owner updates own maps"
+-- "using" picks the rows you may edit; "with check" stops you moving a row
+-- into another team or handing it to someone else as you save it.
+drop policy if exists "edit own and team maps" on public.maps;
+create policy "edit own and team maps"
   on public.maps for update
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using (is_team_member(team_id)
+         and (scope = 'team' or owner_id = auth.uid())
+         and team_subscription_active(team_id))
+  with check (is_team_member(team_id)
+              and (scope = 'team' or owner_id = auth.uid()));
 
-drop policy if exists "owner deletes own maps" on public.maps;
-create policy "owner deletes own maps"
+-- Anyone may delete their own private map. Only the team owner may delete a
+-- shared one, so a single member cannot wipe the team's network map.
+drop policy if exists "delete own maps, owner deletes shared" on public.maps;
+create policy "delete own maps, owner deletes shared"
   on public.maps for delete
-  using (auth.uid() = user_id);
+  using (is_team_member(team_id)
+         and ((scope = 'personal' and owner_id = auth.uid())
+              or (scope = 'team' and is_team_owner(team_id))));
 
 -- ──────────────────────────────────────────────────────────────────────────
--- 4. Image storage
+-- 5. Image storage
 -- ──────────────────────────────────────────────────────────────────────────
--- Images are downscaled on upload but still live inside the map JSON. Moving
--- them to Storage keeps rows small and lets the browser cache them.
--- Convention: every object is stored under <user-id>/<filename>, which is what
--- the policies below check.
+-- Images are downscaled on upload but still sit inside the map JSON. Moving
+-- them here keeps rows small. Path convention: <team-id>/<filename>, so a
+-- shared map's images are readable by the whole team.
 
 insert into storage.buckets (id, name, public)
 values ('map-images', 'map-images', false)
 on conflict (id) do nothing;
 
-drop policy if exists "owner reads own images" on storage.objects;
-create policy "owner reads own images"
+drop policy if exists "team reads its images" on storage.objects;
+create policy "team reads its images"
   on storage.objects for select
-  using (bucket_id = 'map-images' and auth.uid()::text = (storage.foldername(name))[1]);
+  using (bucket_id = 'map-images'
+         and is_team_member(((storage.foldername(name))[1])::uuid));
 
-drop policy if exists "owner uploads own images" on storage.objects;
-create policy "owner uploads own images"
+drop policy if exists "team uploads images" on storage.objects;
+create policy "team uploads images"
   on storage.objects for insert
-  with check (bucket_id = 'map-images' and auth.uid()::text = (storage.foldername(name))[1]);
+  with check (bucket_id = 'map-images'
+              and is_team_member(((storage.foldername(name))[1])::uuid));
 
-drop policy if exists "owner deletes own images" on storage.objects;
-create policy "owner deletes own images"
+drop policy if exists "team deletes its images" on storage.objects;
+create policy "team deletes its images"
   on storage.objects for delete
-  using (bucket_id = 'map-images' and auth.uid()::text = (storage.foldername(name))[1]);
+  using (bucket_id = 'map-images'
+         and is_team_member(((storage.foldername(name))[1])::uuid));
 
 -- ──────────────────────────────────────────────────────────────────────────
--- 5. Verify
+-- 6. Selling a team — what you run when an invoice is paid
 -- ──────────────────────────────────────────────────────────────────────────
--- Run these after the above. Expect rowsecurity = true, and four policies.
+-- 1. Create the users in Authentication → Users (or send invite links).
+-- 2. Then, replacing the values:
+--
+--   insert into public.teams (name, seats, subscription_ends_at)
+--   values ('Doncaster — Public Health', 5, now() + interval '12 months')
+--   returning id;
+--
+--   insert into public.team_members (team_id, user_id, role) values
+--     ('<team-id>', '<user-id>', 'owner');
+--
+-- Renewal is one update:
+--   update public.teams
+--      set subscription_ends_at = subscription_ends_at + interval '12 months'
+--    where id = '<team-id>';
 
+-- ──────────────────────────────────────────────────────────────────────────
+-- 7. Verify
+-- ──────────────────────────────────────────────────────────────────────────
 -- select tablename, rowsecurity from pg_tables
---   where schemaname = 'public' and tablename = 'maps';
-
--- select policyname, cmd from pg_policies
---   where schemaname = 'public' and tablename = 'maps' order by cmd;
+--   where schemaname = 'public' and tablename in ('teams','team_members','maps');
+-- select tablename, policyname, cmd from pg_policies
+--   where schemaname = 'public' order by tablename, cmd;
