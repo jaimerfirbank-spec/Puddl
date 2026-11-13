@@ -6202,10 +6202,12 @@ function rearrangeLayout(){
 // Big maps read better as a wide oblong than a circle: an oblong matches the
 // shape of the screen, so more of the map is visible without zooming out.
 const BIG_MAP_THRESHOLD=500;
+const BIG_MAP_WIDEN=1.45;   // push past the raw screen ratio: the layout settles
+                            // narrower than the force target, so aim wider
 function _mapAspect(){
   if(nodes.length<BIG_MAP_THRESHOLD) return 1;
   const a=(W&&H)?W/H:1.6;
-  return Math.max(1.1,Math.min(2.4,a));
+  return Math.max(1.1,Math.min(3.4,a*BIG_MAP_WIDEN));
 }
 // Big maps also need more air between nodes so names and lines stay readable.
 function _bigMapGap(){ return nodes.length>=BIG_MAP_THRESHOLD?1.35:1; }
