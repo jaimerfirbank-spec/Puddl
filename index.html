@@ -3138,6 +3138,11 @@ function _simpleR(n){
 function _viewBounds(pad){
   return {x0:(-panX)/zoom-pad, y0:(-panY)/zoom-pad, x1:(W-panX)/zoom+pad, y1:(H-panY)/zoom+pad};
 }
+// How far unfocused parts fade while something is highlighted. Presentation
+// mode highlights one node at a time, so these set how clear the rest stays.
+const DIM_ALPHA=0.25;        // nodes with no relation to the focus
+const DIM_SECONDARY=0.65;    // the focused node's neighbours
+const DIM_EDGE_ALPHA=0.18;   // unrelated connectors on big maps
 function drawSimpleEdges(hasHL,_dark){
   const byId=new Map(); nodes.forEach(n=>byId.set(n.id,n));
   const vb=_viewBounds(0);
@@ -3152,7 +3157,7 @@ function drawSimpleEdges(hasHL,_dark){
     const style=CONNECTION_STYLES.find(s=>s.id===(e.strength||'moderate'))||CONNECTION_STYLES[1];
     let col=isHl?'#FF8C8C':(e.colour||style.colour);
     if(_dark&&!isHl) col=adaptColourForDark(col);
-    const alpha=knockEdgeAlpha(i,hasHL&&!isHl?0.06:1);
+    const alpha=knockEdgeAlpha(i,hasHL&&!isHl?DIM_EDGE_ALPHA:1);
     const key=col+'|'+alpha+'|'+(isHl?1:0);
     let g=groups.get(key); if(!g){ g={col,alpha,hl:isHl,segs:[]}; groups.set(key,g); }
     g.segs.push(a.x,a.y,b.x,b.y);
@@ -3174,7 +3179,7 @@ function drawSimpleNodes(hasHL,_dark){
     if(n.x<vb.x0||n.x>vb.x1||n.y<vb.y0||n.y>vb.y1) return;
     if(_dateHidden.size&&_dateHidden.has(n.id)) return;
     const isHl=highlightIds.has(n.id), isSec=secondaryIds.has(n.id)&&!isHl;
-    ctx.globalAlpha=knockNodeAlpha(n,hasHL&&!isHl&&!isSec?0.10:isSec?0.45:1);
+    ctx.globalAlpha=knockNodeAlpha(n,hasHL&&!isHl&&!isSec?DIM_ALPHA:isSec?DIM_SECONDARY:1);
     const r=Math.max(_simpleR(n),2.2/zoom);
     ctx.fillStyle=nodeInk(n)||nodeFill(n);
     ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
@@ -3644,7 +3649,7 @@ function draw(){
     const isHl=highlightIds.has(n.id);
     const isSecondary=secondaryIds.has(n.id)&&!highlightIds.has(n.id)||false;
     const dimmed=hasHL&&!isHl&&!isSecondary;
-    ctx.globalAlpha=knockNodeAlpha(n,dimmed?0.10:isSecondary?0.45:1);
+    ctx.globalAlpha=knockNodeAlpha(n,dimmed?DIM_ALPHA:isSecondary?DIM_SECONDARY:1);
 
     // ── Central event node: logo card ────────────────────────────────────────
     if(n.type==='centre'){
@@ -3657,7 +3662,7 @@ function draw(){
       const pad=7/zoom;
       ctx.beginPath();rr(ctx,cx2-pad,cy2-pad,cw+pad*2,ch+pad*2,(10/zoom)+pad);
       ctx.strokeStyle=_dark?'rgba(255,255,255,0.35)':centreCol;
-      ctx.globalAlpha=knockNodeAlpha(n,dimmed?0.10:isSecondary?0.45:1)*0.40;
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?DIM_ALPHA:isSecondary?DIM_SECONDARY:1)*0.40;
       ctx.lineWidth=1.5/zoom;
       ctx.setLineDash([5/zoom,4/zoom]);
       ctx.stroke();
@@ -3884,7 +3889,7 @@ function draw(){
       // pill text
       ctx.fillStyle=_dark?'rgba(147,197,253,1)':'rgba(29,78,216,1)';
       ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.globalAlpha=knockNodeAlpha(n,dimmed?0.10:isSecondary?0.45:1);
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?DIM_ALPHA:isSecondary?DIM_SECONDARY:1);
       ctx.fillText(n.groupStatus,n.x,_pilY+_sph/2);
       ctx.restore();
     }
@@ -6413,11 +6418,22 @@ function updateEdgePopupStyle() {
   }
 }
 
+// Bold, dashed and double are visual variants that carry no meaning of their
+// own - strong, moderate and weak already say everything a network map needs.
+// They stay in CONNECTION_STYLES so maps already using them still draw
+// correctly, and are still editable in Settings; they are just not offered on
+// a network map unless that map already uses one.
+const EXTRA_CONN_STYLES=['bold','dashed','double'];
+function offeredConnectionStyles(){
+  if(typeof MAP_TYPE==='undefined'||MAP_TYPE!=='network') return CONNECTION_STYLES;
+  const inUse=new Set((edges||[]).map(e=>e.strength).filter(Boolean));
+  return CONNECTION_STYLES.filter(st=>!EXTRA_CONN_STYLES.includes(st.id)||inUse.has(st.id));
+}
 function populateEdgePopupStyles() {
   const select = document.getElementById('edge-popup-strength');
   if(!select) return;
   
-  select.innerHTML = CONNECTION_STYLES.map(style => 
+  select.innerHTML = offeredConnectionStyles().map(style => 
     `<option value="${style.id}">${style.label}</option>`
   ).join('');
 }
@@ -6426,7 +6442,7 @@ function populateConnectionFilterChips() {
   const container = document.getElementById('conn-type-filter-chips');
   if(!container) return;
   
-  container.innerHTML = CONNECTION_STYLES.map(style => 
+  container.innerHTML = offeredConnectionStyles().map(style => 
     `<span class="ms-chip" onclick="toggleMsChip(this,'conn-type-filter','${style.id}')">${style.label}</span>`
   ).join('');
 }
