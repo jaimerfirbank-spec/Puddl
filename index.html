@@ -1345,6 +1345,7 @@ body.share-mode #present-exit{display:none !important;}
     <button onclick="toggleHoverPanelEnabled()" id="btn-hover-toggle" title="Toggle node info popups">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:auto;"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.35"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2.55" stroke-linecap="round"/><circle cx="12" cy="16" r="1.35" fill="currentColor"/></svg>
     </button>
+    <button onclick="toggleNodeLabels()" id="btn-labels-toggle" title="Hide node names" style="width:40px;height:40px;padding:0;font-size:13.5px;font-weight:700;letter-spacing:-0.2px;">Aa</button>
     <button onclick="toggleFullscreen()" id="btn-fullscreen" title="Full screen" style="width:40px;height:40px;padding:0;">
       <svg id="icon-fs-enter" width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:auto;"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <svg id="icon-fs-exit" width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none;margin:auto;"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -2663,6 +2664,17 @@ let SIZE_BY='';                  // '' | 'connections' | 'field:<id>'
 let COLOUR_BY='';                // '' | 'connections' | 'field:<id>'
 let _degCache=null;             // node id -> connection count, rebuilt each frame
 let showNodeLabels=true;
+function toggleNodeLabels(){
+  showNodeLabels=!showNodeLabels;
+  syncLabelsBtn(); draw(); saveState(); markUnsaved();
+  showStatus(showNodeLabels?'Node names shown.':'Node names hidden.');
+}
+function syncLabelsBtn(){
+  const b=document.getElementById('btn-labels-toggle');
+  if(!b) return;
+  b.style.opacity=showNodeLabels?'1':'0.45';
+  b.title=showNodeLabels?'Hide node names':'Show node names';
+}
 let DEFAULT_NODE_OUTLINE=false; // false=filled, true=outline
 // A Set whose clear() keeps any pinned items. Pinned feedback loops use this so hovering, scrolling and
 // node clicks don't wipe them; only Clear, clicking the loop again, or clearing the search does.
@@ -2939,6 +2951,7 @@ function snap(){
     sizeByConnections:SIZE_BY==='connections',
     sizeBy:SIZE_BY,
     simpleMode:SIMPLE_MODE,
+    showNodeLabels:showNodeLabels,
     mapType:MAP_TYPE,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
     mapFocus:MAP_FOCUS,
@@ -2998,6 +3011,7 @@ function restoreSnap(s){
   SIZE_BY=typeof d.sizeBy==='string'?d.sizeBy:(d.sizeByConnections?'connections':'');
   COLOUR_BY=typeof d.colourBy==='string'?d.colourBy:'';
   SIMPLE_MODE=['auto','on','off'].includes(d.simpleMode)?d.simpleMode:'auto';
+  showNodeLabels=d.showNodeLabels!==false; syncLabelsBtn();
   NODE_CONTRAST=['auto','always','never'].includes(d.nodeContrast)?d.nodeContrast:'auto';
   NODE_SIZE_MODE=['auto','always','never'].includes(d.nodeSizeMode)?d.nodeSizeMode:'auto';
   NODE_RING=d.nodeRing===true;
@@ -6185,6 +6199,16 @@ function rearrangeLayout(){
 }
 
 // Arrange freshly imported nodes so connected ones sit together, then pin them in place.
+// Big maps read better as a wide oblong than a circle: an oblong matches the
+// shape of the screen, so more of the map is visible without zooming out.
+const BIG_MAP_THRESHOLD=500;
+function _mapAspect(){
+  if(nodes.length<BIG_MAP_THRESHOLD) return 1;
+  const a=(W&&H)?W/H:1.6;
+  return Math.max(1.1,Math.min(2.4,a));
+}
+// Big maps also need more air between nodes so names and lines stay readable.
+function _bigMapGap(){ return nodes.length>=BIG_MAP_THRESHOLD?1.35:1; }
 function layoutImportedNodes(newNodes){
   if(!newNodes.length||typeof d3==='undefined') return;
   const total=nodes.length;
@@ -6213,7 +6237,7 @@ function layoutImportedNodes(newNodes){
     });
     const avgR=simNodes.reduce((a,d)=>a+d.r,0)/simNodes.length;
     let ox=0, rowH=0, oy=0, rowW=0;
-    const rowMax=Math.sqrt(simNodes.length)*avgR*3.2;
+    const rowMax=Math.sqrt(simNodes.length)*avgR*3.2*_mapAspect();
     comps.forEach(ring=>{
       const depthCount={}; ring.forEach(d=>depthCount[d]=(depthCount[d]||0)+1);
       const maxDepth=Math.max(0,...[...ring.values()]);
@@ -6236,9 +6260,9 @@ function layoutImportedNodes(newNodes){
   const fs=d3.forceSimulation(simNodes)
     .force('link',d3.forceLink(links).id(d=>d.id).distance(dist).strength(roomy?0.5:0.7))
     .force('charge',d3.forceManyBody().strength(simpleAfter?-40:(roomy?-1200:-400)).distanceMax(simpleAfter?400:(roomy?3000:1500)))
-    .force('collide',d3.forceCollide(d=>roomy?d.r*1.2:d.r).strength(0.9))
-    .force('x',d3.forceX((W/2-panX)/zoom).strength(0.04))
-    .force('y',d3.forceY((H/2-panY)/zoom).strength(0.04))
+    .force('collide',d3.forceCollide(d=>(roomy?d.r*1.2:d.r)*_bigMapGap()).strength(0.9))
+    .force('x',d3.forceX((W/2-panX)/zoom).strength(0.04/_mapAspect()))
+    .force('y',d3.forceY((H/2-panY)/zoom).strength(0.04*_mapAspect()))
     .stop();
   const ticks=newNodes.length>800?220:300;
   for(let i=0;i<ticks;i++) fs.tick();
