@@ -9710,7 +9710,16 @@ function autoSave(){
     localStorage.setItem(key, snap());
     markSaved();
     showAutoSaveToast();
-  } catch(e){ /* storage full or unavailable */ }
+  } catch(e){
+    // Storage full or unavailable. Never fail silently: the map is NOT saved and
+    // the user has to know before they close the tab. markSaved() has not run, so
+    // the unsaved indicator stays on.
+    if(e&&(e.name==='QuotaExceededError'||e.name==='NS_ERROR_DOM_QUOTA_REACHED'||e.code===22)){
+      showStatus('Out of browser storage - this map is NOT saved. Remove a large image, or export the map to a file.');
+    } else {
+      showStatus('Could not save to this browser - this map is NOT saved. Export it to a file to be safe.');
+    }
+  }
 }
 function showAutoSaveToast(){
   let toast=document.getElementById('autosave-toast');
@@ -10074,18 +10083,45 @@ function ctxUploadImage(){
   closeNodeCtxMenu();
   document.getElementById('node-img-upload-input').click();
 }
+// Uploaded images are stored inline as data URLs, so one phone photo can exhaust
+// localStorage on its own. Downscale and re-encode before storing.
+const IMG_NODE_MAX_EDGE=512, IMG_BG_MAX_EDGE=1920, IMG_QUALITY=0.82;
+function downscaleImageFile(file,maxEdge,cb){
+  const reader=new FileReader();
+  reader.onerror=function(){ showStatus('Could not read that image.'); };
+  reader.onload=function(ev){
+    const src=ev.target.result;
+    // SVG is already small and scales cleanly - keep the original.
+    if(file.type==='image/svg+xml'){ cb(src); return; }
+    const img=new Image();
+    img.onerror=function(){ showStatus('That file is not an image Puddl can read.'); };
+    img.onload=function(){
+      const w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+      if(!w||!h){ cb(src); return; }
+      const scale=Math.min(1,maxEdge/Math.max(w,h));
+      const cw=Math.max(1,Math.round(w*scale)), ch=Math.max(1,Math.round(h*scale));
+      const c=document.createElement('canvas');
+      c.width=cw; c.height=ch;
+      c.getContext('2d').drawImage(img,0,0,cw,ch);
+      let out=null;
+      try{ const t=c.toDataURL('image/webp',IMG_QUALITY); if(t.indexOf('data:image/webp')===0) out=t; }catch(_){}
+      if(!out){ try{ out=c.toDataURL(file.type==='image/png'?'image/png':'image/jpeg',IMG_QUALITY); }catch(_){ out=null; } }
+      cb(out&&out.length<src.length?out:src);
+    };
+    img.src=src;
+  };
+  reader.readAsDataURL(file);
+}
 function handleNodeImageUpload(e){
   const file=e.target.files[0];
   if(!file||!ctxMenuNodeId) return;
   const n=nodes.find(nd=>nd.id===ctxMenuNodeId);
   if(!n) return;
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    n.nodeImg=ev.target.result;
+  downscaleImageFile(file,IMG_NODE_MAX_EDGE,function(url){
+    n.nodeImg=url;
     loadNodeImage(n);
     saveState();markUnsaved();
-  };
-  reader.readAsDataURL(file);
+  });
   e.target.value='';
 }
 function loadNodeImage(n){
@@ -10210,14 +10246,11 @@ function uploadBgImage(){ document.getElementById('bg-upload-input').click(); }
 function handleBgImageUpload(e){
   const file=e.target.files[0];
   if(!file) return;
-  const reader=new FileReader();
-  reader.onload=function(ev){
-    const url=ev.target.result;
+  downscaleImageFile(file,IMG_BG_MAX_EDGE,function(url){
     const img=new Image();
     img.onload=()=>{ bgImg=img; document.getElementById('bg-image-data').textContent=url; draw(); updateBgMenuItems(); };
     img.src=url;
-  };
-  reader.readAsDataURL(file);
+  });
   e.target.value='';
 }
 function removeBgImage(){
