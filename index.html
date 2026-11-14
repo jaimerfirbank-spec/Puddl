@@ -1384,12 +1384,13 @@ body.share-mode #present-exit{display:none !important;}
   <!-- Demo mode banner + exit button -->
   <div id="demo-banner" style="display:none;position:absolute;top:0;left:0;right:0;z-index:30;background:linear-gradient(90deg,#C5E86C,#B0D45C);padding:7px 16px;display:none;align-items:center;justify-content:space-between;font-family:'DM Sans',sans-serif;">
     <div style="display:flex;align-items:center;gap:10px;">
-      <span style="font-size:13px;font-weight:700;color:#18181b;">👀 Demo mode</span>
-      <span style="font-size:12px;color:#3a5500;">These are example nodes — your real map is safe.</span>
+      <span id="demo-banner-title" style="font-size:13px;font-weight:700;color:#18181b;">👀 Demo mode</span>
+      <span id="demo-banner-sub" style="font-size:12px;color:#3a5500;">These are example nodes — your real map is safe.</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <button onclick="startWalkthrough()" style="font-size:11px;height:26px;padding:0 10px;background:rgba(0,0,0,0.12);border-color:transparent;color:#18181b;">↺ Restart tour</button>
-      <button onclick="toggleDemo()" style="font-size:11px;height:26px;padding:0 12px;background:#18181b;border-color:#18181b;color:#fff;font-weight:700;">← Exit demo</button>
+      <button id="demo-banner-tour" onclick="startWalkthrough()" style="font-size:11px;height:26px;padding:0 10px;background:rgba(0,0,0,0.12);border-color:transparent;color:#18181b;">↺ Restart tour</button>
+      <a id="demo-banner-cta" href="#" style="display:none;font-size:11px;height:26px;line-height:26px;padding:0 12px;background:rgba(0,0,0,0.12);border-radius:var(--radius);color:#18181b;font-weight:600;text-decoration:none;">Get Puddl</a>
+      <button id="demo-banner-exit" onclick="toggleDemo()" style="font-size:11px;height:26px;padding:0 12px;background:#18181b;border-color:#18181b;color:#fff;font-weight:700;">← Exit demo</button>
     </div>
   </div>
 
@@ -9045,6 +9046,14 @@ function enterPresentationMode(){
   presApplyMapOnly();
 }
 
+// Where "Get Puddl" sends people. Set this once the marketing site exists;
+// while it is empty the button stays hidden and only "Sign in" shows.
+const PUDDL_SITE_URL='';
+
+// app.puddl.co.uk/?try — a look at Puddl with no account and nothing saved.
+// Shares the demo map and tour the Demo tour button already uses.
+const IS_TRY_MODE=(function(){ try{ return new URLSearchParams(window.location.search).has('try'); }catch(e){ return false; } })();
+
 const IS_SHARE_VIEW=(function(){ try{ const e=document.getElementById('puddl-share'); const v=e&&e.textContent.trim()==='1'; if(v&&e) e.textContent=''; return !!v; }catch(err){ return false; } })();
 function exitPresentationMode(){
   if(IS_SHARE_VIEW) return;
@@ -12905,9 +12914,105 @@ if (supabaseClient && supabaseClient.auth && supabaseClient.auth.onAuthStateChan
   });
 }
 
+// A visitor on ?try: skip the sign-in wall and the "name your project"
+// splash, and drop them straight into the demo map.
+//
+// Nothing they do can be saved, and it is locked twice over: loadDemo() sets
+// inDemoMode, which both autoSave() and cloudSaveCurrent() refuse to run
+// under, and cloudInit() is never called, so there is no account to save to.
+// Puddl's canvas and toolbar need room; on a phone the whole app overflows and
+// is unusable. A visitor arriving from the website on their phone would see a
+// mess, which is worse than seeing nothing, so show them a short note instead
+// and let them come back on a laptop. Signing in is still offered, for someone
+// who already pays and just wants a look.
+function showTryTooSmall(){
+  // The toolbar and canvas are wider than a phone, which pushes the page out
+  // sideways and drags this panel off-centre with it. Nothing else is being
+  // shown, so take them out of the layout entirely.
+  const ca = document.getElementById('canvas-area');
+  if (ca) ca.style.display = 'none';
+  const hd = document.getElementById('main-header');
+  if (hd) hd.style.display = 'none';
+  const tb = document.querySelector('.toolbar');
+  if (tb) tb.style.display = 'none';
+  document.body.style.overflow = 'hidden';
+
+  const wrap = document.createElement('div');
+  wrap.id = 'try-too-small';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9997;background:var(--surf);display:flex;align-items:center;justify-content:center;padding:24px;font-family:\'DM Sans\',sans-serif;';
+  wrap.innerHTML =
+    '<div style="max-width:380px;text-align:center;">' +
+      '<div style="font-size:40px;line-height:1;margin-bottom:18px;">🐑</div>' +
+      '<h1 style="font-size:21px;font-weight:600;color:var(--ink);margin:0 0 10px 0;">Puddl needs a bigger screen</h1>' +
+      '<p style="font-size:14px;line-height:1.5;color:var(--ink-m);margin:0 0 22px 0;">Maps get big, and a phone cannot show enough of one to be worth looking at. Open this on a laptop or desktop and you will get the full thing to play with.</p>' +
+      '<button type="button" onclick="exitTryTooSmall();" style="padding:10px 18px;background:var(--accent-2);color:#fff;border:none;border-radius:var(--radius);font-family:inherit;font-weight:600;font-size:14px;cursor:pointer;">I have an account</button>' +
+    '</div>';
+  document.body.appendChild(wrap);
+}
+
+function exitTryTooSmall(){
+  const panel = document.getElementById('try-too-small');
+  if (panel) panel.remove();
+  const ca = document.getElementById('canvas-area');
+  if (ca) ca.style.display = 'block';
+  const hd = document.getElementById('main-header');
+  if (hd) hd.style.display = '';
+  const tb = document.querySelector('.toolbar');
+  if (tb) tb.style.display = '';
+  document.body.style.overflow = '';
+  document.getElementById('auth-modal').style.display = 'flex';
+}
+
+function startTryMode(){
+  const splash = document.getElementById('who-modal-bg');
+  if (splash) splash.style.display = 'none';
+
+  if (window.innerWidth < 800) {
+    document.getElementById('auth-modal').style.display = 'none';
+    showTryTooSmall();
+    return;
+  }
+  document.getElementById('auth-modal').style.display = 'none';
+  document.getElementById('canvas-area').style.display = 'block';
+
+  // No account here, so the account menu has nothing to show.
+  const acct = document.getElementById('account-wrap');
+  if (acct) acct.style.display = 'none';
+
+  // The tour opens by reassuring a signed-in user that their own map is safe.
+  // A visitor has no map, so that line means nothing to them. Set this before
+  // loadDemo(), which starts the tour a second later.
+  if (typeof WALK_STEPS !== 'undefined' && WALK_STEPS[0]) {
+    WALK_STEPS[0].text = 'This is a real map of Doncaster community organisations, loaded so you can see what Puddl does. Click around, drag things, change whatever you like — nothing is saved and you cannot break anything. The tour takes about a minute.';
+  }
+
+  if (typeof loadDemo === 'function') loadDemo();
+
+  // Reword the banner. The signed-in Demo tour keeps its own wording, where
+  // "your real map is safe" and "Exit demo" both make sense; here they do not.
+  const t = document.getElementById('demo-banner-title');
+  if (t) t.textContent = '👀 You are trying Puddl';
+  const sub = document.getElementById('demo-banner-sub');
+  if (sub) sub.textContent = 'A real map to play with. Nothing here is saved.';
+
+  // "Exit demo" would drop them into an empty app they cannot sign in to.
+  const exit = document.getElementById('demo-banner-exit');
+  if (exit) {
+    exit.textContent = 'Sign in';
+    exit.onclick = function(){
+      const splash2 = document.getElementById('who-modal-bg');
+      if (splash2) splash2.style.display = 'none';
+      document.getElementById('auth-modal').style.display = 'flex';
+    };
+  }
+  const cta = document.getElementById('demo-banner-cta');
+  if (cta && PUDDL_SITE_URL) { cta.href = PUDDL_SITE_URL; cta.style.display = ''; }
+}
+
 // Initialize auth on page load
 async function initAuth() {
   if (IS_SHARE_VIEW) { hideAuthModal(); return; }
+  if (IS_TRY_MODE) { startTryMode(); return; }
   if (!supabaseClient) {
     showAuthModal();
     document.getElementById('canvas-area').style.display = 'none';
