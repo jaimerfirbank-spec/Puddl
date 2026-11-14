@@ -154,6 +154,37 @@ Grid is built once (`_iconGridBuilt` flag) and cached in `#icon-picker-grid`.
 
 ---
 
+## Sharing — `viewer.html` is generated, never hand-edited
+
+`viewer.html` is what people are sent when a map is shared. It is **generated**
+from `index.html`:
+
+```
+python3 tools/build-viewer.py
+```
+
+**Re-run it after any change to rendering, the hover panel, insights or the
+presentation**, or shared maps will drift from the real thing.
+
+The generator walks the call graph out from a list of viewer entry points and
+emits only what is reachable, so there is one copy of the drawing code rather
+than a second renderer to keep in step. Editing, import, export, saving, the
+account and the cloud are unreachable from those entry points, so none of it is
+emitted. It refuses to write the file if any of them slip through (`FORBIDDEN`),
+and it strips buttons whose handlers were not emitted, so no dead controls are
+left on screen.
+
+Why it exists: `saveFile()` used to write `document.documentElement.outerHTML` —
+the whole 742 KB app with a CSS class set. Anyone sent a "view-only" file had a
+complete working copy of Puddl, and a customer could export once, cancel, and
+keep using it forever. The viewer is ~240 KB and contains no editor.
+
+`saveFile()` fetches `viewer.html` at save time and injects the snapshot into
+both `#puddl-viewer-data` (what the viewer reads) and `#puddl-saved-state` (what
+Puddl's own importer reads, so a shared file can still be opened back up).
+It needs the app to be online. `viewer.html?src=<url>` loads a map from a URL
+instead, which is how hosted share links will work.
+
 ## Persistence
 ### Undo/redo
 - `saveState()` → pushes `snap()` JSON onto `history[]`
