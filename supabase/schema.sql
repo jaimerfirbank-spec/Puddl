@@ -31,6 +31,11 @@ create table if not exists public.teams (
   id                   uuid primary key default gen_random_uuid(),
   name                 text not null,
   seats                int  not null default 5 check (seats > 0),
+  -- A ceiling, not a selling point. Nobody should ever meet it in normal use;
+  -- it exists so a runaway import loop cannot quietly fill the database.
+  -- Raise it for one customer with:
+  --   update public.teams set maps_per_user = 100 where id = '<team-id>';
+  maps_per_user        int  not null default 25 check (maps_per_user > 0),
   -- null means no expiry. Set this 12 months out when an invoice is paid.
   subscription_ends_at timestamptz,
   created_at           timestamptz not null default now()
@@ -92,6 +97,29 @@ create trigger team_members_seat_limit
   before insert on public.team_members
   for each row execute function public.enforce_seat_limit();
 
+-- Cap how many maps one person may keep, for the same reason as the seat
+-- limit: enforced here, so it holds even against someone calling the API
+-- directly. Counts personal maps only — shared team maps are not a per-person
+-- possession.
+create or replace function public.enforce_map_limit()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare used int; allowed int;
+begin
+  if new.scope <> 'personal' or new.owner_id is null then
+    return new;
+  end if;
+  select count(*) into used
+    from public.maps
+   where owner_id = new.owner_id and scope = 'personal';
+  select maps_per_user into allowed from public.teams where id = new.team_id;
+  if used >= coalesce(allowed, 25) then
+    raise exception 'Map limit reached: % of % maps used. Delete one, or ask for more.', used, allowed
+      using errcode = 'check_violation';
+  end if;
+  return new;
+end;
+$$;
+
 -- ──────────────────────────────────────────────────────────────────────────
 -- 3. Maps
 -- ──────────────────────────────────────────────────────────────────────────
@@ -126,6 +154,11 @@ create or replace function public.touch_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end;
 $$;
+
+drop trigger if exists maps_map_limit on public.maps;
+create trigger maps_map_limit
+  before insert on public.maps
+  for each row execute function public.enforce_map_limit();
 
 drop trigger if exists maps_touch_updated_at on public.maps;
 create trigger maps_touch_updated_at
@@ -233,8 +266,8 @@ create policy "team deletes its images"
 -- 1. Create the users in Authentication → Users (or send invite links).
 -- 2. Then, replacing the values:
 --
---   insert into public.teams (name, seats, subscription_ends_at)
---   values ('Doncaster — Public Health', 5, now() + interval '12 months')
+--   insert into public.teams (name, seats, maps_per_user, subscription_ends_at)
+--   values ('Doncaster — Public Health', 5, 25, now() + interval '12 months')
 --   returning id;
 --
 --   insert into public.team_members (team_id, user_id, role) values
