@@ -175,6 +175,22 @@ alter table public.teams        enable row level security;
 alter table public.team_members enable row level security;
 alter table public.maps         enable row level security;
 
+-- Grants are the outer door; the policies below are the inner filter. Both are
+-- needed: a policy can only narrow what a role was already granted, so without
+-- these a signed-in user gets "permission denied for table" and never reaches
+-- their own maps.
+--
+-- Do not rely on Supabase's default privileges for this. They did not apply on
+-- this project: after the tables were created, anon had no grant at all, which
+-- is how this omission was caught.
+--
+-- 'anon' is a visitor who has not signed in and is deliberately granted
+-- nothing. Everything here goes to 'authenticated' only.
+grant usage on schema public to authenticated;
+grant select                         on public.teams        to authenticated;
+grant select, insert, delete         on public.team_members to authenticated;
+grant select, insert, update, delete on public.maps         to authenticated;
+
 -- Teams: members may look at their own team. Nobody may create or edit one
 -- through the app; that is yours to do when an invoice is paid.
 drop policy if exists "members read their team" on public.teams;
