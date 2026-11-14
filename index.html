@@ -2863,6 +2863,15 @@ function getCentreNodeSize(n){
   }
   return {cw:Math.max(minCW,measuredW+pad), ch};
 }
+// A node's radius on its own. Split out of nodeDims because the zoom floor
+// needs it on every zoom step, and nodeDims measures label text, which is far
+// too slow to run per node that often.
+function nodeBaseRadius(n){
+  let r = n.nodeSize==='small' ? 28 : n.nodeSize==='large' ? 60 : n.nodeSize==='xl' ? 120 : n.nodeSize==='xxl' ? 240 : 40;
+  if(SIZE_BY_CONNECTIONS){ r = Math.round(r * sizeScale(n)); }
+  return Math.round(r * nodeSizeScale());
+}
+
 function nodeDims(n){
   if(n.type==='centre'){ const {cw,ch}=getCentreNodeSize(n); return {w:cw, h:ch, r:null, tagText:'', FS:13}; }
   const FS=n.titleSize==='large'?16:n.titleSize==='xl'?22:n.titleSize==='xxl'?30:11;
@@ -2872,9 +2881,7 @@ function nodeDims(n){
   const catW=n.colourLabel?ctx.measureText(n.colourLabel).width:0;
   const areaW=n.area?ctx.measureText(n.area).width:0;
   const maxTW=Math.max(lw,catW,areaW);
-  let r = n.nodeSize==='small' ? 28 : n.nodeSize==='large' ? 60 : n.nodeSize==='xl' ? 120 : n.nodeSize==='xxl' ? 240 : 40;
-  if(SIZE_BY_CONNECTIONS){ r = Math.round(r * sizeScale(n)); }
-  r = Math.round(r * nodeSizeScale());
+  const r = nodeBaseRadius(n);
   return {w:r*2, h:r*2, r, tagText:'', FS};
 }
 
@@ -4087,12 +4094,24 @@ document.addEventListener('fullscreenchange',syncFullscreenIcon);
 document.addEventListener('webkitfullscreenchange',syncFullscreenIcon);
 
 // How far out you'd need to zoom to see the whole map, and the floor that allows it
+// Bounding box of the whole map, counting how big each node actually is.
+// Measuring centres alone treated an XXL node (radius 240) as a dot, so a map
+// holding one zoomed right in and the node filled the screen. Large nodes
+// overflowed the fitted view on every map for the same reason.
+function mapBounds(){
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  nodes.forEach(n=>{
+    const r=nodeBaseRadius(n);
+    minX=Math.min(minX,n.x-r); maxX=Math.max(maxX,n.x+r);
+    minY=Math.min(minY,n.y-r); maxY=Math.max(maxY,n.y+r);
+  });
+  const pad=100;
+  return {minX,maxX,minY,maxY,cw:maxX-minX+pad*2,ch:maxY-minY+pad*2};
+}
 function fitZoomLevel(){
   if(!nodes.length) return 0.02;
-  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-  nodes.forEach(n=>{minX=Math.min(minX,n.x);maxX=Math.max(maxX,n.x);minY=Math.min(minY,n.y);maxY=Math.max(maxY,n.y);});
-  const pad=100,cw=maxX-minX+pad*2,ch=maxY-minY+pad*2;
-  return Math.min(W/cw,H/ch);
+  const b=mapBounds();
+  return Math.min(W/b.cw,H/b.ch);
 }
 function minZoomAllowed(){ return Math.max(0.0005, Math.min(0.02, fitZoomLevel()*0.8)); }
 const MAX_ZOOM=32;   // was 8, too shallow to read a node on a big map
@@ -4103,11 +4122,9 @@ function zoomBy(f){
 function zoomReset(){zoom=1;panX=W/2;panY=H/2;fitAll();}
 function fitAll(){
   if(!nodes.length){draw();return;}
-  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-  nodes.forEach(n=>{minX=Math.min(minX,n.x);maxX=Math.max(maxX,n.x);minY=Math.min(minY,n.y);maxY=Math.max(maxY,n.y);});
-  const pad=100,cw=maxX-minX+pad*2,ch=maxY-minY+pad*2;
-  zoom=Math.max(minZoomAllowed(),Math.min(2,Math.min(W/cw,H/ch)));
-  panX=W/2-(minX+maxX)/2*zoom;panY=H/2-(minY+maxY)/2*zoom;draw();
+  const b=mapBounds();
+  zoom=Math.max(minZoomAllowed(),Math.min(2,Math.min(W/b.cw,H/b.ch)));
+  panX=W/2-(b.minX+b.maxX)/2*zoom;panY=H/2-(b.minY+b.maxY)/2*zoom;draw();
 }
 
 // ── Search / filter ───────────────────────────────────────────────────────────
@@ -13228,6 +13245,12 @@ async function cloudOpenMap(id){
     restoreSnap(JSON.stringify(data.data));
     _cloudMapId = id;
     markSaved();
+    // The "name your project" splash is still underneath, because the panel
+    // opened over it at startup. They have just picked a map, so asking them
+    // to name a project makes no sense - and naming one would quietly rename
+    // the map they opened.
+    const splash = document.getElementById('who-modal-bg');
+    if (splash) splash.style.display = 'none';
     const hdr = document.getElementById('header-project-name');
     if (hdr && data.title) hdr.textContent = data.title;
     return true;
