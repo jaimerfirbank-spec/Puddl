@@ -1087,6 +1087,7 @@ body.share-mode #present-exit{display:none !important;}
       <div class="dd-menu" id="menu-account" style="min-width:220px;">
         <div id="account-email" style="padding:8px 11px 6px;font-size:11px;color:var(--ink-h);word-break:break-all;">Not signed in</div>
         <div class="dd-sep"></div>
+        <button id="btn-my-maps" onclick="closeMenus();openMyMaps()" title="Open, rename or delete a map saved to your account"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg> Your maps</button>
         <button onclick="openLog();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Activity log</button>
         <button id="btn-demo" onclick="toggleDemo();closeMenus()" title="Load the demo map and tour"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg> <span id="btn-demo-label">Demo tour</span></button>
         <div class="dd-sep"></div>
@@ -9797,6 +9798,9 @@ function autoSave(){
     localStorage.setItem(key, snap());
     markSaved();
     showAutoSaveToast();
+    // localStorage is the fallback; the account copy is the one that survives
+    // a cleared cache or a different computer.
+    if (typeof cloudSaveCurrent === 'function') cloudSaveCurrent();
   } catch(e){
     // Storage full or unavailable. Never fail silently: the map is NOT saved and
     // the user has to know before they close the tab. markSaved() has not run, so
@@ -12761,6 +12765,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
     hideAuthModal();
     document.getElementById('auth-form').reset();
     loadingDiv.style.display = 'none';
+    afterSignIn();
   } catch (error) {
     errorDiv.textContent = error.message;
     errorDiv.style.display = 'block';
@@ -12874,6 +12879,7 @@ document.getElementById('setpw-form').addEventListener('submit', async (e) => {
     loading.style.display = 'none';
     showAuthPane('signin');
     hideAuthModal();
+    afterSignIn();
   } catch (err) {
     loading.style.display = 'none';
     errorDiv.textContent = err.message;
@@ -12927,6 +12933,7 @@ async function initAuth() {
     if (user) {
       _authUser = user; if(typeof updateAccountMenu==="function") updateAccountMenu();
       hideAuthModal();
+      afterSignIn();
     } else {
       showAuthModal();
       document.getElementById('canvas-area').style.display = 'none';
@@ -12965,12 +12972,285 @@ async function logout() {
   try {
     await supabaseClient.auth.signOut();
     _authUser = null;
+    _cloudReady = false; _cloudTeam = null; _cloudMapId = null; _cloudNotice = false;
+    cloudCloseModal();
     showAuthPane('signin');
     showAuthModal();
     document.getElementById('canvas-area').style.display = 'none';
   } catch (error) {
     console.error('Logout error:', error);
   }
+}
+
+// ══ Cloud saving ══════════════════════════════════════════════════════════
+// Maps used to live only in localStorage, so a cleared cache or a second
+// computer meant the work was gone. They now live in Supabase, one row per
+// map, with localStorage kept underneath as an offline fallback.
+//
+// Never block someone out of their own work: if the cloud is unreachable, or
+// their account is not linked to a subscription yet, Puddl drops back to
+// local-only saving and says so, rather than refusing to run.
+
+let _cloudReady   = false;   // we have a team and may read/write rows
+let _cloudTeam    = null;    // { team_id, name, maps_per_user, subscription_ends_at }
+let _cloudMapId   = null;    // row id of the map currently open
+let _cloudSaving  = false;
+let _cloudDirty   = false;   // a save arrived while one was in flight
+let _cloudNotice  = false;   // local-only warning already shown
+
+// PostgREST will take more, but a map this size means images that belong in
+// the storage bucket. Warn rather than silently failing a 10 MB request.
+const CLOUD_MAX_BYTES = 5 * 1024 * 1024;
+
+function cloudLocalOnly(why){
+  _cloudReady = false;
+  if (_cloudNotice) return;
+  _cloudNotice = true;
+  if (typeof showStatus === 'function') {
+    showStatus(why + ' Your work is being saved in this browser only - use Export to keep a copy.');
+  }
+}
+
+async function cloudInit(){
+  _cloudReady = false; _cloudMapId = null; _cloudTeam = null; _cloudNotice = false;
+  if (!supabaseClient || !_authUser || IS_SHARE_VIEW) return false;
+  try {
+    const { data, error } = await supabaseClient
+      .from('team_members')
+      .select('team_id, teams(name, seats, maps_per_user, subscription_ends_at)')
+      .limit(1);
+    if (error) {
+      // The tables may not exist yet, or the network is down.
+      cloudLocalOnly('Could not reach your saved maps.');
+      return false;
+    }
+    if (!data || !data.length) {
+      cloudLocalOnly('This account is not linked to a subscription yet.');
+      return false;
+    }
+    const row = data[0];
+    _cloudTeam = {
+      team_id: row.team_id,
+      name: row.teams ? row.teams.name : '',
+      maps_per_user: row.teams ? row.teams.maps_per_user : 25,
+      subscription_ends_at: row.teams ? row.teams.subscription_ends_at : null
+    };
+    _cloudReady = true;
+    return true;
+  } catch (err) {
+    cloudLocalOnly('Could not reach your saved maps.');
+    return false;
+  }
+}
+
+async function cloudListMaps(){
+  if (!_cloudReady) return [];
+  const { data, error } = await supabaseClient
+    .from('maps')
+    .select('id, title, kind, updated_at')
+    .eq('scope', 'personal')
+    .order('updated_at', { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+
+// One save path for both a brand-new map and an existing one, so nothing has
+// to remember to create the row first.
+async function cloudSaveCurrent(){
+  if (!_cloudReady || IS_SHARE_VIEW || inDemoMode) return;
+  if (_cloudSaving) { _cloudDirty = true; return; }
+  _cloudSaving = true;
+  try {
+    const dataStr = snap();
+    if (dataStr.length > CLOUD_MAX_BYTES) {
+      if (typeof showStatus === 'function') {
+        showStatus('This map is too large to save online (' + Math.round(dataStr.length/1048576) + ' MB). Remove a large image, or export it to a file.');
+      }
+      return;
+    }
+    const payload = {
+      title: (mapTitle || 'Untitled map').slice(0, 200),
+      data: JSON.parse(dataStr)
+    };
+    if (!_cloudMapId) {
+      payload.team_id = _cloudTeam.team_id;
+      payload.owner_id = _authUser.id;
+      payload.scope    = 'personal';
+      payload.kind     = (typeof MAP_TYPE !== 'undefined' && MAP_TYPE) ? MAP_TYPE : 'general';
+      const { data, error } = await supabaseClient.from('maps').insert(payload).select('id').single();
+      if (error) {
+        if (/Map limit reached/i.test(error.message || '')) {
+          if (typeof showStatus === 'function') showStatus(error.message);
+        } else {
+          cloudLocalOnly('Could not save online.');
+        }
+        return;
+      }
+      _cloudMapId = data.id;
+    } else {
+      const { error } = await supabaseClient.from('maps').update(payload).eq('id', _cloudMapId);
+      if (error) { cloudLocalOnly('Could not save online.'); return; }
+    }
+  } catch (err) {
+    cloudLocalOnly('Could not save online.');
+  } finally {
+    _cloudSaving = false;
+    if (_cloudDirty) { _cloudDirty = false; cloudSaveCurrent(); }
+  }
+}
+
+async function cloudOpenMap(id){
+  if (!_cloudReady) return false;
+  const { data, error } = await supabaseClient.from('maps').select('data, title').eq('id', id).single();
+  if (error || !data) {
+    if (typeof showStatus === 'function') showStatus('Could not open that map.');
+    return false;
+  }
+  try {
+    if (typeof saveState === 'function') saveState();   // so Ctrl+Z gets back
+    restoreSnap(JSON.stringify(data.data));
+    _cloudMapId = id;
+    markSaved();
+    const hdr = document.getElementById('header-project-name');
+    if (hdr && data.title) hdr.textContent = data.title;
+    return true;
+  } catch (err) {
+    if (typeof showStatus === 'function') showStatus('That map could not be read.');
+    return false;
+  }
+}
+
+async function cloudDeleteMap(id){
+  if (!_cloudReady) return false;
+  const { error } = await supabaseClient.from('maps').delete().eq('id', id);
+  if (error) { if (typeof showStatus === 'function') showStatus('Could not delete that map.'); return false; }
+  if (_cloudMapId === id) _cloudMapId = null;   // next save starts a fresh row
+  return true;
+}
+
+async function cloudRenameMap(id, title){
+  if (!_cloudReady) return false;
+  const { error } = await supabaseClient.from('maps').update({ title: title.slice(0,200) }).eq('id', id);
+  return !error;
+}
+
+// Run once someone is signed in: find their subscription, then show what they
+// already have saved. Someone with nothing saved falls through to the normal
+// "name your project" splash.
+async function afterSignIn(){
+  const ok = await cloudInit();
+  const btn = document.getElementById('btn-my-maps');
+  if (btn) btn.style.display = ok ? '' : 'none';
+  if (!ok) return;
+  try {
+    const maps = await cloudListMaps();
+    if (maps.length) openMyMaps();
+  } catch (err) { /* nothing saved yet is not an error */ }
+}
+
+// ── My maps panel ─────────────────────────────────────────────────────────
+function cloudEnsureModal(){
+  if (document.getElementById('cloud-maps-bg')) return;
+  const wrap = document.createElement('div');
+  wrap.id = 'cloud-maps-bg';
+  wrap.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.5);display:none;align-items:center;justify-content:center;font-family:\'DM Sans\',sans-serif;';
+  wrap.innerHTML =
+    '<div style="background:var(--surf);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);padding:28px;width:100%;max-width:520px;margin:20px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">' +
+        '<h2 style="font-size:20px;font-weight:600;color:var(--ink);margin:0;">Your maps</h2>' +
+        '<span id="cloud-maps-count" style="font-size:12px;color:var(--ink-m);"></span>' +
+      '</div>' +
+      '<p style="color:var(--ink-m);margin:6px 0 18px 0;font-size:13px;">Saved to your account. They open on any computer you sign in from.</p>' +
+      '<div id="cloud-maps-list" style="overflow-y:auto;flex:1;min-height:60px;"></div>' +
+      '<div style="display:flex;gap:10px;margin-top:18px;">' +
+        '<button type="button" onclick="cloudNewMap()" style="flex:1;padding:10px;background:var(--accent-2);color:#fff;border:none;border-radius:var(--radius);font-family:inherit;font-weight:600;cursor:pointer;font-size:14px;">Start a new map</button>' +
+        '<button type="button" onclick="cloudCloseModal()" style="padding:10px 16px;background:none;color:var(--ink-m);border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;cursor:pointer;font-size:14px;">Close</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(wrap);
+}
+
+function cloudCloseModal(){
+  const bg = document.getElementById('cloud-maps-bg');
+  if (bg) bg.style.display = 'none';
+}
+
+async function openMyMaps(){
+  if (!_cloudReady) {
+    if (typeof showStatus === 'function') showStatus('Saved maps are unavailable - this browser is saving locally.');
+    return;
+  }
+  cloudEnsureModal();
+  const bg = document.getElementById('cloud-maps-bg');
+  const list = document.getElementById('cloud-maps-list');
+  list.innerHTML = '<div style="color:var(--ink-m);font-size:13px;padding:8px 0;">Loading...</div>';
+  bg.style.display = 'flex';
+
+  const maps = await cloudListMaps();
+  const count = document.getElementById('cloud-maps-count');
+  if (count) count.textContent = maps.length + ' of ' + (_cloudTeam.maps_per_user || 25);
+
+  if (!maps.length) {
+    list.innerHTML = '<div style="color:var(--ink-m);font-size:13px;padding:8px 0;">Nothing saved yet. Start a new map and it will appear here.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  maps.forEach(function(m){
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--bdr);border-radius:var(--radius);margin-bottom:8px;';
+    const when = new Date(m.updated_at).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+    const isOpen = (m.id === _cloudMapId);
+    const name = document.createElement('div');
+    name.style.cssText = 'flex:1;min-width:0;';
+    const t = document.createElement('div');
+    t.style.cssText = 'font-size:14px;font-weight:600;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    t.textContent = m.title || 'Untitled map';
+    const sub = document.createElement('div');
+    sub.style.cssText = 'font-size:11px;color:var(--ink-m);margin-top:2px;';
+    sub.textContent = (isOpen ? 'Open now - ' : '') + 'last saved ' + when;
+    name.appendChild(t); name.appendChild(sub);
+    row.appendChild(name);
+
+    const mk = function(label, title, fn){
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = label; b.title = title;
+      b.style.cssText = 'padding:6px 10px;background:none;border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;font-size:12px;color:var(--ink);cursor:pointer;flex-shrink:0;';
+      b.onclick = fn;
+      return b;
+    };
+    if (!isOpen) row.appendChild(mk('Open', 'Open this map', async function(){
+      if (hasUnsavedChanges) await cloudSaveCurrent();
+      const ok = await cloudOpenMap(m.id);
+      if (ok) { cloudCloseModal(); if (typeof showStatus === 'function') showStatus('Opened "' + (m.title||'Untitled map') + '".'); }
+    }));
+    row.appendChild(mk('Rename', 'Rename this map', async function(){
+      const next = window.prompt('New name for this map:', m.title || 'Untitled map');
+      if (next === null) return;
+      const clean = next.trim();
+      if (!clean) return;
+      if (await cloudRenameMap(m.id, clean)) {
+        if (m.id === _cloudMapId) {
+          mapTitle = clean;
+          const hdr = document.getElementById('header-project-name');
+          if (hdr) hdr.textContent = clean;
+        }
+        openMyMaps();
+      }
+    }));
+    row.appendChild(mk('Delete', 'Delete this map for good', async function(){
+      if (!window.confirm('Delete "' + (m.title||'Untitled map') + '"?\n\nThis cannot be undone.')) return;
+      if (await cloudDeleteMap(m.id)) openMyMaps();
+    }));
+    list.appendChild(row);
+  });
+}
+
+async function cloudNewMap(){
+  if (hasUnsavedChanges) await cloudSaveCurrent();
+  _cloudMapId = null;           // the next save creates a fresh row
+  cloudCloseModal();
+  if (typeof _executeReset === 'function') { _executeReset(); return; }
+  window.location.reload();
 }
 
 // Initialize when DOM is ready
