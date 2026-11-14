@@ -11273,6 +11273,10 @@ function _executeReset(){
   const bgDataEl=document.getElementById('bg-image-data');
   if(bgDataEl) bgDataEl.textContent='';
   mapTitle=''; markSaved();
+  // Let go of the saved copy. Without this the next edit would save this blank
+  // canvas over the map they just cleared, destroying it in "Your maps".
+  // Starting fresh means a new row, leaving the old map where they left it.
+  _cloudMapId = null;
   const hdr=document.getElementById('header-project-name');
   if(hdr) hdr.textContent='—';
   buildSim(); draw();
