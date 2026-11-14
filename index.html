@@ -1084,8 +1084,11 @@ body.share-mode #present-exit{display:none !important;}
     <button id="btn-pres-mode" onclick="togglePresentationEditMode()" style="font-size:11px;height:28px;padding:0 14px;font-weight:700;background:var(--ink);color:var(--surf);border-color:var(--ink);" title="Set up and run a presentation">▶ Present</button>
     <div class="dd-wrap" id="account-wrap">
       <button id="btn-account" onclick="toggleMenu('menu-account',event)" title="Account" style="width:30px;height:30px;padding:0;border-radius:50%;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-left:4px;">?</button>
-      <div class="dd-menu" id="menu-account" style="min-width:220px;">
-        <div id="account-email" style="padding:8px 11px 6px;font-size:11px;color:var(--ink-h);word-break:break-all;">Not signed in</div>
+      <div class="dd-menu" id="menu-account" style="min-width:248px;max-width:320px;">
+        <div id="account-email" style="padding:9px 12px 8px;">
+          <div id="account-email-label" style="font-size:10px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-h);display:none;">Signed in as</div>
+          <div id="account-email-addr" style="font-size:12.5px;color:var(--ink);line-height:1.35;margin-top:3px;overflow-wrap:anywhere;">Not signed in</div>
+        </div>
         <div class="dd-sep"></div>
         <button id="btn-my-maps" onclick="closeMenus();openMyMaps()" title="Open, rename or delete a map saved to your account"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg> Your maps</button>
         <button onclick="openLog();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg> Activity log</button>
@@ -12963,7 +12966,12 @@ function addLogoutButton() {
 
 function updateAccountMenu(){
   const email=(typeof _authUser!=='undefined'&&_authUser&&_authUser.email)||'';
-  const em=document.getElementById('account-email'); if(em) em.textContent=email?('Signed in as '+email):'Not signed in';
+  // The address goes on its own line: "Signed in as" above it, so a long one
+  // wraps cleanly instead of breaking mid-word against the label.
+  const lbl=document.getElementById('account-email-label');
+  if(lbl) lbl.style.display=email?'':'none';
+  const em=document.getElementById('account-email-addr');
+  if(em){ em.textContent=email||'Not signed in'; em.title=email||''; }
   const b=document.getElementById('btn-account');
   if(b){ const base=(email.split('@')[0]||'').replace(/[^a-zA-Z]+/g,' ').trim(); const parts=base.split(' ').filter(Boolean);
     b.textContent=parts.length>1?(parts[0][0]+parts[1][0]).toUpperCase():(base.slice(0,1).toUpperCase()||'?'); }
