@@ -1196,6 +1196,7 @@ body.share-mode #present-exit{display:none !important;}
 <!-- Auth Modal -->
 <div id="auth-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:'DM Sans',sans-serif;">
   <div style="background:var(--surf);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);padding:40px;width:100%;max-width:400px;margin:20px;">
+    <div id="auth-signin-pane">
     <h1 style="font-size:24px;font-weight:600;color:var(--ink);margin:0 0 8px 0;">Welcome to Puddl</h1>
     <p style="color:var(--ink-m);margin:0 0 24px 0;font-size:14px;">Sign in to access your mapping workspace</p>
 
@@ -1210,6 +1211,29 @@ body.share-mode #present-exit{display:none !important;}
       </div>
       <button type="submit" style="padding:10px;background:var(--accent-2);color:#fff;border:none;border-radius:var(--radius);font-weight:600;cursor:pointer;font-size:14px;margin-top:8px;">Sign In</button>
     </form>
+    <button type="button" onclick="startPasswordReset()" style="background:none;border:none;padding:0;margin-top:14px;color:var(--ink-m);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;">Forgot your password?</button>
+    </div>
+
+    <div id="auth-setpw-pane" style="display:none;">
+      <h1 style="font-size:24px;font-weight:600;color:var(--ink);margin:0 0 8px 0;">Choose your password</h1>
+      <p style="color:var(--ink-m);margin:0 0 24px 0;font-size:14px;">Pick something only you know. You&rsquo;ll use it to sign in from now on.</p>
+
+      <form id="setpw-form" style="display:flex;flex-direction:column;gap:12px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">New password</label>
+          <input type="password" id="setpw-password" name="new-password" autocomplete="new-password" placeholder="At least 8 characters" required style="width:100%;padding:10px;border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;box-sizing:border-box;font-size:14px;">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;">Confirm password</label>
+          <input type="password" id="setpw-confirm" name="confirm-password" autocomplete="new-password" placeholder="Type it again" required style="width:100%;padding:10px;border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;box-sizing:border-box;font-size:14px;">
+        </div>
+        <button type="submit" style="padding:10px;background:var(--accent-2);color:#fff;border:none;border-radius:var(--radius);font-weight:600;cursor:pointer;font-size:14px;margin-top:8px;">Save password and continue</button>
+      </form>
+
+      <div id="setpw-error" style="color:#E8736A;font-size:12px;margin-top:12px;display:none;"></div>
+      <div id="setpw-loading" style="color:var(--ink-m);font-size:12px;margin-top:12px;display:none;">Saving...</div>
+      <button type="button" onclick="showAuthPane('signin')" style="background:none;border:none;padding:0;margin-top:14px;color:var(--ink-m);font-family:inherit;font-size:12px;text-decoration:underline;cursor:pointer;">Back to sign in</button>
+    </div>
 
     <div id="auth-error" style="color:#E8736A;font-size:12px;margin-top:12px;display:none;"></div>
     <div id="auth-loading" style="color:var(--ink-m);font-size:12px;margin-top:12px;display:none;">Signing in...</div>
@@ -12691,6 +12715,16 @@ const SUPABASE_ANON_KEY = 'sb_publishable_cEmd4G8xYwwUEqOZSV9jsA_bO4vh6gG';
 let supabaseClient = null;
 let _authUser = null;
 
+// Supabase sends invited people, and anyone resetting a password, back here
+// with a one-time token in the URL fragment. supabase-js consumes that
+// fragment as soon as the client starts, so read it first and keep it.
+const _authHash = (function(){ try { return window.location.hash || ''; } catch(e){ return ''; } })();
+const _authWantsNewPassword = /type=(invite|recovery|signup)/.test(_authHash);
+const _authHashError = (function(){
+  const m = _authHash.match(/error_description=([^&]*)/);
+  return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+})();
+
 // Attach form handler FIRST so it always prevents default submission
 document.getElementById('auth-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -12745,6 +12779,119 @@ try {
   console.error('Supabase init error:', err);
 }
 
+// ── Setting a password ────────────────────────────────────────────────────
+function showAuthPane(which){
+  const signin = document.getElementById('auth-signin-pane');
+  const setpw  = document.getElementById('auth-setpw-pane');
+  if (signin) signin.style.display = (which === 'setpw') ? 'none' : '';
+  if (setpw)  setpw.style.display  = (which === 'setpw') ? '' : 'none';
+}
+
+// "Forgot your password?" on the sign-in box. Emails a link back to this page.
+async function startPasswordReset(){
+  const errorDiv = document.getElementById('auth-error');
+  const loading  = document.getElementById('auth-loading');
+  const email    = (document.getElementById('auth-email').value || '').trim();
+  errorDiv.style.display = 'none';
+  if (!email) {
+    errorDiv.textContent = 'Type your email address above first, then click this again.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  if (!supabaseClient) {
+    errorDiv.textContent = 'Not connected. Refresh the page and try again.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  loading.textContent = 'Sending the link...';
+  loading.style.display = 'block';
+  try {
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+    if (error) {
+      loading.style.display = 'none';
+      errorDiv.textContent = error.message;
+      errorDiv.style.display = 'block';
+      return;
+    }
+    loading.textContent = 'Sent. Check your email for a link to set a new password.';
+  } catch (err) {
+    loading.style.display = 'none';
+    errorDiv.textContent = err.message;
+    errorDiv.style.display = 'block';
+  }
+}
+
+document.getElementById('setpw-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const pw       = document.getElementById('setpw-password').value;
+  const pw2      = document.getElementById('setpw-confirm').value;
+  const errorDiv = document.getElementById('setpw-error');
+  const loading  = document.getElementById('setpw-loading');
+  errorDiv.style.display = 'none';
+
+  if (pw.length < 8) {
+    errorDiv.textContent = 'Use at least 8 characters.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  if (pw !== pw2) {
+    errorDiv.textContent = 'The two passwords do not match.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+  if (!supabaseClient) {
+    errorDiv.textContent = 'Not connected. Refresh the page and try again.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+
+  loading.textContent = 'Saving...';
+  loading.style.display = 'block';
+  try {
+    // The invite link signs them in for one session. No session means the link
+    // was already used, or it expired.
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      loading.style.display = 'none';
+      errorDiv.textContent = 'That link has expired or was already used. Go back to sign in and use "Forgot your password?" to get a new one.';
+      errorDiv.style.display = 'block';
+      return;
+    }
+    const { data, error } = await supabaseClient.auth.updateUser({ password: pw });
+    if (error) {
+      loading.style.display = 'none';
+      errorDiv.textContent = error.message;
+      errorDiv.style.display = 'block';
+      return;
+    }
+    _authUser = data.user;
+    if (typeof updateAccountMenu === 'function') updateAccountMenu();
+    // Strip the one-time token out of the address bar. NOTE: `history` is this
+    // app's undo stack, so the browser API must be reached via `window`.
+    try { window.history.replaceState(null, '', window.location.pathname + window.location.search); } catch(_) {}
+    document.getElementById('setpw-form').reset();
+    loading.style.display = 'none';
+    showAuthPane('signin');
+    hideAuthModal();
+  } catch (err) {
+    loading.style.display = 'none';
+    errorDiv.textContent = err.message;
+    errorDiv.style.display = 'block';
+  }
+});
+
+// Supabase fires this when someone arrives on a reset link.
+if (supabaseClient && supabaseClient.auth && supabaseClient.auth.onAuthStateChange) {
+  supabaseClient.auth.onAuthStateChange(function(event){
+    if (event === 'PASSWORD_RECOVERY' && !IS_SHARE_VIEW) {
+      showAuthModal();
+      document.getElementById('canvas-area').style.display = 'none';
+      showAuthPane('setpw');
+    }
+  });
+}
+
 // Initialize auth on page load
 async function initAuth() {
   if (IS_SHARE_VIEW) { hideAuthModal(); return; }
@@ -12753,6 +12900,28 @@ async function initAuth() {
     document.getElementById('canvas-area').style.display = 'none';
     return;
   }
+
+  // Arrived on a dead link - say so on the sign-in box rather than failing silently.
+  if (_authHashError) {
+    showAuthModal();
+    document.getElementById('canvas-area').style.display = 'none';
+    showAuthPane('signin');
+    const errorDiv = document.getElementById('auth-error');
+    errorDiv.textContent = _authHashError + ' Use "Forgot your password?" below to get a fresh link.';
+    errorDiv.style.display = 'block';
+    return;
+  }
+
+  // Arrived on an invite or reset link. The token signs them in, so this check
+  // has to come before the signed-in check below, or they would skip straight
+  // past choosing a password.
+  if (_authWantsNewPassword) {
+    showAuthModal();
+    document.getElementById('canvas-area').style.display = 'none';
+    showAuthPane('setpw');
+    return;
+  }
+
   try {
     const { data: { user } } = await supabaseClient.auth.getUser();
     if (user) {
@@ -12796,6 +12965,7 @@ async function logout() {
   try {
     await supabaseClient.auth.signOut();
     _authUser = null;
+    showAuthPane('signin');
     showAuthModal();
     document.getElementById('canvas-area').style.display = 'none';
   } catch (error) {
