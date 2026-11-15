@@ -13430,6 +13430,37 @@ async function cloudNewMap(){
   window.location.reload();
 }
 
+// ── Click outside a modal closes it ───────────────────────────────────────
+// Standard web behaviour. The sign-in wall and the naming splash are not here
+// on purpose: closing those would strand someone with no way forward. The
+// connection modal routes through its own cancel so a half-made connection is
+// cleaned up, and reset through its own close so the typed DELETE is cleared.
+const MODAL_BACKDROP_CLOSERS = {
+  'modal-bg':             () => closeModal(),
+  'cat-modal-bg':         () => closeCatModal(),
+  'combined-review-modal':() => closeCombinedReview(),
+  'del-node-modal-bg':    () => document.getElementById('del-node-modal-bg').classList.add('hidden'),
+  'reset-modal-bg':       () => closeResetModal(),
+  'pwd-modal-bg':         () => closePwdModal(),
+  'import-modal-bg':      () => closeImportModal(),
+  'puddl-import-modal-bg':() => closePuddlImportModal(),
+  'report-modal-bg':      () => closeReport(),
+  'versions-modal-bg':    () => closeVersionsModal(),
+  'customize-modal-bg':   () => closeCustomizePanel(),
+  'conn-strength-modal':  () => cancelConnection(),
+  'cloud-maps-bg':        () => cloudCloseModal()
+};
+// Only a true click on the dim area closes: a drag that starts inside the card
+// (selecting text, say) and ends on the backdrop must not.
+let _backdropDownOn = null;
+document.addEventListener('mousedown', e => { _backdropDownOn = e.target; });
+document.addEventListener('click', e => {
+  const id = e.target && e.target.id;
+  if (!id || !(id in MODAL_BACKDROP_CLOSERS)) return;
+  if (_backdropDownOn !== e.target) return;
+  try { MODAL_BACKDROP_CLOSERS[id](); } catch (err) {}
+});
+
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
