@@ -3,7 +3,7 @@
 Generate viewer.html from index.html.
 
 The viewer is the page people are sent when a map is shared. It must draw a map
-exactly as Puddl does, and must not contain the editor: the old share file was
+exactly as Puddle does, and must not contain the editor: the old share file was
 the whole 742 KB app with a CSS class applied, so anyone who opened it had a
 working copy of the product.
 
@@ -241,7 +241,7 @@ VIEWER_SHELL = r'''<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Puddl map</title>
+<title>Puddle map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -279,7 +279,7 @@ VIEWER_SHELL = r'''<!DOCTYPE html>
 </div>
 
 <div id="viewer-bar">
-  <div id="viewer-title">Puddl map</div>
+  <div id="viewer-title">Puddle map</div>
   <button type="button" id="viewer-explore" class="primary">Explore the map</button>
   <button type="button" id="viewer-present" class="primary" style="display:none;">Back to presentation</button>
   <button type="button" id="viewer-theme" title="Light or dark">◐</button>
@@ -288,7 +288,7 @@ VIEWER_SHELL = r'''<!DOCTYPE html>
 <!--__MARKUP__-->
 
 <div id="puddl-viewer-data" style="display:none;"></div>
-<!-- Same JSON again, under the name Puddl's own importer looks for, so a
+<!-- Same JSON again, under the name Puddle's own importer looks for, so a
      shared file can be opened back up in the app by someone who has one. -->
 <div id="puddl-saved-state" style="display:none;"></div>
 <div id="bg-image-data" style="display:none;"></div>
@@ -299,7 +299,7 @@ VIEWER_SHELL = r'''<!DOCTYPE html>
 </script>
 <script>
 // ── Boot ──────────────────────────────────────────────────────────────────
-// Everything above is Puddl's own drawing code, lifted unchanged so a shared
+// Everything above is Puddle's own drawing code, lifted unchanged so a shared
 // map looks exactly like the real thing. Nothing that edits, imports, exports
 // or saves is in this file.
 (function(){
@@ -323,7 +323,7 @@ VIEWER_SHELL = r'''<!DOCTYPE html>
   try{ restoreSnap(raw); }
   catch(err){ document.getElementById('viewer-title').textContent='This map could not be read'; return; }
 
-  try{ document.getElementById('viewer-title').textContent = (typeof mapTitle!=='undefined' && mapTitle) ? mapTitle : 'Puddl map'; }catch(e){}
+  try{ document.getElementById('viewer-title').textContent = (typeof mapTitle!=='undefined' && mapTitle) ? mapTitle : 'Puddle map'; }catch(e){}
 
   var hasPres = false;
   try{ hasPres = !!(presentationStops && presentationStops.length); }catch(e){}

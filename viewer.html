@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Puddl map</title>
+<title>Puddle map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -125,6 +125,22 @@ body{
 /* ── Header ───────────────────────────────────────────────────────────────── */
 header{flex-shrink:0;}
 .logo-img{height:38px;width:auto;border-radius:6px;}
+#main-header{flex-wrap:nowrap;padding:8px 10px!important;gap:8px!important;}
+#main-header>div[style*="justify-content:flex-end"]{gap:4px!important;}
+#main-header #btn-menu-import,#main-header #btn-menu-share,#main-header #btn-open-settings{padding:0 9px!important;}
+/* Tighter still on smaller laptops: the PROJECT label is decoration */
+@media (max-width:1180px){
+  #map-toggle-btn>span:first-child{display:none;}
+  #header-project-name{max-width:180px!important;}
+}
+/* Below ~1040px one row cannot hold everything; wrapping beats clipping. */
+@media (max-width:1040px){
+  #main-header{flex-wrap:wrap!important;row-gap:6px!important;}
+}
+#main-header .toolbar-centre{gap:3px;}
+#main-header .toolbar-centre button{height:27px;font-size:11px;padding:0 9px;}
+#main-header .toolbar-centre #btn-undo,#main-header .toolbar-centre #btn-redo{width:30px;height:27px;font-size:15px;}
+#main-header .toolbar-centre #btn-addnode{font-weight:700;}
 .h-title{color:var(--ink);font-size:14px;font-weight:700;letter-spacing:-0.02em;font-family:'DM Sans',sans-serif;}
 .h-sub{color:var(--ink-h);font-size:11px;margin-top:1px;font-weight:400;}
 
@@ -1081,7 +1097,7 @@ body.share-mode #present-exit{display:none !important;}
 </div>
 
 <div id="viewer-bar">
-  <div id="viewer-title">Puddl map</div>
+  <div id="viewer-title">Puddle map</div>
   <button type="button" id="viewer-explore" class="primary">Explore the map</button>
   <button type="button" id="viewer-present" class="primary" style="display:none;">Back to presentation</button>
   <button type="button" id="viewer-theme" title="Light or dark">◐</button>
@@ -1222,7 +1238,7 @@ body.share-mode #present-exit{display:none !important;}
   <!-- Demo mode banner + exit button -->
   <div style="display:flex;gap:8px;align-items:center;">
       
-      <a id="demo-banner-cta" href="#" style="display:none;font-size:11px;height:26px;line-height:26px;padding:0 12px;background:rgba(0,0,0,0.12);border-radius:var(--radius);color:#18181b;font-weight:600;text-decoration:none;">Get Puddl</a>
+      <a id="demo-banner-cta" href="#" style="display:none;font-size:11px;height:26px;line-height:26px;padding:0 12px;background:rgba(0,0,0,0.12);border-radius:var(--radius);color:#18181b;font-weight:600;text-decoration:none;">Get Puddle</a>
       
     </div>
   </div>
@@ -1230,7 +1246,7 @@ body.share-mode #present-exit{display:none !important;}
   <!-- Map info bar -->
   <div id="map-info-bar" style="position:absolute;bottom:0;left:0;right:0;padding:6px 16px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--txt-m);z-index:10;">
     <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-      <span id="map-title-display" title="Click to edit title" style="font-weight:600;color:var(--ink);cursor:pointer;border-bottom:1px dashed var(--bdr-m);letter-spacing:-0.01em;white-space:nowrap;">Puddl Map</span>
+      <span id="map-title-display" title="Click to edit title" style="font-weight:600;color:var(--ink);cursor:pointer;border-bottom:1px dashed var(--bdr-m);letter-spacing:-0.01em;white-space:nowrap;">Puddle Map</span>
       <div id="node-count-display" style="color:var(--txt-m);white-space:nowrap;"></div>
     </div>
     <div style="display:flex;align-items:center;gap:12px;">
@@ -1327,7 +1343,7 @@ body.share-mode #present-exit{display:none !important;}
 </div>
 
 <div id="puddl-viewer-data" style="display:none;"></div>
-<!-- Same JSON again, under the name Puddl's own importer looks for, so a
+<!-- Same JSON again, under the name Puddle's own importer looks for, so a
      shared file can be opened back up in the app by someone who has one. -->
 <div id="puddl-saved-state" style="display:none;"></div>
 <div id="bg-image-data" style="display:none;"></div>
@@ -1352,8 +1368,8 @@ let CONNECTION_STYLES = [
   {id:'dashed', label:'Dashed', colour:'#EA580C', lineWidth:1.8, dashPattern:[8,4], arrowScale:1},
   {id:'double', label:'Double', colour:'#059669', lineWidth:1.8, dashPattern:[], arrowScale:1, isDouble:true}
 ];
-let centralEventLabel = 'Puddl';
-let mapTitle = 'Puddl Map';
+let centralEventLabel = 'Puddle';
+let mapTitle = 'Puddle Map';
 let currentMapMode = 'team';
 let skipSave = false;
 let personalMaps = {};
@@ -1406,6 +1422,8 @@ let NODE_SIZE_MODE='auto';
 let NODE_RING=false;               // coloured ring on dark nodes, off by default
 // Map type: changes wording and which insights show. 'general' keeps today's neutral wording.
 let MAP_TYPE='general';            // 'general' | 'network' | 'systems' | 'stakeholder' | 'argument'
+const MAP_TYPE_LABELS={general:'General map',network:'Network map',systems:'Systems map',stakeholder:'Stakeholder map',argument:'Argument map'};
+function updateHeaderMapType(){ const el=document.getElementById('header-map-type'); if(el) el.textContent=MAP_TYPE_LABELS[MAP_TYPE]||'General map'; }
 let MAP_FOCUS=null;                // node id at the centre of a stakeholder map, or null
 const MAP_TYPES=['general','network','systems','stakeholder','argument'];
 function ensureArgStyles(){
@@ -1728,6 +1746,7 @@ function restoreSnap(s){
   NODE_SIZE_MODE=['auto','always','never'].includes(d.nodeSizeMode)?d.nodeSizeMode:'auto';
   NODE_RING=d.nodeRing===true;
   MAP_TYPE=MAP_TYPES.includes(d.mapType)?d.mapType:'general';
+  updateHeaderMapType();
   if(MAP_TYPE==='argument'){
     ensureArgStyles();
     nodes.forEach(n=>{ if(n.argPart==='claim'&&String(n.colour).toUpperCase()==='#1E3A8A') n.colour='#4F46E5'; });
@@ -3130,7 +3149,7 @@ function insightSummaryLines(I){
   const hub=I.most[0];
   if(MAP_TYPE==='systems'){
     if(!I.directedEdges){
-      S.push("No arrows are set, so Puddl can't tell what drives what. Open a connection and give it an arrow to see drivers, outcomes and feedback loops.");
+      S.push("No arrows are set, so Puddle can't tell what drives what. Open a connection and give it an arrow to see drivers, outcomes and feedback loops.");
     } else {
       if(I.drivers[0]) S.push(`${I.drivers[0].label} influences the most other factors: ${I.outDeg.get(I.drivers[0].id)} outgoing arrows.`);
       if(I.sinks[0]) S.push(`${I.sinks[0].label} is affected by the most: ${I.inDeg.get(I.sinks[0].id)} incoming arrows.`);
@@ -4953,7 +4972,7 @@ function renderHoverPanel(n){
 </script>
 <script>
 // ── Boot ──────────────────────────────────────────────────────────────────
-// Everything above is Puddl's own drawing code, lifted unchanged so a shared
+// Everything above is Puddle's own drawing code, lifted unchanged so a shared
 // map looks exactly like the real thing. Nothing that edits, imports, exports
 // or saves is in this file.
 (function(){
@@ -4977,7 +4996,7 @@ function renderHoverPanel(n){
   try{ restoreSnap(raw); }
   catch(err){ document.getElementById('viewer-title').textContent='This map could not be read'; return; }
 
-  try{ document.getElementById('viewer-title').textContent = (typeof mapTitle!=='undefined' && mapTitle) ? mapTitle : 'Puddl map'; }catch(e){}
+  try{ document.getElementById('viewer-title').textContent = (typeof mapTitle!=='undefined' && mapTitle) ? mapTitle : 'Puddle map'; }catch(e){}
 
   var hasPres = false;
   try{ hasPres = !!(presentationStops && presentationStops.length); }catch(e){}
