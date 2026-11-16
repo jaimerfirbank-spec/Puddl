@@ -79,15 +79,7 @@ function findNodes(src){
     }
     approx.delete();hull.delete();c.delete();
   }
-  // A second pass catches round nodes whose outline is joined to several arrows.
-  const circles=new cv.Mat();
-  cv.HoughCircles(blur,circles,cv.HOUGH_GRADIENT,1.25,Math.max(55,src.cols/18),90,30,Math.max(28,src.cols/45),Math.max(170,src.cols/7));
-  for(let i=0;i<circles.cols;i++){
-    const x=circles.data32F[i*3],y=circles.data32F[i*3+1],r=circles.data32F[i*3+2];
-    const box={x:Math.max(0,Math.round(x-r)),y:Math.max(0,Math.round(y-r)),w:Math.round(r*2),h:Math.round(r*2),shape:'oval',area:Math.PI*r*r,score:.62};
-    if(box.x+box.w<src.cols&&box.y+box.h<src.rows) raw.push(box);
-  }
-  circles.delete();contours.delete();hier.delete();gray.delete();blur.delete();white.delete();
+  contours.delete();hier.delete();gray.delete();blur.delete();white.delete();
   raw.sort((a,b)=>b.area-a.area);const out=[];
   for(const n of raw){if(!out.some(o=>insideScore(n,o)>.62))out.push(n)}
   return out.sort((a,b)=>a.y-b.y||a.x-b.x);
@@ -101,27 +93,9 @@ function cropForOCR(base,n){
 }
 function cleanText(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9 '&-]/g,' ').replace(/\s+/g,' ').trim()}
 
-function thresholdCanvas(base,scale=1){
-  const c=makeCanvas(base.width*scale,base.height*scale),g=c.getContext('2d');g.drawImage(base,0,0,c.width,c.height);
-  const d=g.getImageData(0,0,c.width,c.height);for(let i=0;i<d.data.length;i+=4){const v=(d.data[i]+d.data[i+1]+d.data[i+2])/3<175?0:255;d.data[i]=d.data[i+1]=d.data[i+2]=v}g.putImageData(d,0,0);return c;
-}
 async function readLabels(canvas,nodes,worker){
-  // Read the whole page first. It often understands a complete word better
-  // than a tight crop, then we match each word back to its enclosing node.
-  await worker.setParameters({tessedit_pageseg_mode:'11'});
-  setStatus('Reading names across the page…');
-  const page=await worker.recognize(thresholdCanvas(canvas));
-  const words=(page.data.words||[]).map(w=>({
-    text:cleanText(w.text),confidence:Math.round(w.confidence||0),
-    x0:w.bbox&&w.bbox.x0||0,y0:w.bbox&&w.bbox.y0||0,x1:w.bbox&&w.bbox.x1||0,y1:w.bbox&&w.bbox.y1||0
-  })).filter(w=>w.text);
-  nodes.forEach(n=>{
-    const hits=words.filter(w=>{const x=(w.x0+w.x1)/2,y=(w.y0+w.y1)/2;return x>n.x-n.w*.12&&x<n.x+n.w*1.12&&y>n.y-n.h*.12&&y<n.y+n.h*1.12});
-    if(hits.length){n.label=hits.sort((a,b)=>a.x0-b.x0).map(w=>w.text).join(' ');n.textConfidence=Math.round(hits.reduce((s,w)=>s+w.confidence,0)/hits.length)}
-  });
   await worker.setParameters({tessedit_pageseg_mode:'8'});
   for(let i=0;i<nodes.length;i++){
-    if(nodes[i].label&&nodes[i].textConfidence>=55) continue;
     setStatus('Reading name '+(i+1)+' of '+nodes.length+'…');
     const crop=cropForOCR(canvas,nodes[i]);
     const r=await worker.recognize(crop);nodes[i].label=cleanText(r.data.text)||'UNREADABLE';nodes[i].textConfidence=Math.round(r.data.confidence||0);
