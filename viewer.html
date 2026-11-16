@@ -789,16 +789,8 @@ body.share-mode #present-exit{display:none !important;}
 }
 .present-para{margin-bottom:8px;}
 .present-spacer{height:10px;}
-#present-nav{
-  display:flex;align-items:center;gap:10px;
-  padding:14px 20px;
-  border-top:1px solid var(--bdr);
-  background:var(--surf);
-  flex-shrink:0;
-}
 #present-progress{
-  flex:1;text-align:center;font-size:11px;
-  color:var(--ink-h);letter-spacing:0.03em;
+  font-size:11px;color:var(--ink-h);letter-spacing:0.03em;white-space:nowrap;
 }
 .present-nav-btn{
   padding:7px 18px;font-size:12px;font-weight:600;
@@ -810,14 +802,19 @@ body.share-mode #present-exit{display:none !important;}
 .present-nav-btn:disabled{opacity:.3;cursor:default;}
 .present-nav-btn.primary{background:var(--ink);color:var(--on-ink);border-color:var(--ink);}
 .present-nav-btn.primary:hover:not(:disabled){background:#3f3f46;border-color:#3f3f46;}
+/* Halved from two rows (~84px) to one (~40px): merged Play/Back/Next with the
+   timeline, tighter padding, smaller buttons. */
 #present-play-row{
-  display:flex;align-items:center;gap:10px;
-  padding:10px 20px 0;background:var(--surf);flex-shrink:0;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+  padding:7px 16px;background:var(--surf);flex-shrink:0;
+  border-top:1px solid var(--bdr);
 }
-#present-timeline{flex:1;height:6px;border-radius:3px;background:var(--bdr);overflow:hidden;cursor:pointer;}
-#present-timeline-fill{height:100%;width:0%;background:var(--ink);border-radius:3px;transition:width .12s linear;}
-#present-time{font-size:11px;color:var(--ink-h);min-width:74px;text-align:right;font-variant-numeric:tabular-nums;}
-#present-btn-play{min-width:92px;}
+#present-play-row .present-nav-btn{padding:5px 10px;font-size:11px;}
+#present-timeline{flex:1;min-width:60px;height:4px;border-radius:2px;background:var(--bdr);overflow:hidden;cursor:pointer;}
+#present-timeline-fill{height:100%;width:0%;background:var(--ink);border-radius:2px;transition:width .12s linear;}
+#present-time{font-size:10.5px;color:var(--ink-h);min-width:66px;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+#present-btn-play{min-width:34px;}
+#present-btn-back,#present-btn-next{min-width:30px;padding:5px 8px;}
 #pres-narration-box{
   padding:10px 14px;border-top:1px solid var(--bdr);display:flex;flex-direction:column;gap:6px;
 }
@@ -848,7 +845,7 @@ body.share-mode #present-exit{display:none !important;}
 }
 #present-exit:hover{background:var(--surf-3);color:var(--ink);border-color:var(--bdr-m);}
 #present-overlay.map-only #present-left{
-  position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+  position:fixed;left:50%;bottom:8px;transform:translateX(-50%);
   width:min(620px,92vw) !important;min-width:0;border:1px solid var(--bdr);
   border-radius:14px;box-shadow:var(--shadow-xl);overflow:visible;z-index:5;
   transition:opacity .35s;padding-bottom:0;
@@ -858,7 +855,7 @@ body.share-mode #present-exit{display:none !important;}
 #present-overlay.map-only #present-divider{display:none !important;}
 #present-overlay.map-only #present-right{flex:1 1 100%;}
 #present-overlay.map-only #present-exit{top:-38px;right:0;background:var(--surf);}
-#present-overlay.map-only #present-play-row{padding-top:12px;}
+#present-overlay.map-only #present-play-row{border-top:none;}
 #present-overlay.map-only.idle #present-left{opacity:0;pointer-events:none;}
 #present-overlay.map-only.idle{cursor:none;}
 #present-divider{
@@ -1281,16 +1278,14 @@ body.share-mode #present-exit{display:none !important;}
         <div id="present-body-text"></div>
       </div>
       <div id="present-play-row">
-        <button class="present-nav-btn primary" id="present-btn-play" onclick="presPlayToggle()" title="Play or pause (Space)">▶ Play</button>
+        <button class="present-nav-btn" id="present-btn-back" onclick="presentPrev()" title="Previous stop">←</button>
+        <button class="present-nav-btn primary" id="present-btn-play" onclick="presPlayToggle()" title="Play or pause (Space)">▶</button>
+        <button class="present-nav-btn" id="present-btn-next" onclick="presentNext()" title="Next stop">→</button>
         <div id="present-timeline" onclick="presTimelineSeek(event)" title="Click to jump"><div id="present-timeline-fill"></div></div>
         <span id="present-time">0:00 / 0:00</span>
-        <button class="present-nav-btn" id="present-btn-fs" onclick="toggleFullscreen()" title="Full screen" style="padding:7px 10px;">⛶</button>
-        <button class="present-nav-btn" id="present-btn-notes" onclick="presToggleMapOnly()" title="Show or hide the notes (N)" style="padding:7px 10px;">Hide notes</button>
-      </div>
-      <div id="present-nav">
-        <button class="present-nav-btn" id="present-btn-back" onclick="presentPrev()">← Back</button>
         <span id="present-progress"></span>
-        <button class="present-nav-btn primary" id="present-btn-next" onclick="presentNext()">Next →</button>
+        <button class="present-nav-btn" id="present-btn-fs" onclick="toggleFullscreen()" title="Full screen" style="padding:6px 9px;">⛶</button>
+        <button class="present-nav-btn" id="present-btn-notes" onclick="presToggleMapOnly()" title="Show or hide the notes (N)" style="padding:6px 9px;">Hide notes</button>
       </div>
       <div id="present-badge">▶ Presentation</div>
     </div>
@@ -4517,8 +4512,10 @@ function presRender(){
   if(pc.width!==PW*dpr||pc.height!==PH*dpr){ pc.width=PW*dpr; pc.height=PH*dpr; }
   const pctx=pc.getContext('2d');
 
-  // Ease toward target (smooth camera movement)
-  const ease=0.072;
+  // Ease toward target (smooth camera movement). Lower = slower, smoother
+  // deceleration; 0.072 converged in ~20 frames and read as a snap rather
+  // than a glide.
+  const ease=0.045;
   presViewPanX+=(presTargetPanX-presViewPanX)*ease;
   presViewPanY+=(presTargetPanY-presViewPanY)*ease;
   presViewZoom+=(presTargetZoom-presViewZoom)*ease;
