@@ -3826,8 +3826,11 @@ function buildSummaryReport(){
   }
 
   if(vis.length>0){
-    html+=`<div class="report-section"><h4>All visible nodes</h4>`;
-    [...vis].sort((a,b)=>a.label.localeCompare(b.label)).forEach(n=>{
+    const REPORT_TOP=20;
+    const capped=vis.length>REPORT_TOP;
+    html+=`<div class="report-section"><h4>${capped?`Top ${REPORT_TOP} nodes`:'All visible nodes'}</h4>`;
+    [...vis].sort((a,b)=>((connCount[b.id]||0)-(connCount[a.id]||0))||a.label.localeCompare(b.label))
+      .slice(0,REPORT_TOP).forEach(n=>{
       const col=n.colour||'#888';
       const conns=visEdges.filter(e=>{
         const s=typeof e.source==='object'?e.source.id:e.source;
