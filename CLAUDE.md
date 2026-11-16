@@ -234,3 +234,10 @@ Right-click on node → shows:
 - Call `draw()` to refresh the canvas
 - Add `buildSim()` after structural changes that affect the force simulation
 - Prefer minimal edits — grep → targeted read → Edit tool (never rewrite the file)
+
+
+---
+
+## Claude and Codex coordination
+
+Before starting work, read and follow `AI_WORKFLOW.md`. Claude must use a `claude/<task>` branch and a separate worktree/folder from Codex. Check active branches and pull requests for overlapping work, and do not edit an area currently owned by another agent.
