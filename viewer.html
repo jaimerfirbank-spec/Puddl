@@ -816,7 +816,8 @@ body.share-mode #present-exit{display:none !important;}
 #present-btn-play{min-width:34px;}
 #present-btn-back,#present-btn-next{min-width:30px;padding:5px 8px;}
 #pres-narration-box{
-  padding:10px 14px;border-top:1px solid var(--bdr);display:flex;flex-direction:column;gap:6px;
+  display:none; /* narration removed from the editor (16 Nov 2026) */
+  padding:10px 14px;border-top:1px solid var(--bdr);flex-direction:column;gap:6px;
 }
 #pres-narration-status{font-size:11px;color:var(--ink-h);line-height:1.4;word-break:break-word;}
 #pres-narration-box input[type=text],#pres-narration-box input[type=number]{
@@ -1526,7 +1527,8 @@ let lastMouse=null;
 let sim=null;
 let hoverPanelNodeId=null, hoverHideTimer=null, sidePanelNodeId=null;
 let presMapOnly=false;           // hide notes: map fills the screen, controls float
-let presentationStops=[];       // [{id,panX,panY,zoom,header,subheader,body}]
+let presentationStops=[];       // [{id,panX,panY,zoom,header,subheader,body}] — the draft being built
+let savedPresentations=[];      // [{id,title,createdAt,stops:[...]}] — published, done drafts
 let presentationCurrentIdx=0;
 let presentationSelectedIdx=0;
 let inPresentationMode=false;
@@ -1676,6 +1678,7 @@ function snap(){
     loopConnectionStyle:LOOP_CONNECTION_STYLE,
     connectionStyles:CONNECTION_STYLES,
     presentationStops:presentationStops||[],
+    savedPresentations:savedPresentations||[],
     presMapOnly:!!presMapOnly,
     fieldDefs:FIELD_DEFS,
     dateAsAt:DATE_ASAT,
@@ -1728,6 +1731,7 @@ function restoreSnap(s){
   if(d.loopConnectionStyle) LOOP_CONNECTION_STYLE={...LOOP_CONNECTION_STYLE,...d.loopConnectionStyle};
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
   presentationStops=d.presentationStops||[];
+  savedPresentations=Array.isArray(d.savedPresentations)?d.savedPresentations:[];
   presMapOnly=!!d.presMapOnly;
   FIELD_DEFS=Array.isArray(d.fieldDefs)?d.fieldDefs:[];
   DATE_ASAT=d.dateAsAt||null; if(typeof recomputeDateHidden==='function') recomputeDateHidden();
