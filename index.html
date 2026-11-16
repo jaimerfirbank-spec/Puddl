@@ -11384,7 +11384,10 @@ window.addEventListener('load', ()=>{
       // Hide the startup modal — project name is already known
       const splash=document.getElementById('who-modal-bg');
       if(splash){ splash.style.display='none'; }
-      saveState(); draw();
+      // Opening a saved file: fit this map's own nodes to the screen rather
+      // than drawing at the zoom=1/canvas-centre default, which only matches
+      // by coincidence. fitAll() draws too, so this replaces the plain draw().
+      saveState(); fitAll();
       if(IS_SHARE_VIEW){
         document.body.classList.add('share-mode');
         const au=document.getElementById('auth-modal'); if(au) au.style.display='none';
@@ -13419,6 +13422,10 @@ async function cloudOpenMap(id){
   try {
     if (typeof saveState === 'function') saveState();   // so Ctrl+Z gets back
     restoreSnap(JSON.stringify(data.data));
+    // restoreSnap() never touches zoom/pan - whatever view was on screen
+    // before (a different map's layout) would otherwise carry over. Fit this
+    // map's own nodes to the screen, same as a freshly opened file.
+    if (typeof fitAll === 'function') fitAll();
     _cloudMapId = id;
     markSaved();
     // The "name your project" splash is still underneath, because the panel
