@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Puddle Image-to-Map Test</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,sans-serif;color:#172033;background:#f5f7fb}
+    *{box-sizing:border-box} body{margin:0;padding:24px}.wrap{max-width:1100px;margin:auto}
+    h1{font-size:24px;margin:0 0 6px}.sub{color:#60708a;margin:0 0 20px}
+    .card{background:#fff;border:1px solid #dce2eb;border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 6px 22px #22304a0d}
+    .drop{display:block;border:2px dashed #9aa8bc;border-radius:12px;padding:26px;text-align:center;cursor:pointer;background:#fafcff}
+    .drop:hover{border-color:#2477e8}.drop input{display:none}.actions{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+    button{border:0;border-radius:9px;padding:10px 16px;font-weight:700;background:#2477e8;color:#fff;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}
+    .quiet{background:#e9eef6;color:#26354d}.status{color:#566780;font-size:14px}.grid{display:grid;grid-template-columns:1.25fr .75fr;gap:14px}
+    canvas{width:100%;height:auto;border:1px solid #dce2eb;border-radius:10px;background:white}.result{font-size:14px;line-height:1.5}
+    table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;border-bottom:1px solid #e7ebf1;padding:8px 6px}th{color:#65728a}
+    .warn{color:#a45c00}.ok{color:#14743e}.pill{display:inline-block;padding:2px 7px;border-radius:99px;background:#edf2f8;font-size:12px}
+    .sheet{margin-top:18px}.sheet h2{font-size:17px}.hidden{display:none}@media(max-width:760px){body{padding:12px}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Puddle Image-to-Map test</h1>
+  <p class="sub">Runs in this browser. The pictures are not uploaded anywhere.</p>
+  <div class="card">
+    <label class="drop" id="drop">
+      <strong>Choose one to four map photos</strong><br>
+      <small>JPG or PNG, black marker on white paper</small>
+      <input id="files" type="file" accept="image/jpeg,image/png" multiple>
+    </label>
+    <div class="actions">
+      <button id="run" disabled>Read map</button>
+      <button id="clear" class="quiet">Clear</button>
+      <span id="status" class="status">Loading the reader…</span>
+    </div>
+  </div>
+  <div id="results"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+let cvReady=false, chosen=[];
+const $=id=>document.getElementById(id);
+function setStatus(s){$('status').textContent=s}
+function enable(){ $('run').disabled=!(cvReady&&chosen.length&&window.Tesseract) }
+window.Module={onRuntimeInitialized(){cvReady=true;setStatus('Ready. Choose a photo.');enable()}};
+</script>
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+<script>
+$('files').onchange=e=>{chosen=[...e.target.files].slice(0,4);setStatus(chosen.length+' photo'+(chosen.length===1?'':'s')+' selected.');enable()};
+$('clear').onclick=()=>{chosen=[];$('files').value='';$('results').innerHTML='';setStatus(cvReady?'Ready. Choose a photo.':'Loading the reader…');enable()};
+$('drop').ondragover=e=>e.preventDefault();
+$('drop').ondrop=e=>{e.preventDefault();chosen=[...e.dataTransfer.files].filter(f=>/^image\//.test(f.type)).slice(0,4);setStatus(chosen.length+' photo'+(chosen.length===1?'':'s')+' selected.');enable()};
+
+function loadImage(file){return new Promise((resolve,reject)=>{const u=URL.createObjectURL(file),im=new Image();im.onload=()=>{URL.revokeObjectURL(u);resolve(im)};im.onerror=reject;im.src=u})}
+function makeCanvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c}
+function overlap(a,b){const x=Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x));const y=Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));return x*y}
+function insideScore(a,b){return overlap(a,b)/Math.max(1,Math.min(a.w*a.h,b.w*b.h))}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function centre(n){return{x:n.x+n.w/2,y:n.y+n.h/2}}
+
+function findNodes(src){
+  const gray=new cv.Mat(), blur=new cv.Mat(), white=new cv.Mat();
+  cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);cv.GaussianBlur(gray,blur,new cv.Size(3,3),0);
+  cv.adaptiveThreshold(blur,white,255,cv.ADAPTIVE_THRESH_GAUSSIAN_C,cv.THRESH_BINARY,41,12);
+  const contours=new cv.MatVector(),hier=new cv.Mat();cv.findContours(white,contours,hier,cv.RETR_LIST,cv.CHAIN_APPROX_SIMPLE);
+  const raw=[];const page=src.cols*src.rows;
+  for(let i=0;i<contours.size();i++){
+    const c=contours.get(i), area=Math.abs(cv.contourArea(c));
+    if(area<page*.0012||area>page*.12){c.delete();continue}
+    const r=cv.boundingRect(c), ar=r.width/r.height;
+    if(r.width<45||r.height<35||ar<.35||ar>4.2){c.delete();continue}
+    const peri=cv.arcLength(c,true),approx=new cv.Mat();cv.approxPolyDP(c,approx,.025*peri,true);
+    const hull=new cv.Mat();cv.convexHull(c,hull);const solidity=area/Math.max(1,Math.abs(cv.contourArea(hull)));
+    const fill=area/(r.width*r.height), circ=4*Math.PI*area/Math.max(1,peri*peri);
+    if(solidity>.72&&fill>.38&&(circ>.22||(approx.rows>=4&&approx.rows<=12))){
+      const shape=(approx.rows<=6&&fill>.58)?'rectangle':'oval';raw.push({x:r.x,y:r.y,w:r.width,h:r.height,shape,area,score:Math.min(.99,.45+solidity*.3+fill*.25)});
+    }
+    approx.delete();hull.delete();c.delete();
+  }
+  contours.delete();hier.delete();gray.delete();blur.delete();white.delete();
+  raw.sort((a,b)=>b.area-a.area);const out=[];
+  for(const n of raw){if(!out.some(o=>insideScore(n,o)>.62))out.push(n)}
+  return out.sort((a,b)=>a.y-b.y||a.x-b.x);
+}
+
+function cropForOCR(base,n){
+  const pad=Math.max(5,Math.round(Math.min(n.w,n.h)*.12));
+  const x=Math.max(0,n.x+pad),y=Math.max(0,n.y+pad),w=Math.max(5,Math.min(base.width-x,n.w-pad*2)),h=Math.max(5,Math.min(base.height-y,n.h-pad*2));
+  const c=makeCanvas(w*3,h*3),g=c.getContext('2d');g.fillStyle='white';g.fillRect(0,0,c.width,c.height);g.drawImage(base,x,y,w,h,0,0,c.width,c.height);
+  const d=g.getImageData(0,0,c.width,c.height);for(let i=0;i<d.data.length;i+=4){const v=(d.data[i]+d.data[i+1]+d.data[i+2])/3<165?0:255;d.data[i]=d.data[i+1]=d.data[i+2]=v}g.putImageData(d,0,0);return c;
+}
+function cleanText(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9 '&-]/g,' ').replace(/\s+/g,' ').trim()}
+
+async function readLabels(canvas,nodes,worker){
+  for(let i=0;i<nodes.length;i++){
+    setStatus('Reading name '+(i+1)+' of '+nodes.length+'…');
+    const crop=cropForOCR(canvas,nodes[i]);
+    const r=await worker.recognize(crop);nodes[i].label=cleanText(r.data.text)||'UNREADABLE';nodes[i].textConfidence=Math.round(r.data.confidence||0);
+  }
+}
+
+function darkMask(canvas){const src=cv.imread(canvas),g=new cv.Mat(),b=new cv.Mat();cv.cvtColor(src,g,cv.COLOR_RGBA2GRAY);cv.threshold(g,b,150,255,cv.THRESH_BINARY_INV);src.delete();g.delete();return b}
+function lineEvidence(mask,a,b){
+  const A=centre(a),B=centre(b),dx=B.x-A.x,dy=B.y-A.y,L=Math.hypot(dx,dy);if(L<20)return 0;
+  const ux=dx/L,uy=dy/L;let hit=0,total=0;const start=Math.max(a.w,a.h)*.42,end=L-Math.max(b.w,b.h)*.42;
+  for(let t=start;t<end;t+=3){for(let q=-5;q<=5;q+=2){const x=Math.round(A.x+ux*t-uy*q),y=Math.round(A.y+uy*t+ux*q);if(x>=0&&y>=0&&x<mask.cols&&y<mask.rows){total++;if(mask.ucharPtr(y,x)[0]>0)hit++}}}
+  return total?hit/total:0;
+}
+function arrowEvidence(mask,node,toward){
+  const C=centre(node),T=centre(toward),dx=T.x-C.x,dy=T.y-C.y,L=Math.hypot(dx,dy)||1,ux=dx/L,uy=dy/L;
+  const radius=Math.min(node.w,node.h)*.54;let side=0,axis=0;
+  for(let t=radius;t<radius+30;t+=2){for(let q=-20;q<=20;q+=2){const x=Math.round(C.x+ux*t-uy*q),y=Math.round(C.y+uy*t+ux*q);if(x<0||y<0||x>=mask.cols||y>=mask.rows)continue;const on=mask.ucharPtr(y,x)[0]>0;if(on){if(Math.abs(q)>5)side++;else axis++}}}
+  return side/(axis+8);
+}
+function findEdges(canvas,nodes){
+  const mask=darkMask(canvas),edges=[];
+  for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+    const ev=lineEvidence(mask,nodes[i],nodes[j]);if(ev<.11)continue;
+    const ai=arrowEvidence(mask,nodes[i],nodes[j]),aj=arrowEvidence(mask,nodes[j],nodes[i]);
+    let direction='unclear';if(ai>.85&&aj>.85)direction='both';else if(ai>.85)direction='to '+(nodes[i].label||'#'+(i+1));else if(aj>.85)direction='to '+(nodes[j].label||'#'+(j+1));
+    edges.push({a:i,b:j,evidence:ev,direction,confidence:Math.min(99,Math.round(ev*260))});
+  }
+  mask.delete();return edges;
+}
+
+function drawOverlay(canvas,nodes,edges){
+  const c=makeCanvas(canvas.width,canvas.height),g=c.getContext('2d');g.drawImage(canvas,0,0);g.lineWidth=Math.max(3,canvas.width/350);g.font=Math.max(16,canvas.width/45)+'px system-ui';
+  edges.forEach(e=>{const a=centre(nodes[e.a]),b=centre(nodes[e.b]);g.strokeStyle='#e09b13';g.beginPath();g.moveTo(a.x,a.y);g.lineTo(b.x,b.y);g.stroke()});
+  nodes.forEach((n,i)=>{g.strokeStyle=n.textConfidence<55?'#e05252':'#18a66a';g.strokeRect(n.x,n.y,n.w,n.h);g.fillStyle=g.strokeStyle;g.fillText((i+1)+' '+n.label,n.x,n.y-5)});return c;
+}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function renderSheet(file,canvas,nodes,edges){
+  const wrap=document.createElement('div');wrap.className='card sheet';
+  const rows=nodes.map((n,i)=>`<tr><td>${i+1}</td><td>${esc(n.label)}</td><td>${n.shape}</td><td class="${n.textConfidence<55?'warn':'ok'}">${n.textConfidence}%</td></tr>`).join('');
+  const erows=edges.map(e=>`<tr><td>${esc(nodes[e.a].label)}</td><td>${esc(nodes[e.b].label)}</td><td class="${e.direction==='unclear'?'warn':''}">${esc(e.direction)}</td><td>${e.confidence}%</td></tr>`).join('');
+  const unclear=nodes.filter(n=>n.textConfidence<55||n.label==='UNREADABLE').length+edges.filter(e=>e.direction==='unclear').length;
+  wrap.innerHTML=`<h2>${esc(file.name)}</h2><div class="grid"><div class="picture"></div><div class="result"><p><span class="pill">${nodes.length} nodes</span> <span class="pill">${edges.length} possible connections</span></p><p class="${unclear?'warn':'ok'}">${unclear?unclear+' item(s) need checking.':'Nothing was marked unclear.'}</p><h3>Nodes</h3><table><thead><tr><th>#</th><th>Name</th><th>Shape</th><th>Reading</th></tr></thead><tbody>${rows}</tbody></table><h3>Connections</h3><table><thead><tr><th>From</th><th>To</th><th>Arrow</th><th>Match</th></tr></thead><tbody>${erows||'<tr><td colspan="4">None found</td></tr>'}</tbody></table></div></div>`;
+  wrap.querySelector('.picture').appendChild(drawOverlay(canvas,nodes,edges));$('results').appendChild(wrap);
+}
+
+$('run').onclick=async()=>{
+  $('run').disabled=true;$('results').innerHTML='';let worker;
+  try{
+    setStatus('Starting text reader…');worker=await Tesseract.createWorker('eng',1,{logger:m=>{if(m.status==='recognizing text')setStatus('Reading text… '+Math.round((m.progress||0)*100)+'%')}});
+    await worker.setParameters({tessedit_char_whitelist:"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 '&-",tessedit_pageseg_mode:'6'});
+    for(let f=0;f<chosen.length;f++){
+      setStatus('Finding nodes in photo '+(f+1)+'…');const im=await loadImage(chosen[f]);const scale=Math.min(1,1800/Math.max(im.naturalWidth,im.naturalHeight));const c=makeCanvas(Math.round(im.naturalWidth*scale),Math.round(im.naturalHeight*scale));c.getContext('2d').drawImage(im,0,0,c.width,c.height);
+      const src=cv.imread(c),nodes=findNodes(src);src.delete();await readLabels(c,nodes,worker);setStatus('Tracing connections…');const edges=findEdges(c,nodes);renderSheet(chosen[f],c,nodes,edges);
+    }
+    setStatus('Finished. Check the highlighted results.');
+  }catch(err){console.error(err);setStatus('The test failed: '+(err.message||err));}
+  finally{if(worker)await worker.terminate();enable()}
+};
+</script>
+</body>
+</html>
