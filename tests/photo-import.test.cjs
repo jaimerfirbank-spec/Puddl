@@ -18,3 +18,16 @@ function bridge(payload){
 }
 test('malformed photo import preserves the current map and pending payload',async()=>{const {c,callbacks,storage}=bridge({...graph(),nodes:[{id:'n1',x:NaN,y:0,width:20,height:20}]});await callbacks.load();assert.equal(c.cleared,false);assert.equal(storage.has('puddl_image_import'),true)});
 test('photo import preserves image aspect ratio and direction',async()=>{const g=graph();g.nodes.push({...g.nodes[0],id:'n2',x:110,y:110});g.edges=[{source:'n1',target:'n2',direction:'target_to_source'}];const {c,callbacks}=bridge({...g,imageWidth:2000,imageHeight:1000});await new Promise(r=>setImmediate(r));assert.equal(c.cleared,true);assert.equal(c.draft.edges[0].from,2);assert.equal(c.draft.edges[0].to,1);const [a,b]=c.draft.nodes;assert.equal((b.x-a.x)/(b.y-a.y),2)});
+const configSource=fs.readFileSync('api/client-config.js','utf8').replace('export default ','');
+function clientConfig(env){const c=vm.createContext({process:{env},Buffer,URL});vm.runInContext(configSource,c);let output;const res={setHeader(){},end(body){output={status:this.statusCode,body}}};c.handler({},res);return output;}
+test('runtime config exposes only publishable keys and rejects a service-role key',()=>{
+ const publicResult=clientConfig({SUPABASE_URL:'https://staging.supabase.co',SUPABASE_ANON_KEY:'sb_publishable_test',OPENAI_API_KEY:'private-openai'});
+ assert.equal(publicResult.status,200);assert.ok(!publicResult.body.includes('private-openai'));
+ const service='x.'+Buffer.from(JSON.stringify({role:'service_role'})).toString('base64url')+'.x';
+ const denied=clientConfig({SUPABASE_URL:'https://staging.supabase.co',SUPABASE_ANON_KEY:service});assert.equal(denied.status,503);assert.ok(!denied.body.includes(service));
+});
+test('incomplete preview config fails closed instead of using the production project',()=>{
+ assert.equal(clientConfig({}).status,503);
+ const source=fs.readFileSync('index.html','utf8');
+ assert.ok(source.includes("location.hostname==='puddl.vercel.app'?"));
+});

@@ -15,3 +15,11 @@ The database grants ten photo reads per active team member in a rolling hour. Th
 The prototype continues to simplify ovals to circles and node sizes to Puddle's standard sizes. Connection strengths start at moderate. Its review screen says so; inference of relationship strength is not implemented.
 
 Tests: `node --test tests/*.test.cjs`; browser steps are documented in `tests/README.md`. The browser photo test mocks authentication and provider responses. No accuracy claim is made for the larger drawing that has not yet been supplied.
+
+## Staging integration checks, 17 November 2026
+
+A separate free Supabase project, **Puddle Staging**, was created in PuddL and initialized without copying production records. Both migrations applied successfully. Synthetic staging accounts passed real sign-in, private-map isolation, ownership protection, stale-save rejection, concurrent map/seat limits, and concurrent photo allowance checks. A local browser connected to that actual staging database passed save/edit/undo/reload/reopen and cleaned up its disposable map.
+
+The browser now loads public database settings from `/api/client-config`, so a branch preview can use the same staging database as its photo endpoint. The endpoint rejects private/service-role keys and never exposes the OpenAI key. Unconfigured preview hosts cannot silently fall back to production. Vercel preview database variables are scoped to `codex/photo-import-reliability`; production settings are unchanged.
+
+Credential fixtures live outside the repository and are not committed. `tests/staging-integration.cjs` and `tests/browser-staging.cjs` require an explicit non-production project reference and an external fixture file. `tests/staging-preview-server.cjs` serves a loopback-only preview with public staging configuration.

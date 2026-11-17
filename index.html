@@ -1063,6 +1063,7 @@ body.share-mode #present-exit{display:none !important;}
 #icon-picker-grid button:hover{background:var(--acc,#3B82F6);border-color:transparent;color:#fff;}
 </style>
 <!-- Supabase Auth -->
+<script src="/api/client-config"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -13056,8 +13057,8 @@ document.addEventListener('click',function(e){
 <!-- Supabase Auth Logic -->
 <script>
 // Initialize Supabase
-const SUPABASE_URL = 'https://amjkbkbmqpaifqurzozg.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_cEmd4G8xYwwUEqOZSV9jsA_bO4vh6gG';
+const SUPABASE_URL = window.PUDDLE_CONFIG?.supabaseUrl || (location.hostname==='puddl.vercel.app'?'https://amjkbkbmqpaifqurzozg.supabase.co':'');
+const SUPABASE_ANON_KEY = window.PUDDLE_CONFIG?.supabaseKey || (location.hostname==='puddl.vercel.app'?'sb_publishable_cEmd4G8xYwwUEqOZSV9jsA_bO4vh6gG':'');
 
 let supabaseClient = null;
 let _authUser = null;
@@ -13118,7 +13119,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
 
 // Try to initialize Supabase client
 try {
-  if (window.supabase && window.supabase.createClient) {
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase && window.supabase.createClient) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   } else {
     console.error('Supabase library not loaded');

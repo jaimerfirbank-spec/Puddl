@@ -24,6 +24,7 @@
     </section>
     <section id="result" class="card result hidden"></section>
   </main>
+<script src="/api/client-config"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const $=id=>document.getElementById(id);let chosen=null,previewUrl='',requestNumber=0,readController=null,photoAuthClient=null;
@@ -65,7 +66,8 @@ $('read').addEventListener('click',async()=>{
   $('read').disabled=true;clearError();$('result').classList.add('hidden');
   try{
     if(!window.supabase)throw Error('The sign-in service could not load. Please reload the page.');
-    if(!photoAuthClient)photoAuthClient=window.supabase.createClient('https://amjkbkbmqpaifqurzozg.supabase.co','sb_publishable_cEmd4G8xYwwUEqOZSV9jsA_bO4vh6gG');
+    if(!window.PUDDLE_CONFIG?.supabaseUrl||!window.PUDDLE_CONFIG?.supabaseKey)throw Error('The preview database is not configured yet.');
+    if(!photoAuthClient)photoAuthClient=window.supabase.createClient(window.PUDDLE_CONFIG.supabaseUrl,window.PUDDLE_CONFIG.supabaseKey);
     const {data:{session}}=await photoAuthClient.auth.getSession();
     if(!session)throw Error('Sign in to Puddle in another tab, then return here and try again.');
     if(request!==requestNumber)return;
