@@ -79,3 +79,9 @@ test('imported labels, contacts and notes remain text in hover HTML',()=>{
  assert.ok(!target.innerHTML.includes('<img'));assert.ok(!target.innerHTML.includes('<svg'));
  assert.ok(target.innerHTML.includes('&lt;img'));
 });
+
+test('imported settings cannot inject handlers through IDs or colours',()=>{
+ const c=ctx({},['validateMapSnapshot']);
+ for(const d of [{...valid(),categories:[{id:"x');alert(1);//"}]},{...valid(),nodes:[{id:1,x:0,y:0,colour:'red" onmouseover="x'}]},{...valid(),connectionStyles:[{id:'moderate',colour:'red; background:url(x)'}]}])assert.throws(()=>c.validateMapSnapshot(d));
+ assert.doesNotThrow(()=>c.validateMapSnapshot({...valid(),connectionStyles:[{id:'moderate',colour:'rgba(0,0,0,0.5)'}]}));
+});

@@ -3031,15 +3031,25 @@ function updateHistBtns(){
 function validateMapSnapshot(d){
   if(!d||!Array.isArray(d.nodes)||!Array.isArray(d.edges)) throw new Error('Invalid map data.');
   const ids=new Set();
+  const safeColour=value=>value==null||value===''||/^(#[0-9a-f]{3,8}|[a-z]+|rgba?\([\d.,%\s]+\))$/i.test(String(value));
   for(const n of d.nodes){
     if(!n||!Number.isSafeInteger(n.id)||ids.has(n.id)||!Number.isFinite(n.x)||!Number.isFinite(n.y)) throw new Error('Invalid or duplicate node.');
+    if(!safeColour(n.colour)) throw new Error('Invalid node colour.');
     ids.add(n.id);
   }
   for(const e of d.edges){
     if(!e||!ids.has(e.from)||!ids.has(e.to)) throw new Error('A connection refers to a missing node.');
+    if(!safeColour(e.colour)) throw new Error('Invalid connection colour.');
   }
-  for(const key of ['loops','categories','connectionStyles','presentationStops','savedPresentations','namedVersions']){
+  for(const key of ['loops','categories','connectionStyles','presentationStops','savedPresentations','namedVersions','fieldDefs']){
     if(d[key]!==undefined&&!Array.isArray(d[key])) throw new Error('Invalid map '+key+'.');
+  }
+  // These IDs become control IDs and handler arguments in older settings UI.
+  for(const key of ['categories','connectionStyles','fieldDefs']){
+    for(const item of d[key]||[]){
+      if(!item||!/^[-\w]+$/.test(String(item.id))||item.id==null) throw new Error('Invalid settings identifier.');
+      if(!safeColour(item.colour)) throw new Error('Invalid settings colour.');
+    }
   }
   return d;
 }
@@ -5267,7 +5277,7 @@ function handlePuddlImportFile(file){
     const snapEl=doc.getElementById('puddl-saved-state');
     const raw=snapEl&&snapEl.textContent.trim();
     if(!raw){ showStatus('No Puddle map data found in this file'); return; }
-    try{ _puddlImportSnap=JSON.parse(raw); }catch(e){ showStatus('Map data is corrupted'); return; }
+    try{ _puddlImportSnap=validateMapSnapshot(JSON.parse(raw)); }catch(e){ showStatus('Map data is corrupted'); return; }
     const nc=(_puddlImportSnap.nodes||[]).length;
     const ec=(_puddlImportSnap.edges||[]).length;
     const lc=(_puddlImportSnap.loops||[]).length;
