@@ -10,8 +10,8 @@ http.createServer((req,res)=>{
   const context=vm.createContext({process:{env:{SUPABASE_URL:a.url,SUPABASE_ANON_KEY:a.key}},Buffer,URL});
   vm.runInContext(fs.readFileSync('api/client-config.js','utf8').replace('export default ',''),context);return context.handler(req,res);
  }
- const target=path.resolve(root,'.'+decodeURIComponent(url.pathname==='/'?'/index.html':url.pathname));
+ const target=path.resolve(root,'.'+decodeURIComponent(url.pathname.endsWith('/')?url.pathname+'index.html':url.pathname));
  if(!target.startsWith(root+path.sep)||url.pathname.startsWith('/.')){res.writeHead(403);return res.end();}
- try{res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.png':'image/png','.webp':'image/webp'})[path.extname(target)]||'text/plain');res.end(fs.readFileSync(target));}
+ try{res.setHeader('Content-Type',({'.html':'text/html','.css':'text/css','.js':'text/javascript','.png':'image/png','.webp':'image/webp','.svg':'image/svg+xml','.webmanifest':'application/manifest+json'})[path.extname(target)]||'text/plain');res.end(fs.readFileSync(target));}
  catch{res.writeHead(404);res.end('Not found');}
 }).listen(7894,'127.0.0.1',()=>console.log('Staging-only local preview listening on 127.0.0.1:7894'));

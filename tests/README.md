@@ -14,3 +14,5 @@ accounts and concurrent transactions before applying it to production.
 Run `tests/browser-photo.cjs` with the same Playwright environment to exercise the photo flow. All photo API and auth responses in that check are mocked.
 
 Real staging checks use `tests/staging-integration.cjs` and `tests/browser-staging.cjs`, with `PUDDLE_STAGING_REF` explicitly set to a non-production project. Put synthetic credentials in an external fixture selected with `PUDDLE_STAGING_AUTH`; never commit that file. The loopback staging server is `tests/staging-preview-server.cjs`. These tests create and remove only synthetic staging records.
+
+Lens: `tests/lens-staging.cjs` uses the same isolated staging fixture and exact staging-ref guard. It checks private photo Storage and cleans up its synthetic object. Physical phone camera/installation checks remain manual; see `LENS_ROLLOUT.md`.
