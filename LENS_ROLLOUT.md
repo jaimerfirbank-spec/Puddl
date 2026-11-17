@@ -23,3 +23,7 @@ Only the isolated free staging project was changed. Preview environment must use
 Browser at 390×844: real staging sign-in, gallery selection of the existing 30-node photo, rotation (2000×1362 after turning), rename and successful upload. Desktop inbox received that photo; opening Review loaded it into the existing reader without an AI call. No physical phone camera or paid recognition run is claimed for this check.
 
 Supabase security advisors were reviewed. No Lens-specific findings; existing schema advisories include `touch_updated_at` search path and callable helper/trigger functions, plus leaked-password protection disabled. The denied direct access to `photo_read_requests` is intentional (RPC only). These existing items were not changed as part of Lens. References: https://supabase.com/docs/guides/database/database-linter?lint=0011_function_search_path_mutable and https://supabase.com/docs/guides/auth/password-security.
+
+## Installation follow-up
+
+The protected preview manifest link uses `crossorigin="use-credentials"`, required for a manifest fetched behind preview authentication. A browser-provided `beforeinstallprompt` enables the Install Puddle Lens button; it is never shown as a working install action without that event. Standalone mode is detected separately from a shortcut. Installation still needs confirmation on the actual Android device; Vercel protection remains enabled. No service worker, offline cache, account or photo-storage changes are included.
