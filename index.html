@@ -1600,6 +1600,29 @@ body.share-mode #present-exit{display:none !important;}
         <div id="modal-argpart-grid" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
       </div>
 
+      <!-- Stakeholder attributes: role, power, interest, stance. Stakeholder maps only. -->
+      <div id="modal-stake-section" style="display:none;margin-bottom:14px;flex-direction:column;gap:12px;">
+        <div>
+          <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Role / group</div>
+          <input type="text" id="modal-stake-role" list="modal-stake-role-options" placeholder="e.g. Customer, Executive, Regulator…" autocomplete="off" style="width:100%;height:32px;font-size:13px;padding:0 10px;border-radius:7px;border:1.5px solid var(--bdr-m);background:var(--surf);color:var(--ink);box-sizing:border-box;">
+          <datalist id="modal-stake-role-options">
+            <option value="Customer"><option value="Executive"><option value="Internal team"><option value="Investor"><option value="Regulator"><option value="Partner">
+          </datalist>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Power <span style="font-weight:400;">— authority to block or advance this</span></div>
+          <div id="modal-stake-power-grid" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Interest <span style="font-weight:400;">— how much they care or are affected</span></div>
+          <div id="modal-stake-interest-grid" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Stance</div>
+          <div id="modal-stake-stance-grid" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        </div>
+      </div>
+
       <!-- Colour picker -->
       <div style="margin-bottom:14px;">
         <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Colour</div>
@@ -2093,18 +2116,19 @@ function selectConnColour(col){
       <button data-arrow="both" onclick="setEdgeArrow('both')" title="Arrows both ways" style="width:32px;height:28px;font-size:14px;padding:0;">↔</button>
     </div>
   </div>
-  <!-- Causal Loop Diagram polarity + delay. Systems maps only - a polarity sign
-       means nothing on a map with no cause/effect direction convention. -->
+  <!-- Edge polarity (+/-). Meaning changes by map type: cause/effect direction
+       on a systems map, alliance/friction on a stakeholder map. Delay (//) is
+       a systems-only concept, hidden on stakeholder maps. -->
   <div id="edge-cld-row" style="display:none;flex-direction:column;gap:8px;margin-bottom:10px;padding-top:8px;border-top:1px solid var(--bdr);">
     <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:12px;color:var(--ink);flex:1;">Polarity</span>
+      <span id="edge-polarity-label" style="font-size:12px;color:var(--ink);flex:1;">Polarity</span>
       <div id="edge-polarity-btns" style="display:flex;gap:4px;">
         <button data-polarity="" onclick="setEdgePolarity('')" title="Not set yet" style="width:32px;height:28px;font-size:14px;padding:0;">?</button>
-        <button data-polarity="positive" onclick="setEdgePolarity('positive')" title="Same direction: cause up, effect up" style="width:32px;height:28px;font-size:16px;padding:0;">+</button>
-        <button data-polarity="negative" onclick="setEdgePolarity('negative')" title="Opposite direction: cause up, effect down" style="width:32px;height:28px;font-size:16px;padding:0;">−</button>
+        <button data-polarity="positive" onclick="setEdgePolarity('positive')" id="edge-polarity-pos-btn" title="Same direction: cause up, effect up" style="width:32px;height:28px;font-size:16px;padding:0;">+</button>
+        <button data-polarity="negative" onclick="setEdgePolarity('negative')" id="edge-polarity-neg-btn" title="Opposite direction: cause up, effect down" style="width:32px;height:28px;font-size:16px;padding:0;">−</button>
       </div>
     </div>
-    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);cursor:pointer;">
+    <label id="edge-delay-row" style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);cursor:pointer;">
       <input type="checkbox" id="edge-delay-chk" onchange="setEdgeDelay(this.checked)" style="width:auto;margin:0;accent-color:var(--ink);">
       <span>Delay between cause and effect (<span style="font-family:monospace;">//</span>)</span>
     </label>
@@ -2997,7 +3021,7 @@ function snap(){
     };
   }
   return JSON.stringify({
-    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null})),
+    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
     edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false})),
     colourLegendMap,
     categories:CATEGORIES,
@@ -3612,11 +3636,13 @@ function draw(){
         ctx.fillStyle=drawStroke;ctx.fill();
         ctx.restore();
       }
-      // Causal Loop Diagram markers: polarity badge near the arrowhead, delay
-      // hatch nearer the source. Systems maps only - these marks assume a CLD
-      // reading that no other map type uses. Own save/restore because the
-      // block above already closed the one opened at the top of this edge.
-      if(MAP_TYPE==='systems'&&!dimmed&&(e.polarity||e.hasDelay)){
+      // Polarity badge near the arrowhead: cause/effect on a systems map,
+      // alliance/friction on a stakeholder map - same mark, different real-
+      // world meaning. Delay hatch is systems-only; hasDelay can only be set
+      // true from the systems side of the edge popup, so it never fires here
+      // for a stakeholder edge. Own save/restore because the block above
+      // already closed the one opened at the top of this edge.
+      if((MAP_TYPE==='systems'||MAP_TYPE==='stakeholder')&&!dimmed&&(e.polarity||e.hasDelay)){
         ctx.save();
         ctx.globalAlpha=knockEdgeAlpha(i,isSecondaryEdge?0.30:1);
         if(e.polarity){
@@ -4656,6 +4682,66 @@ function computeInsights(){
     }
   }
 
+  // Stakeholder power dynamics: Silent Giants, Gridlock Risks, Influence
+  // Bridges, Alignment Health - all built from the stakeholder attributes set
+  // on each node plus the same +/- polarity field systems maps use, just read
+  // as alliance/friction here rather than cause/effect.
+  let silentGiants=[], gridlockRisks=[], influenceBridges=[], alignmentHealth=null;
+  if(MAP_TYPE==='stakeholder'){
+    silentGiants=pool.filter(n=>n.stakePower==='high'&&n.stakeInterest==='low');
+
+    const byId=new Map(pool.map(n=>[n.id,n]));
+    const posAdj=new Map(pool.map(n=>[n.id,new Set()]));
+    edgesIn.forEach(e=>{
+      const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+      const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+      if(e.polarity==='positive'){ posAdj.get(a)?.add(b); posAdj.get(b)?.add(a); }
+      if(e.polarity==='negative'){
+        const na=byId.get(a), nb=byId.get(b);
+        if(na&&nb&&na.stakePower==='high'&&nb.stakePower==='high') gridlockRisks.push({a:na,b:nb});
+      }
+    });
+
+    // Influence Bridges: for each Skeptic/Blocker, the nearest Champion
+    // reachable through alliance (+) links only - a trusted path to work
+    // through, not a straight line that may not exist socially.
+    const champions=pool.filter(n=>n.stakeStance==='champion');
+    const atRisk=pool.filter(n=>n.stakeStance==='skeptic'||n.stakeStance==='blocker');
+    if(champions.length&&atRisk.length){
+      const champSet=new Set(champions.map(n=>n.id));
+      atRisk.forEach(target=>{
+        const dist=new Map([[target.id,0]]), par=new Map();
+        const q=[target.id];
+        let reached=null;
+        while(q.length&&!reached){
+          const u=q.shift();
+          if(champSet.has(u)&&u!==target.id){ reached=u; break; }
+          (posAdj.get(u)||new Set()).forEach(v=>{ if(!dist.has(v)){ dist.set(v,dist.get(u)+1); par.set(v,u); q.push(v); } });
+        }
+        if(reached){
+          const path=[reached]; let cur=reached;
+          while(par.has(cur)){ cur=par.get(cur); path.push(cur); }
+          influenceBridges.push({target,champion:byId.get(reached),steps:dist.get(reached),path:path.map(id=>byId.get(id))});
+        }
+      });
+      influenceBridges.sort((x,y)=>x.steps-y.steps);
+      influenceBridges=influenceBridges.slice(0,5);
+    }
+
+    // Alignment Health: among the high-power stakeholders specifically - a
+    // friction link between two people with no real authority barely matters
+    // to whether the initiative stalls.
+    const highPower=new Set(pool.filter(n=>n.stakePower==='high').map(n=>n.id));
+    let posC=0, negC=0;
+    edgesIn.forEach(e=>{
+      const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+      const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+      if(!highPower.has(a)||!highPower.has(b)) return;
+      if(e.polarity==='positive') posC++; else if(e.polarity==='negative') negC++;
+    });
+    if(posC+negC>0) alignmentHealth={positive:posC,negative:negC,total:posC+negC,pct:Math.round(posC/(posC+negC)*100)};
+  }
+
   pool.forEach(n=>{ const y=yearOf(n.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].p++; });
   edgesIn.forEach(e=>{ const y=yearOf(e.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].c++; });
 
@@ -4663,6 +4749,7 @@ function computeInsights(){
           groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length,
           outDeg,inDeg,drivers,sinks,directedEdges,loops,loopsCapped,compCount,compBig,focus,focusGuessed,fD,fCounts,
           loopClass,limitsToGrowth,unassignedPolarityCount,nodeLoopCount,
+          silentGiants,gridlockRisks,influenceBridges,alignmentHealth,
           arg:MAP_TYPE==='argument'?argumentAnalysis(pool):null};
 }
 // Causal Loop Diagrams: classify a detected cycle by counting '-' edges round
@@ -4837,6 +4924,32 @@ function renderInsights(){
     const direct=I.pool.filter(n=>I.fD&&I.fD.get(n.id)===1).sort((a,b)=>I.total.get(b.id)-I.total.get(a.id));
     h += grp('focus',`Directly linked to ${esc(I.focus.label)}`,direct.length,
       direct.length ? direct.slice(0,10).map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('Nothing is linked to the centre yet.'));
+  }
+  if(MAP_TYPE==='stakeholder'){
+    const missingAttrs=I.pool.filter(n=>!n.stakePower||!n.stakeInterest||!n.stakeStance).length;
+    if(missingAttrs>0) h += `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--surf-3);font-size:11px;color:var(--ink-m);margin-bottom:6px;"><span>${plural(missingAttrs,'stakeholder')} ${missingAttrs===1?'is':'are'} missing power, interest or stance.</span><span style="color:var(--ink-h);">Open a node to set them</span></div>`;
+
+    h += grp('silentgiants','Silent giants',I.silentGiants.length,
+      I.silentGiants.length
+        ? `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">High power, low interest - a risk if surprised late.</div>`+I.silentGiants.map(n=>row(n,'')).join('')
+        : none('None found. Needs power and interest set on every stakeholder.'));
+
+    if(I.gridlockRisks.length){
+      h += grp('gridlock','Gridlock risks',I.gridlockRisks.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Friction between two high-power stakeholders - can stall progress.</div>`+
+        I.gridlockRisks.map(p=>`<div style="padding:4px 6px;font-size:11.5px;">${esc(p.a.label)} <span style="color:var(--ink-h);">↔ friction ↔</span> ${esc(p.b.label)}</div>`).join(''));
+    }
+
+    if(I.influenceBridges.length){
+      h += grp('bridges2','Influence bridges',I.influenceBridges.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">A trusted route from a Champion to someone at risk, through alliance links only.</div>`+
+        I.influenceBridges.map(b=>`<div style="padding:4px 6px;font-size:11.5px;">${b.path.map(n=>esc(n.label)).join(' → ')} <span style="color:var(--ink-h);">(${b.steps} step${b.steps===1?'':'s'})</span></div>`).join(''));
+    }
+
+    if(I.alignmentHealth){
+      const A=I.alignmentHealth;
+      h += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surf-3);font-size:11.5px;line-height:1.5;"><strong>Alignment health (high-power stakeholders):</strong> ${A.pct}% positive - ${A.positive} alliance${A.positive===1?'':'s'}, ${A.negative} friction point${A.negative===1?'':'s'}.</div>`;
+    }
   }
   if(MAP_TYPE==='argument'&&I.arg){
     const A=I.arg;
@@ -6715,9 +6828,15 @@ function openEdgeEditPopup(idx, sx, sy){
   renderEdgeArrowBtns(arrowOf(e));
   const cldRow=document.getElementById('edge-cld-row');
   if(cldRow){
-    cldRow.style.display=(MAP_TYPE==='systems')?'flex':'none';
+    const isStake=MAP_TYPE==='stakeholder', isSys=MAP_TYPE==='systems';
+    cldRow.style.display=(isSys||isStake)?'flex':'none';
     renderEdgePolarityBtns(e.polarity||'');
     const dc=document.getElementById('edge-delay-chk'); if(dc) dc.checked=!!e.hasDelay;
+    // Same +/- field, different real-world meaning by map type.
+    const lbl=document.getElementById('edge-polarity-label'); if(lbl) lbl.textContent=isStake?'Alignment':'Polarity';
+    const posBtn=document.getElementById('edge-polarity-pos-btn'); if(posBtn) posBtn.title=isStake?'Alliance: trust, shared incentives, strong collaboration':'Same direction: cause up, effect up';
+    const negBtn=document.getElementById('edge-polarity-neg-btn'); if(negBtn) negBtn.title=isStake?'Friction: conflict, competing goals, distrust':'Opposite direction: cause up, effect down';
+    const delayRow=document.getElementById('edge-delay-row'); if(delayRow) delayRow.style.display=isStake?'none':'flex';
   }
 
   // Position near click
@@ -6793,15 +6912,17 @@ function renderEdgePolarityBtns(v){
     b.style.cursor='pointer';
   });
 }
-// A polarity sign only means something if the edge has a direction. An edge
-// drawn as a plain line (arrow:'none') has no cause->effect reading yet, so
-// giving it a polarity also gives it the direction it was drawn in - quietly,
-// the same way confirmConnectionFull() already defaults new edges to one.
+// On a systems map a polarity sign only means something if the edge has a
+// direction, so giving a direction-less edge a polarity also gives it the
+// direction it was drawn in - quietly, the same way confirmConnectionFull()
+// already defaults new edges to one. A stakeholder alliance/friction link is
+// a different relationship (trust or conflict between two people), not a
+// cause->effect reading, so it is never forced to pick a direction.
 function setEdgePolarity(val){
   if(edgeEditIdx===null) return;
   const e=edges[edgeEditIdx];
   e.polarity=val||null;
-  if(val&&arrowOf(e)==='none'){ e.arrow='forward'; renderEdgeArrowBtns('forward'); }
+  if(val&&MAP_TYPE==='systems'&&arrowOf(e)==='none'){ e.arrow='forward'; renderEdgeArrowBtns('forward'); }
   renderEdgePolarityBtns(val);
   draw(); saveState(); markUnsaved();
   if(typeof refreshInsightsIfOpen==='function') refreshInsightsIfOpen();
@@ -7172,6 +7293,46 @@ function pickArgPart(id){
   buildArgPartSelector();
 }
 
+// Power/Interest/Stance: a node carries these so Insights can tell a Silent
+// Giant (high power, low interest) from anyone else, and find a Champion to
+// bridge to a Blocker. Unset ('') on purpose - forcing a guess would make
+// Silent Giants/Gridlock Risk wrong rather than just incomplete.
+let stakeholderAttrs={role:'',power:'',interest:'',stance:''};
+const STAKE_POWER_OPTS=[{id:'',label:'Not set'},{id:'high',label:'High'},{id:'low',label:'Low'}];
+const STAKE_INTEREST_OPTS=[{id:'',label:'Not set'},{id:'high',label:'High'},{id:'low',label:'Low'}];
+const STAKE_STANCE_OPTS=[
+  {id:'',label:'Not set',colour:'transparent'},
+  {id:'champion',label:'Champion',colour:'#16A34A'},
+  {id:'supporter',label:'Supporter',colour:'#86EFAC'},
+  {id:'neutral',label:'Neutral',colour:'#A1A1AA'},
+  {id:'skeptic',label:'Skeptic',colour:'#FDBA74'},
+  {id:'blocker',label:'Blocker',colour:'#DC2626'}
+];
+function _stakeBtnGrid(gridId,opts,current,kind){
+  const grid=document.getElementById(gridId); if(!grid) return;
+  grid.innerHTML=opts.map(o=>{
+    const sel=(current||'')===o.id;
+    const dot=o.colour?`<span style="width:10px;height:10px;border-radius:50%;background:${o.colour};border:1px solid var(--bdr-m);flex-shrink:0;"></span>`:'';
+    return `<button type="button" onclick="pickStakeAttr('${kind}','${o.id}')" style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;font-size:12px;border-radius:14px;border:1.5px solid ${sel?'var(--ink)':'var(--bdr-m)'};background:${sel?'var(--surf-3)':'var(--surf)'};font-weight:${sel?700:500};">${dot}${o.label}</button>`;
+  }).join('');
+}
+function buildStakeholderSelector(){
+  const section=document.getElementById('modal-stake-section');
+  if(!section) return;
+  const on=MAP_TYPE==='stakeholder';
+  section.style.display=on?'flex':'none';
+  if(!on) return;
+  const roleInp=document.getElementById('modal-stake-role');
+  if(roleInp) roleInp.value=stakeholderAttrs.role||'';
+  _stakeBtnGrid('modal-stake-power-grid',STAKE_POWER_OPTS,stakeholderAttrs.power,'power');
+  _stakeBtnGrid('modal-stake-interest-grid',STAKE_INTEREST_OPTS,stakeholderAttrs.interest,'interest');
+  _stakeBtnGrid('modal-stake-stance-grid',STAKE_STANCE_OPTS,stakeholderAttrs.stance,'stance');
+}
+function pickStakeAttr(kind,val){
+  stakeholderAttrs[kind]=val||'';
+  buildStakeholderSelector();
+}
+
 function openAddModal(){
   modalMode='add'; modalNodeId=null;
   document.getElementById('modal-title').textContent='Add node';
@@ -7189,6 +7350,8 @@ function openAddModal(){
   buildSizeSelector();
   buildTitleSizeSelector();
   selectedArgPart=null;
+  stakeholderAttrs={role:'',power:'',interest:'',stance:''};
+  buildStakeholderSelector();
   if(MAP_TYPE==='argument'){
     selectedArgPart=nodes.some(n=>n.argPart==='claim')?'reason':'claim';
     selectedModalColour=argPartOf({argPart:selectedArgPart}).colour;
@@ -7271,6 +7434,8 @@ function switchToEditMode(){
   buildTitleSizeSelector();
   selectedArgPart=n.argPart||null;
   buildArgPartSelector();
+  stakeholderAttrs={role:n.stakeRole||'',power:n.stakePower||'',interest:n.stakeInterest||'',stance:n.stakeStance||''};
+  buildStakeholderSelector();
   document.getElementById('del-node-btn').style.display=n.type==='centre'?'none':'block';
   document.getElementById('modal-view-panel').style.display='none';
   document.getElementById('modal-edit-panel').style.display='flex';
@@ -7435,6 +7600,10 @@ function confirmModal(){
       type:'process'
     };
     if(MAP_TYPE==='argument'&&selectedArgPart){ newNode.argPart=selectedArgPart; if(selectedArgPart==='claim') newNode.nodeSize=newNode.nodeSize==='medium'?'large':newNode.nodeSize; }
+    if(MAP_TYPE==='stakeholder'){
+      const roleVal=(document.getElementById('modal-stake-role')?.value||'').trim();
+      newNode.stakeRole=roleVal; newNode.stakePower=stakeholderAttrs.power||''; newNode.stakeInterest=stakeholderAttrs.interest||''; newNode.stakeStance=stakeholderAttrs.stance||'';
+    }
     nodes.push(newNode);
     loadNodeImage(newNode);
     addLog('added node "'+newNode.label+'"');
@@ -7456,6 +7625,10 @@ function confirmModal(){
       n.customFields=customFields;
       n.date=nodeDate;
       if(MAP_TYPE==='argument') n.argPart=selectedArgPart||null;
+      if(MAP_TYPE==='stakeholder'){
+        const roleVal=(document.getElementById('modal-stake-role')?.value||'').trim();
+        n.stakeRole=roleVal; n.stakePower=stakeholderAttrs.power||''; n.stakeInterest=stakeholderAttrs.interest||''; n.stakeStance=stakeholderAttrs.stance||'';
+      }
       if(n.type==='centre') centralEventLabel=n.label;
       addLog('edited node "'+n.label+'"');
     }
@@ -8474,6 +8647,33 @@ function buildSummaryReport(){
           </div>`;
         }).join('');
       html+=`</div>`;
+    }
+  }
+  if(MAP_TYPE==='stakeholder'){
+    const SI=computeInsights();
+    if(SI.focus){
+      html+=`<div class="report-section"><h4>Distance from ${escHtml(SI.focus.label)}</h4>
+        <div class="report-row">${SI.fCounts.d1} directly linked, ${SI.fCounts.d2} two steps away, ${SI.fCounts.far+SI.fCounts.un} further out or not connected.</div></div>`;
+    }
+    if(SI.silentGiants.length){
+      html+=`<div class="report-section"><h4>Silent giants</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">High power, low interest - a risk if surprised late in the project.</div>`+
+        SI.silentGiants.map(n=>`<div class="report-row">${escHtml(n.label)}</div>`).join('')+`</div>`;
+    }
+    if(SI.gridlockRisks.length){
+      html+=`<div class="report-section"><h4>Gridlock risks</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Friction between two high-power stakeholders - can stall progress.</div>`+
+        SI.gridlockRisks.map(p=>`<div class="report-row">${escHtml(p.a.label)} ↔ friction ↔ ${escHtml(p.b.label)}</div>`).join('')+`</div>`;
+    }
+    if(SI.influenceBridges.length){
+      html+=`<div class="report-section"><h4>Influence bridges</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">A trusted route from a Champion to someone at risk, through alliance links only.</div>`+
+        SI.influenceBridges.map(b=>`<div class="report-row">${b.path.map(n=>escHtml(n.label)).join(' → ')} (${b.steps} step${b.steps===1?'':'s'})</div>`).join('')+`</div>`;
+    }
+    if(SI.alignmentHealth){
+      const A=SI.alignmentHealth;
+      html+=`<div class="report-section"><h4>Alignment health</h4>
+        <div class="report-row">Among high-power stakeholders: ${A.pct}% positive - ${A.positive} alliance${A.positive===1?'':'s'}, ${A.negative} friction point${A.negative===1?'':'s'}.</div></div>`;
     }
   }
   return html;
