@@ -4,7 +4,7 @@ These changes are prepared on `codex/photo-import-reliability`, based on the exi
 
 Before deploying this branch:
 
-1. On a staging Supabase project, apply `20261117_reliable_map_limits.sql`, then `20261117_photo_read_allowance.sql`. The existing teams/maps schema must already be installed. Verify ownership protection with two users and concurrent admissions/map inserts. The migration has not been run against the live database.
+1. On a staging Supabase project, apply `20261117_reliable_map_limits.sql`, then `20261117_photo_read_allowance.sql`. The existing teams/maps schema must already be installed. Verify ownership protection with two users and concurrent admissions/map inserts. Both migrations have now passed the staging database checks described below; production has not been changed.
 2. Set Vercel server environment variables `SUPABASE_URL` and `SUPABASE_ANON_KEY` for the same Supabase project used by the app; keep `OPENAI_API_KEY` server-side. Never put a service-role key in the client or use it for the allowance RPC.
 3. Check the Vercel function duration setting supports the expected read time. The upstream request times out after 90 seconds; the hosting limit may be shorter.
 4. Deploy an approved preview and sign in there. The photo page uses the sign-in session for that origin; a session on the production hostname does not automatically sign you in on a preview hostname.
@@ -23,3 +23,7 @@ A separate free Supabase project, **Puddle Staging**, was created in PuddL and i
 The browser now loads public database settings from `/api/client-config`, so a branch preview can use the same staging database as its photo endpoint. The endpoint rejects private/service-role keys and never exposes the OpenAI key. Unconfigured preview hosts cannot silently fall back to production. Vercel preview database variables are scoped to `codex/photo-import-reliability`; production settings are unchanged.
 
 Credential fixtures live outside the repository and are not committed. `tests/staging-integration.cjs` and `tests/browser-staging.cjs` require an explicit non-production project reference and an external fixture file. `tests/staging-preview-server.cjs` serves a loopback-only preview with public staging configuration.
+
+The hosted Vercel preview completed one real OpenAI image read using a generated test drawing: School → Parents → Library. All three labels and both arrow directions were correct, and the imported 3-node/2-connection map was verified in the staging database. This is an integration check, not an accuracy benchmark for photographed handwriting.
+
+That live run exposed an initialization race: the bridge could consume the import before team lookup finished, causing the saved-maps panel to open over the canvas. Import now waits for explicit account/team readiness, and afterSignIn captures the pending-import intent before asynchronous initialization. A real-staging browser regression verifies that the import saves separately and the maps panel remains closed.

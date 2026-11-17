@@ -19,5 +19,12 @@ assert.ok(process.env.PUDDLE_STAGING_REF&&process.env.PUDDLE_STAGING_REF!=='amjk
  const reopened=await page.evaluate(async id=>{if(!await cloudOpenMap(id))throw Error('Reopen failed');return nodes[0].label},mapId);
  assert.equal(reopened,'Before edit');console.log('PASS: real cloud save, edit, undo, reload and reopen retain the undone map');
  assert.equal(await page.evaluate(id=>cloudDeleteMap(id),mapId),true);console.log('PASS: disposable staging map cleaned up');
+ await page.evaluate(()=>{clearTimeout(autoSaveTimer);sessionStorage.setItem('puddl_image_import',JSON.stringify({title:'Staging photo handoff',imageWidth:800,imageHeight:400,nodes:[{id:'n1',label:'Handoff node',x:100,y:100,width:100,height:100,shape:'circle'}],edges:[]}));});
+ await page.goto('http://127.0.0.1:7894/?imageImport=1');
+ await page.waitForFunction(()=>_cloudAuthInitialized&&mapTitle==='Staging photo handoff'&&!_cloudNeedsSave);
+ assert.equal(await page.locator('#cloud-maps-bg').isVisible(),false,'Saved-maps panel must not open over a photo import');
+ assert.equal(await page.evaluate(()=>sessionStorage.getItem('puddl_image_import')),null);
+ const photoId=await page.evaluate(()=>_cloudMapId);assert.ok(photoId);assert.equal(await page.evaluate(id=>cloudDeleteMap(id),photoId),true);
+ console.log('PASS: photo handoff waits for real auth/team initialization, saves separately and keeps the maps panel closed');
  assert.deepEqual(errors,[]);console.log('PASS: no browser JavaScript errors');
 }finally{await browser.close()}})().catch(e=>{console.error('FAIL:',e.message);process.exit(1)});

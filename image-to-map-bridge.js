@@ -1,7 +1,7 @@
 (function () {
   let importing=false;
   async function importImageMap() {
-    if(importing||document.readyState!=='complete'||!_authUser) return;
+    if(importing||document.readyState!=='complete'||!_authUser||!_cloudAuthInitialized) return;
     const params=new URLSearchParams(location.search);
     if(params.get('imageImport')!=='1') return;
     importing=true;

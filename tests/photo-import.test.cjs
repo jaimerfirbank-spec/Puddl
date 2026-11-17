@@ -11,9 +11,9 @@ test('unauthenticated photo requests never call a provider',async()=>{const hand
 test('allowance failure stops before the paid reader',async()=>{let calls=0;const handler=server(async()=>{calls++;return calls===1?{ok:true,json:async()=>({id:'user'})}:{ok:true,json:async()=>false}});assert.equal((await handler(request())).status,429);assert.equal(calls,2)});
 test('invalid graph references are rejected instead of handed to the editor',async()=>{let calls=0;const bad=graph();bad.edges=[{source:'n1',target:'missing',direction:'source_to_target'}];const handler=server(async()=>{calls++;return{ok:true,json:async()=>calls===1?{id:'u'}:calls===2?true:{output_text:JSON.stringify(bad)}}});assert.equal((await handler(request())).status,502)});
 test('authorized valid reads return their graph',async()=>{let calls=0;const handler=server(async()=>{calls++;return{ok:true,json:async()=>calls===1?{id:'u'}:calls===2?true:{output_text:JSON.stringify(graph())}}});const response=await handler(request());assert.equal(response.status,200);assert.equal(response.result.nodes.length,1)});
-function bridge(payload){
+function bridge(payload,ready=true){
  const callbacks={},storage=new Map([['puddl_image_import',JSON.stringify(payload)]]);
- const c=vm.createContext({_authUser:{id:'test'},URLSearchParams,location:{search:'?imageImport=1',pathname:'/',hash:''},document:{readyState:'complete',getElementById:()=>({style:{}})},sessionStorage:{getItem:k=>storage.get(k),removeItem:k=>storage.delete(k)},W:1000,H:600,zoom:1,panX:0,panY:0,CONNECTION_STYLES:[],cleared:false,showStatus(){},saveBeforeMapChange:async()=>true,validateMapSnapshot(){},_executeReset(){c.cleared=true},restoreSnap(s){c.draft=JSON.parse(s)},saveState(){},markUnsaved(){},fitAll(){},window:{addEventListener(n,fn){callbacks[n]=fn},history:{replaceState(){}}}});
+ const c=vm.createContext({_cloudAuthInitialized:ready,_authUser:{id:'test'},URLSearchParams,location:{search:'?imageImport=1',pathname:'/',hash:''},document:{readyState:'complete',getElementById:()=>({style:{}})},sessionStorage:{getItem:k=>storage.get(k),removeItem:k=>storage.delete(k)},W:1000,H:600,zoom:1,panX:0,panY:0,CONNECTION_STYLES:[],cleared:false,showStatus(){},saveBeforeMapChange:async()=>true,validateMapSnapshot(){},_executeReset(){c.cleared=true},restoreSnap(s){c.draft=JSON.parse(s)},saveState(){},markUnsaved(){},fitAll(){},window:{addEventListener(n,fn){callbacks[n]=fn},history:{replaceState(){}}}});
  vm.runInContext(fs.readFileSync('image-to-map-bridge.js','utf8'),c);return {c,callbacks,storage};
 }
 test('malformed photo import preserves the current map and pending payload',async()=>{const {c,callbacks,storage}=bridge({...graph(),nodes:[{id:'n1',x:NaN,y:0,width:20,height:20}]});await callbacks.load();assert.equal(c.cleared,false);assert.equal(storage.has('puddl_image_import'),true)});
@@ -31,3 +31,5 @@ test('incomplete preview config fails closed instead of using the production pro
  const source=fs.readFileSync('index.html','utf8');
  assert.ok(source.includes("location.hostname==='puddl.vercel.app'?"));
 });
+
+test('photo import waits until account and team initialization finish',async()=>{const {c,callbacks}=bridge(graph(),false);await callbacks.load();assert.equal(c.cleared,false);c._cloudAuthInitialized=true;await callbacks['puddl-auth-ready']();assert.equal(c.cleared,true)});

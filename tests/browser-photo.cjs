@@ -22,7 +22,7 @@ const {chromium}=require(process.env.PUDDLE_PLAYWRIGHT_PATH||'playwright'),asser
  await page.waitForURL('**/?imageImport=1');await page.waitForFunction(()=>typeof restoreSnap==='function'&&typeof d3!=='undefined');
  await page.waitForTimeout(300);
  const result=await page.evaluate(async()=>{
-  _authUser={id:'test'};window.dispatchEvent(new Event('puddl-auth-ready'));
+  _authUser={id:'test'};_cloudAuthInitialized=true;window.dispatchEvent(new Event('puddl-auth-ready'));
   await new Promise(r=>setTimeout(r,200));
   return {title:mapTitle,nodes:nodes.length,edges:edges.length,pending:sessionStorage.getItem('puddl_image_import'),cloudId:_cloudMapId};
  });

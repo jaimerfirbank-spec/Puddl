@@ -13062,6 +13062,7 @@ const SUPABASE_ANON_KEY = window.PUDDLE_CONFIG?.supabaseKey || (location.hostnam
 
 let supabaseClient = null;
 let _authUser = null;
+let _cloudAuthInitialized=false;
 
 // Supabase sends invited people, and anyone resetting a password, back here
 // with a one-time token in the URL fragment. supabase-js consumes that
@@ -13625,10 +13626,13 @@ async function cloudRenameMap(id, title){
 // already have saved. Someone with nothing saved falls through to the normal
 // "name your project" splash.
 async function afterSignIn(){
+  const photoImportPending=new URLSearchParams(location.search).get('imageImport')==='1';
+  _cloudAuthInitialized=false;
   const ok = await cloudInit();
+  _cloudAuthInitialized=true;
   const btn = document.getElementById('btn-my-maps');
   if (btn) btn.style.display = '';
-  if(new URLSearchParams(location.search).get('imageImport')==='1'){
+  if(photoImportPending){
     window.dispatchEvent(new Event('puddl-auth-ready'));
     return;
   }
