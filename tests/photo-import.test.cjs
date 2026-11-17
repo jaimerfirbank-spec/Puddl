@@ -33,3 +33,16 @@ test('incomplete preview config fails closed instead of using the production pro
 });
 
 test('photo import waits until account and team initialization finish',async()=>{const {c,callbacks}=bridge(graph(),false);await callbacks.load();assert.equal(c.cleared,false);c._cloudAuthInitialized=true;await callbacks['puddl-auth-ready']();assert.equal(c.cleared,true)});
+
+test('dense photo imports leave room for standard node sizes',async()=>{
+ const g=graph();g.nodes.push({...g.nodes[0],id:'n2',x:65});
+ const {c}=bridge({...g,imageWidth:800,imageHeight:600});await new Promise(r=>setImmediate(r));
+ assert.ok(c.draft.nodes[1].x-c.draft.nodes[0].x>=120);
+});
+test('150-node photo-shaped payload imports without dropping nodes or connections',async()=>{
+ const nodes=Array.from({length:150},(_,i)=>({id:'n'+i,label:'TEST '+i,shape:'circle',x:30+(i%15)*62,y:30+Math.floor(i/15)*92,width:20,height:20}));
+ const edges=nodes.map((n,i)=>({source:n.id,target:nodes[(i+1)%150].id,direction:'source_to_target'}));
+ const {c}=bridge({nodes,edges,imageWidth:1400,imageHeight:2000});await new Promise(r=>setImmediate(r));
+ assert.equal(c.draft.nodes.length,150);assert.equal(c.draft.edges.length,150);
+ for(let i=0;i<150;i++)for(let j=i+1;j<150;j++)assert.ok(Math.abs(c.draft.nodes[i].x-c.draft.nodes[j].x)>=96||Math.abs(c.draft.nodes[i].y-c.draft.nodes[j].y)>=112);
+});

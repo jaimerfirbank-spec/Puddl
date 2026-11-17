@@ -33,3 +33,11 @@ That live run exposed an initialization race: the bridge could consume the impor
 The user reported correct recognition on a 15-node drawing and on a 30-node/30-connection drawing. A further angled, shadowed photo retained the map structure but flagged an uncertain curly L and read a name beginning with C. These are user-reported results, not an independently captured benchmark.
 
 The upload screen now links to `hand-drawn-map-guide.html`, a printable guide with drawn examples for L/C, I/J, U/V and O/0, plus LOUIS written with an angular L. It recommends separated capitals, clear spacing and arrowheads while preserving actual spelling, accents and punctuation. It explains that naturally curved letters retain their curves and that every reading should be reviewed.
+
+## Thirty-node import and scale checks
+
+The actual reviewed 30-node/30-connection result was imported through the hosted preview, saved to staging, reloaded and reopened. Comparing the stored graph with the review table confirmed every label, endpoint and arrow direction was retained, including SALLY remaining isolated. Unknown shapes continue to use the prototype's documented circle fallback.
+
+This check exposed node overlap: photo positions were fitted to the viewport without reserving room for the fixed-size Puddle nodes. Import now scales all positions uniformly to provide room for node shapes and labels, preserving the drawing's relative layout and aspect ratio. Pairwise spacing checks run in memory; the existing 500-node API bound remains unchanged.
+
+The revised bridge passed real-staging import/save/reload/reopen checks with the actual 30-node graph and a generated 150-node/150-connection payload. These are import/storage checks, not evidence that 150 nodes can yet be recognised from one photograph. The current photo preprocessing still downsizes the longest edge to 2000 pixels; a dense A1 photo will need a separate readability test.
