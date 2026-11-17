@@ -4626,8 +4626,37 @@ function closeNodeCtxMenu(){
   if(m) m.style.display='none';
   closeIconPicker();
 }
+const NODE_IMG_STORAGE_PREFIX='sb:';
+function nodeImgIsStorageRef(v){ return typeof v==='string' && v.indexOf(NODE_IMG_STORAGE_PREFIX)===0; }
+
+// Uploads a data URL to Storage; resolves to the 'sb:' marker on success, or
+// null if it can't be filed (offline, not signed in, bucket error) - the
+// caller then just keeps the data URL, exactly as before this feature existed.
+async function resolveNodeImageUrl(ref){
+  const path=ref.slice(NODE_IMG_STORAGE_PREFIX.length);
+  // typeof-guarded: this function is reachable from the shared viewer (it
+  // hangs off loadNodeImage), which never declares supabaseClient at all. A
+  // plain "if(!supabaseClient)" would throw ReferenceError there instead of
+  // just giving up on this one image.
+  if(typeof supabaseClient==='undefined' || !supabaseClient) return null;
+  try{
+    const {data,error}=await supabaseClient.storage.from('map-images').createSignedUrl(path,3600);
+    if(error||!data) return null;
+    return data.signedUrl;
+  }catch(err){ return null; }
+}
 function loadNodeImage(n){
   if(!n.nodeImg) return;
+  if(nodeImgIsStorageRef(n.nodeImg)){
+    const ref=n.nodeImg;
+    resolveNodeImageUrl(ref).then(function(url){
+      if(!url || n.nodeImg!==ref) return; // node's image changed while this was loading
+      const img=new Image();
+      img.onload=()=>{ n._nodeImgObj=img; draw(); };
+      img.src=url;
+    });
+    return;
+  }
   const img=new Image();
   img.onload=()=>{ n._nodeImgObj=img; draw(); };
   img.src=n.nodeImg;

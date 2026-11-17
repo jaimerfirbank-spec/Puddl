@@ -10033,7 +10033,31 @@ async function saveFile(share){
     return;
   }
 
-  const data=snap();
+  // Save and Share both promise a self-contained file: no login, nothing
+  // fetched later, works forever offline. A node photo stored in the cloud
+  // (nodeImg = 'sb:...') is a dead reference outside this app - the viewer
+  // carries no Supabase client and never will. So every photo is baked back
+  // into a real data URL in THIS EXPORTED COPY ONLY; the live map on screen
+  // keeps its lightweight storage ref untouched.
+  const snapObj=JSON.parse(snap());
+  const photoNodes=(snapObj.nodes||[]).filter(n=>nodeImgIsStorageRef(n.nodeImg));
+  if(photoNodes.length){
+    showStatus('Fetching photos for the file ('+photoNodes.length+')...');
+    await Promise.all(photoNodes.map(async n=>{
+      try{
+        const url=await resolveNodeImageUrl(n.nodeImg);
+        if(!url) return;
+        const blob=await (await fetch(url)).blob();
+        n.nodeImg=await new Promise((res,rej)=>{
+          const r=new FileReader();
+          r.onload=()=>res(r.result); r.onerror=rej;
+          r.readAsDataURL(blob);
+        });
+      }catch(err){ /* leave this one as a storage ref - rare, not worth failing the whole export over */ }
+    }));
+    showStatus('Preparing the file...');
+  }
+  const data=JSON.stringify(snapObj);
   // The JSON goes into the HTML as text, so < and & have to be escaped or the
   // parser will treat part of a node label as markup.
   const esc=data.replace(/&/g,'&amp;').replace(/</g,'&lt;');
@@ -10386,6 +10410,57 @@ function ctxUploadImage(){
 // Uploaded images are stored inline as data URLs, so one phone photo can exhaust
 // localStorage on its own. Downscale and re-encode before storing.
 const IMG_NODE_MAX_EDGE=512, IMG_BG_MAX_EDGE=1920, IMG_QUALITY=0.82;
+
+// ── Node photos: Supabase Storage instead of embedded base64 ───────────────
+// A node photo used to sit inside the map JSON as a data URL - fine for one
+// photo, but a map with a dozen logos hit the 5 MB cloud-save ceiling and
+// slowed every save. Signed-in uploads now go to the 'map-images' bucket
+// (already created and RLS-protected by tools/build-viewer.py's companion
+// schema.sql, unused until now); n.nodeImg then holds a short marker,
+// 'sb:<team-id>/<file>', instead of the image itself.
+//
+// Demo mode, the ?try viewer and anyone not signed into a team keep today's
+// behaviour untouched - a plain data URL in n.nodeImg - since there is no
+// team to file the upload under. loadNodeImage() below handles both forms.
+const NODE_IMG_STORAGE_PREFIX='sb:';
+
+function nodeImgIsStorageRef(v){ return typeof v==='string' && v.indexOf(NODE_IMG_STORAGE_PREFIX)===0; }
+
+// Uploads a data URL to Storage; resolves to the 'sb:' marker on success, or
+// null if it can't be filed (offline, not signed in, bucket error) - the
+// caller then just keeps the data URL, exactly as before this feature existed.
+async function uploadNodeImageToStorage(dataUrl, nodeId){
+  if(!supabaseClient || !_cloudReady || !_cloudTeam || !_cloudTeam.team_id) return null;
+  try{
+    const m=/^data:([^;,]+)[^,]*,/.exec(dataUrl);
+    const mime=m?m[1]:'image/webp';
+    const ext=mime==='image/png'?'png':mime==='image/jpeg'?'jpg':mime==='image/svg+xml'?'svg':'webp';
+    const blob=await (await fetch(dataUrl)).blob();
+    const path=_cloudTeam.team_id+'/node-'+nodeId+'-'+Date.now()+'.'+ext;
+    const {error}=await supabaseClient.storage.from('map-images').upload(path, blob, {contentType:mime, upsert:true});
+    if(error) return null;
+    return NODE_IMG_STORAGE_PREFIX+path;
+  }catch(err){ return null; }
+}
+
+// A signed URL, not a public one: the bucket is private, scoped to the team
+// by the policies in schema.sql. Fetched fresh each time an image is drawn
+// for the first time in a session, rather than stored, so nothing in the map
+// JSON ever expires.
+async function resolveNodeImageUrl(ref){
+  const path=ref.slice(NODE_IMG_STORAGE_PREFIX.length);
+  // typeof-guarded: this function is reachable from the shared viewer (it
+  // hangs off loadNodeImage), which never declares supabaseClient at all. A
+  // plain "if(!supabaseClient)" would throw ReferenceError there instead of
+  // just giving up on this one image.
+  if(typeof supabaseClient==='undefined' || !supabaseClient) return null;
+  try{
+    const {data,error}=await supabaseClient.storage.from('map-images').createSignedUrl(path,3600);
+    if(error||!data) return null;
+    return data.signedUrl;
+  }catch(err){ return null; }
+}
+
 function downscaleImageFile(file,maxEdge,cb){
   const reader=new FileReader();
   reader.onerror=function(){ showStatus('Could not read that image.'); };
@@ -10421,11 +10496,27 @@ function handleNodeImageUpload(e){
     n.nodeImg=url;
     loadNodeImage(n);
     saveState();markUnsaved();
+    uploadNodeImageToStorage(url,n.id).then(function(ref){
+      // The node may have moved on (image removed, a different photo chosen,
+      // even deleted) while the upload was in flight - only swap if it's
+      // still exactly the photo this upload was for.
+      if(ref && n.nodeImg===url){ n.nodeImg=ref; markUnsaved(); }
+    });
   });
   e.target.value='';
 }
 function loadNodeImage(n){
   if(!n.nodeImg) return;
+  if(nodeImgIsStorageRef(n.nodeImg)){
+    const ref=n.nodeImg;
+    resolveNodeImageUrl(ref).then(function(url){
+      if(!url || n.nodeImg!==ref) return; // node's image changed while this was loading
+      const img=new Image();
+      img.onload=()=>{ n._nodeImgObj=img; draw(); };
+      img.src=url;
+    });
+    return;
+  }
   const img=new Image();
   img.onload=()=>{ n._nodeImgObj=img; draw(); };
   img.src=n.nodeImg;
