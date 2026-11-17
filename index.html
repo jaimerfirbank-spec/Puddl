@@ -2093,6 +2093,22 @@ function selectConnColour(col){
       <button data-arrow="both" onclick="setEdgeArrow('both')" title="Arrows both ways" style="width:32px;height:28px;font-size:14px;padding:0;">↔</button>
     </div>
   </div>
+  <!-- Causal Loop Diagram polarity + delay. Systems maps only - a polarity sign
+       means nothing on a map with no cause/effect direction convention. -->
+  <div id="edge-cld-row" style="display:none;flex-direction:column;gap:8px;margin-bottom:10px;padding-top:8px;border-top:1px solid var(--bdr);">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span style="font-size:12px;color:var(--ink);flex:1;">Polarity</span>
+      <div id="edge-polarity-btns" style="display:flex;gap:4px;">
+        <button data-polarity="" onclick="setEdgePolarity('')" title="Not set yet" style="width:32px;height:28px;font-size:14px;padding:0;">?</button>
+        <button data-polarity="positive" onclick="setEdgePolarity('positive')" title="Same direction: cause up, effect up" style="width:32px;height:28px;font-size:16px;padding:0;">+</button>
+        <button data-polarity="negative" onclick="setEdgePolarity('negative')" title="Opposite direction: cause up, effect down" style="width:32px;height:28px;font-size:16px;padding:0;">−</button>
+      </div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);cursor:pointer;">
+      <input type="checkbox" id="edge-delay-chk" onchange="setEdgeDelay(this.checked)" style="width:auto;margin:0;accent-color:var(--ink);">
+      <span>Delay between cause and effect (<span style="font-family:monospace;">//</span>)</span>
+    </label>
+  </div>
   <div style="display:flex;gap:6px;">
     <button onclick="closeEdgeEditPopup()" style="flex:1;font-size:12px;">Cancel</button>
     <button onclick="deleteCurrentEdge()" style="flex:1;font-size:12px;color:var(--coral-t);border-color:var(--coral-t);">✕ Delete</button>
@@ -2982,7 +2998,7 @@ function snap(){
   }
   return JSON.stringify({
     nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null})),
-    edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||''})),
+    edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false})),
     colourLegendMap,
     categories:CATEGORIES,
     centralEventLabel,
@@ -3041,7 +3057,9 @@ function restoreSnap(s){
       colour: e.colour||(style?style.colour:'#888888'),
       isLoop: isLoop||false,
       arrow: e.arrow||null,
-      twoWay: e.twoWay||false,      date: e.date||''
+      twoWay: e.twoWay||false,      date: e.date||'',
+      polarity: e.polarity||null,   // 'positive' | 'negative' | null (unassigned) — Causal Loop Diagram polarity, systems maps
+      hasDelay: e.hasDelay||false   // CLD delay mark (//) between cause and effect
     };
   });
   colourLegendMap=d.colourLegendMap||{};
@@ -3592,6 +3610,43 @@ function draw(){
         ctx.lineTo(apS.x-rPx*as*0.45,apS.y-rPy*as*0.45);
         ctx.closePath();
         ctx.fillStyle=drawStroke;ctx.fill();
+        ctx.restore();
+      }
+      // Causal Loop Diagram markers: polarity badge near the arrowhead, delay
+      // hatch nearer the source. Systems maps only - these marks assume a CLD
+      // reading that no other map type uses. Own save/restore because the
+      // block above already closed the one opened at the top of this edge.
+      if(MAP_TYPE==='systems'&&!dimmed&&(e.polarity||e.hasDelay)){
+        ctx.save();
+        ctx.globalAlpha=knockEdgeAlpha(i,isSecondaryEdge?0.30:1);
+        if(e.polarity){
+          const bx=mx+(bpS.x-mx)*0.62, by=my+(bpS.y-my)*0.62;
+          const isPos=e.polarity==='positive';
+          const r=9/zoom;
+          ctx.beginPath(); ctx.arc(bx,by,r,0,Math.PI*2);
+          ctx.fillStyle=_dark?'#27272a':'#ffffff';
+          ctx.fill();
+          ctx.lineWidth=1.3/zoom;
+          ctx.strokeStyle=isPos?'#16A34A':'#DC2626';
+          ctx.stroke();
+          ctx.fillStyle=isPos?'#16A34A':'#DC2626';
+          ctx.font=`700 ${13/zoom}px 'DM Sans',sans-serif`;
+          ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.fillText(isPos?'+':'−',bx,by+0.5/zoom);
+        }
+        if(e.hasDelay){
+          const hx=apS.x+(mx-apS.x)*0.42, hy=apS.y+(my-apS.y)*0.42;
+          const hl=9/zoom;
+          const hNx=-dy/dist, hNy=dx/dist; // perpendicular to the chord, close enough for a short hatch
+          ctx.strokeStyle=_dark?'#e4e4e7':'#27272a';
+          ctx.lineWidth=1.6/zoom;
+          [-2.5/zoom,2.5/zoom].forEach(off=>{
+            ctx.beginPath();
+            ctx.moveTo(hx+hNx*hl+ (dx/dist)*off, hy+hNy*hl+ (dy/dist)*off);
+            ctx.lineTo(hx-hNx*hl+ (dx/dist)*off, hy-hNy*hl+ (dy/dist)*off);
+            ctx.stroke();
+          });
+        }
         ctx.restore();
       }
     }
@@ -4558,6 +4613,22 @@ function computeInsights(){
     loopsCapped=loops.length>=LOOP_CAP||budget<0;
     loops.sort((a,b)=>a.length-b.length);
   }
+  // R/B classification and Limits-to-Growth, systems maps only. edgeByPair
+  // resolves each loop's consecutive node pairs back to the real edge, the
+  // same a|b / b|a lookup pattern refreshLoopPins() already uses for pins.
+  let loopClass=[], limitsToGrowth=[], unassignedPolarityCount=0, nodeLoopCount=new Map();
+  if(MAP_TYPE==='systems'){
+    const edgeByPair=new Map();
+    edgesIn.forEach(e=>{
+      const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+      const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+      edgeByPair.set(a+'|'+b,e); edgeByPair.set(b+'|'+a,e);
+    });
+    loopClass=loops.map(L=>classifySystemsLoop(L,edgeByPair));
+    limitsToGrowth=findLimitsToGrowth(loops,loopClass,total,5);
+    edgesIn.forEach(e=>{ if(arrowOf(e)!=='none'&&!e.polarity) unassignedPolarityCount++; });
+    loops.forEach(L=>{ L.forEach(n=>{ nodeLoopCount.set(n.id,(nodeLoopCount.get(n.id)||0)+1); }); });
+  }
 
   // Clusters: separate pieces of the map that don't touch (within this view)
   let compCount=0, compBig=0;
@@ -4591,7 +4662,53 @@ function computeInsights(){
   return {filtered,pool,deg,total,most,least,isolated,bridges:bridges.slice(0,5),linked,alone,
           groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length,
           outDeg,inDeg,drivers,sinks,directedEdges,loops,loopsCapped,compCount,compBig,focus,focusGuessed,fD,fCounts,
+          loopClass,limitsToGrowth,unassignedPolarityCount,nodeLoopCount,
           arg:MAP_TYPE==='argument'?argumentAnalysis(pool):null};
+}
+// Causal Loop Diagrams: classify a detected cycle by counting '-' edges round
+// it. Even (incl. 0) = Reinforcing (R), compounds in one direction. Odd =
+// Balancing (B), self-corrects. A cycle containing any edge with no polarity
+// set yet can't be classified honestly, so it comes back 'unassigned' rather
+// than a guess - matches the brief's own completeness-prompt requirement.
+function classifySystemsLoop(loopNodes, edgeByPair){
+  let minus=0, unknown=0;
+  for(let i=0;i<loopNodes.length;i++){
+    const a=loopNodes[i].id, b=loopNodes[(i+1)%loopNodes.length].id;
+    const e=edgeByPair.get(a+'|'+b)||edgeByPair.get(b+'|'+a);
+    if(!e||!e.polarity) unknown++;
+    else if(e.polarity==='negative') minus++;
+  }
+  if(unknown>0) return {type:'unassigned',minus,unknown};
+  return {type:(minus%2===0)?'R':'B',minus,unknown:0};
+}
+// Limits to Growth: an R loop and a B loop that share a node - that node is
+// the growth engine the B loop eventually pushes back on. Ranked by how
+// well-connected the shared node is (its degree in the whole pool), so the
+// most structurally significant pair surfaces first rather than every pair
+// a dense map happens to produce.
+function findLimitsToGrowth(loops, loopClass, deg, maxResults){
+  const rIdx=[], bIdx=[];
+  loopClass.forEach((c,i)=>{ if(c.type==='R') rIdx.push(i); else if(c.type==='B') bIdx.push(i); });
+  const pairs=[];
+  const seen=new Set();
+  rIdx.forEach(ri=>{
+    const rIds=new Set(loops[ri].map(n=>n.id));
+    bIdx.forEach(bi=>{
+      let shared=null, sharedDeg=-1;
+      loops[bi].forEach(n=>{
+        if(rIds.has(n.id)){
+          const d=deg.get(n.id)||0;
+          if(d>sharedDeg){ sharedDeg=d; shared=n; }
+        }
+      });
+      if(shared){
+        const key=ri+'|'+bi;
+        if(!seen.has(key)){ seen.add(key); pairs.push({rIdx:ri,bIdx:bi,sharedNode:shared,sharedDeg}); }
+      }
+    });
+  });
+  pairs.sort((x,y)=>y.sharedDeg-x.sharedDeg);
+  return pairs.slice(0,maxResults||5);
 }
 // Argument maps: what's for, what's against, and where the gaps are
 function argumentAnalysis(pool){
@@ -4638,9 +4755,16 @@ function insightSummaryLines(I){
     } else {
       if(I.drivers[0]) S.push(`${I.drivers[0].label} influences the most other factors: ${I.outDeg.get(I.drivers[0].id)} outgoing arrows.`);
       if(I.sinks[0]) S.push(`${I.sinks[0].label} is affected by the most: ${I.inDeg.get(I.sinks[0].id)} incoming arrows.`);
-      S.push(I.loops.length
-        ? `${I.loopsCapped?'At least '+I.loops.length:I.loops.length} feedback loop${I.loops.length===1?'':'s'} found: a chain of effects that circles back on itself.`
-        : 'No feedback loops found in this view: influence flows one way.');
+      if(I.loops.length){
+        const rC=I.loopClass.filter(c=>c.type==='R').length, bC=I.loopClass.filter(c=>c.type==='B').length, uC=I.loopClass.filter(c=>c.type==='unassigned').length;
+        S.push(`${I.loopsCapped?'At least '+I.loops.length:I.loops.length} feedback loop${I.loops.length===1?'':'s'} found: ${rC} reinforcing, ${bC} balancing${uC?`, ${uC} not yet classifiable (give every connection a + or -)`:''}.`);
+      } else {
+        S.push('No feedback loops found in this view: influence flows one way.');
+      }
+      if(I.limitsToGrowth.length){
+        const p=I.limitsToGrowth[0];
+        S.push(`Limits to growth: ${p.sharedNode.label} drives a reinforcing loop that a balancing loop eventually pushes back on.`);
+      }
     }
   } else if(MAP_TYPE==='argument'){
     const A=I.arg, pl=(k,w)=>`${k} ${w}${k===1?'':'s'}`;
@@ -4724,23 +4848,54 @@ function renderInsights(){
       A.branches.length ? A.branches.map(b=>row(b.node,`${b.ev} evidence`)).join('') : none('No evidence linked yet.'));
   }
   if(MAP_TYPE==='systems'&&I.directedEdges){
+    if(I.unassignedPolarityCount>0){
+      h += `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--surf-3);font-size:11px;color:var(--ink-m);margin-bottom:6px;"><span>${plural(I.unassignedPolarityCount,'connection')} ${I.unassignedPolarityCount===1?'has':'have'} no + or - yet.</span><span style="color:var(--ink-h);">Loops can't be told apart without it</span></div>`;
+    }
     h += grp('drivers','Drivers: most outgoing influence',null,
       I.drivers.length ? I.drivers.map(n=>row(n,`${I.outDeg.get(n.id)} out`)).join('') : none('No arrows in this view.'));
     h += grp('sinks','Most affected: incoming influence',null,
       I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows in this view.'));
     _insightLoops=I.loops;
+    const rbBadge=(cls)=>{
+      if(!cls||cls.type==='unassigned') return '<span style="display:inline-block;min-width:16px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:var(--surf-3);color:var(--ink-h);" title="One or more connections in this loop have no polarity yet">?</span>';
+      const isR=cls.type==='R';
+      return `<span style="display:inline-block;min-width:16px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:${isR?'#FEF3C7':'#DBEAFE'};color:${isR?'#92400E':'#1E40AF'};" title="${isR?'Reinforcing: '+cls.minus+' minus sign(s), compounds in one direction':'Balancing: '+cls.minus+' minus sign(s), seeks equilibrium'}">${cls.type}</span>`;
+    };
+    const rCount=I.loopClass.filter(c=>c.type==='R').length, bCount=I.loopClass.filter(c=>c.type==='B').length, uCount=I.loopClass.filter(c=>c.type==='unassigned').length;
     let lh='';
     if(I.loops.length){
       const anyPin=I.loops.some(L=>_pinnedLoops.has(loopKey(L)));
+      lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 6px;">${plural(rCount,'reinforcing loop')}, ${plural(bCount,'balancing loop')}${uCount?', '+plural(uCount,'loop')+' not yet classifiable (missing polarity)':''}.</div>`;
       lh += `<div style="display:flex;gap:6px;margin:2px 0 6px;"><button onclick="highlightAllLoops()" style="flex:1;font-size:10.5px;height:26px;">↻ Highlight all</button>${anyPin?`<button onclick="clearLoopPins()" style="font-size:10.5px;height:26px;padding:0 10px;">Clear</button>`:''}</div>`;
       lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Click loops to highlight them. Click again to remove one.${I.loopsCapped?' Showing the first '+I.loops.length+'.':''}</div>`;
       lh += I.loops.map((L,li)=>{
         const on=_pinnedLoops.has(loopKey(L));
         const lc=on?loopColourOf(_pinColourIdx.get(loopKey(L))||0,document.documentElement.getAttribute('data-theme')==='dark').col:'';
-        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span><span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span></span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
+        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span>${rbBadge(I.loopClass[li])}<span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span></span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
       }).join('');
     } else lh += none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
     h += grp('loops','Feedback loops',(I.loopsCapped?I.loops.length+'+':I.loops.length),lh);
+
+    if(I.limitsToGrowth.length){
+      let gh='';
+      I.limitsToGrowth.forEach((p,pi)=>{
+        const rNodes=I.loops[p.rIdx].map(n=>esc(n.label)).join(' → ');
+        const bNodes=I.loops[p.bIdx].map(n=>esc(n.label)).join(' → ');
+        gh+=`<div onclick="highlightLoopByIdx(${p.rIdx})" style="padding:7px 8px;border-radius:8px;background:var(--surf-3);margin-bottom:6px;cursor:pointer;font-size:11.5px;line-height:1.5;" title="Click to highlight the reinforcing loop">
+          <strong>${esc(p.sharedNode.label)}</strong> is a growth engine held back by a limit.<br>
+          Pushing it harder (the <strong>R</strong> loop: ${rNodes}) eventually triggers more resistance from the <strong>B</strong> loop: ${bNodes}.<br>
+          <span style="color:var(--ink-h);">Leverage point: ease the constraint, not just the push.</span>
+        </div>`;
+      });
+      h += grp('limits','Limits to growth',I.limitsToGrowth.length,gh);
+    }
+
+    const leverage=[...I.nodeLoopCount.entries()].filter(([id,c])=>c>=2).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    if(leverage.length){
+      h += grp('leverage','Structural leverage points',leverage.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">In more than one feedback loop - a change here ripples furthest.</div>`+
+        leverage.map(([id,c])=>{ const n=I.pool.find(p=>p.id===id); return n?row(n,`in ${c} loops`):''; }).join(''));
+    }
   } else {
     h += grp('most','Most connected',null,
       I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.'));
@@ -6558,6 +6713,12 @@ function openEdgeEditPopup(idx, sx, sy){
   // Render style buttons with current style highlighted
   _connShowAll=false; renderEdgeStyleList(e.strength||'moderate');
   renderEdgeArrowBtns(arrowOf(e));
+  const cldRow=document.getElementById('edge-cld-row');
+  if(cldRow){
+    cldRow.style.display=(MAP_TYPE==='systems')?'flex':'none';
+    renderEdgePolarityBtns(e.polarity||'');
+    const dc=document.getElementById('edge-delay-chk'); if(dc) dc.checked=!!e.hasDelay;
+  }
 
   // Position near click
   const popup=document.getElementById('edge-edit-popup');
@@ -6620,6 +6781,34 @@ function setEdgeArrow(val){
   e.arrow=val;
   e.twoWay=val==='both';
   renderEdgeArrowBtns(val);
+  draw(); saveState(); markUnsaved();
+}
+function renderEdgePolarityBtns(v){
+  document.querySelectorAll('#edge-polarity-btns button').forEach(b=>{
+    const on=b.dataset.polarity===v;
+    b.style.background=on?'var(--ink)':'transparent';
+    b.style.color=on?'var(--on-ink)':'var(--ink)';
+    b.style.border='1px solid '+(on?'var(--ink)':'var(--bdr-m)');
+    b.style.borderRadius='6px';
+    b.style.cursor='pointer';
+  });
+}
+// A polarity sign only means something if the edge has a direction. An edge
+// drawn as a plain line (arrow:'none') has no cause->effect reading yet, so
+// giving it a polarity also gives it the direction it was drawn in - quietly,
+// the same way confirmConnectionFull() already defaults new edges to one.
+function setEdgePolarity(val){
+  if(edgeEditIdx===null) return;
+  const e=edges[edgeEditIdx];
+  e.polarity=val||null;
+  if(val&&arrowOf(e)==='none'){ e.arrow='forward'; renderEdgeArrowBtns('forward'); }
+  renderEdgePolarityBtns(val);
+  draw(); saveState(); markUnsaved();
+  if(typeof refreshInsightsIfOpen==='function') refreshInsightsIfOpen();
+}
+function setEdgeDelay(on){
+  if(edgeEditIdx===null) return;
+  edges[edgeEditIdx].hasDelay=!!on;
   draw(); saveState(); markUnsaved();
 }
 
@@ -8262,9 +8451,30 @@ function buildSummaryReport(){
     html+=`<div class="report-section"><h4>Feedback loops</h4>`;
     if(!LI.directedEdges) html+=`<div style="font-size:12px;color:var(--txt-m);">No arrows set, so loops can't be detected. Give connections arrows to see them.</div>`;
     else if(!_insightLoops.length) html+=`<div style="font-size:12px;color:var(--txt-m);">None found: influence flows one way.</div>`;
-    else html+=`<div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">A loop is a chain of effects that circles back on itself. Click one to see it on the map.</div>`+
-      _insightLoops.map((L,li)=>`<div class="report-row" onclick="highlightLoopFromReport(${li})" style="cursor:pointer;" title="Click to highlight this loop on the map">${L.map(n=>escHtml(n.label)).join(' → ')} → ${escHtml(L[0].label)}</div>`).join('');
+    else {
+      const rC=LI.loopClass.filter(c=>c.type==='R').length, bC=LI.loopClass.filter(c=>c.type==='B').length, uC=LI.loopClass.filter(c=>c.type==='unassigned').length;
+      html+=`<div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">A loop is a chain of effects that circles back on itself. ${rC} reinforcing, ${bC} balancing${uC?`, ${uC} need a + or - before they can be told apart`:''}.</div>`+
+      _insightLoops.map((L,li)=>{
+        const cls=LI.loopClass[li];
+        const tag=cls.type==='unassigned'?'<span class="report-stat">?</span>':`<span class="report-stat" style="background:${cls.type==='R'?'#FEF3C7':'#DBEAFE'};color:${cls.type==='R'?'#92400E':'#1E40AF'};">${cls.type}</span>`;
+        return `<div class="report-row" onclick="highlightLoopFromReport(${li})" style="cursor:pointer;" title="Click to highlight this loop on the map">${tag} ${L.map(n=>escHtml(n.label)).join(' → ')} → ${escHtml(L[0].label)}</div>`;
+      }).join('');
+    }
     html+=`</div>`;
+    if(LI.limitsToGrowth&&LI.limitsToGrowth.length){
+      html+=`<div class="report-section"><h4>Limits to growth</h4>`+
+        LI.limitsToGrowth.map(p=>{
+          const rNodes=LI.loops[p.rIdx].map(n=>escHtml(n.label)).join(' → ');
+          const bNodes=LI.loops[p.bIdx].map(n=>escHtml(n.label)).join(' → ');
+          return `<div class="report-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
+            <div><strong style="color:var(--navy);">${escHtml(p.sharedNode.label)}</strong> is a growth engine held back by a limit.</div>
+            <div style="font-size:11px;color:var(--txt-m);">Reinforcing (R): ${rNodes}</div>
+            <div style="font-size:11px;color:var(--txt-m);">Balancing (B): ${bNodes}</div>
+            <div style="font-size:11px;color:var(--txt-m);font-style:italic;">Leverage point: ease the constraint, not just the push.</div>
+          </div>`;
+        }).join('');
+      html+=`</div>`;
+    }
   }
   return html;
 }
