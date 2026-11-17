@@ -1665,7 +1665,7 @@ function snap(includeVersions=true){
     };
   }
   return JSON.stringify({
-    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null})),
+    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
     edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false})),
     bgImageData:document.getElementById('bg-image-data')?.textContent||'',
     namedVersions:includeVersions?namedVersions:[],
@@ -2263,11 +2263,13 @@ function draw(){
         ctx.fillStyle=drawStroke;ctx.fill();
         ctx.restore();
       }
-      // Causal Loop Diagram markers: polarity badge near the arrowhead, delay
-      // hatch nearer the source. Systems maps only - these marks assume a CLD
-      // reading that no other map type uses. Own save/restore because the
-      // block above already closed the one opened at the top of this edge.
-      if(MAP_TYPE==='systems'&&!dimmed&&(e.polarity||e.hasDelay)){
+      // Polarity badge near the arrowhead: cause/effect on a systems map,
+      // alliance/friction on a stakeholder map - same mark, different real-
+      // world meaning. Delay hatch is systems-only; hasDelay can only be set
+      // true from the systems side of the edge popup, so it never fires here
+      // for a stakeholder edge. Own save/restore because the block above
+      // already closed the one opened at the top of this edge.
+      if((MAP_TYPE==='systems'||MAP_TYPE==='stakeholder')&&!dimmed&&(e.polarity||e.hasDelay)){
         ctx.save();
         ctx.globalAlpha=knockEdgeAlpha(i,isSecondaryEdge?0.30:1);
         if(e.polarity){
@@ -3028,8 +3030,13 @@ function computeInsights(){
   const isolated=pool.filter(n=>deg.get(n.id)===0).length;
 
   // One depth-first pass (iterative, so large maps cannot overflow the stack).
+  // Also finds bridge EDGES in the same pass: a tree edge (pv,v) is a bridge
+  // iff low[v] > disc[pv] (strictly greater - an articulation POINT only
+  // needs >=, since a node can be a cut vertex via two different children
+  // without either child edge alone being a bridge).
   const disc=new Map(), low=new Map(), sz=new Map(), par=new Map(), sepSum=new Map(), sepMax=new Map();
   const compRoot=new Map(), compSize=new Map();
+  const bridgeEdgePairs=[];
   let clock=0;
   pool.forEach(root=>{
     if(disc.has(root.id)) return;
@@ -3057,12 +3064,14 @@ function computeInsights(){
             sepSum.set(pv,(sepSum.get(pv)||0)+sz.get(v));
             sepMax.set(pv,Math.max(sepMax.get(pv)||0,sz.get(v)));
           }
+          if(low.get(v)>disc.get(pv)) bridgeEdgePairs.push({a:pv,b:v,size:sz.get(v)});
         }
       }
     }
     compSize.set(root.id,sz.get(root.id));
   });
-  // Bridges: how many people in the same group would be cut off from the largest piece left.
+  // Critical nodes (cut vertices): how many people in the same group would be
+  // cut off from the largest piece left if this one node were removed.
   const bridges=[];
   pool.forEach(n=>{
     const cs=compSize.get(compRoot.get(n.id));
@@ -3072,6 +3081,58 @@ function computeInsights(){
     if(cutOff>0) bridges.push({node:n,cutOff});
   });
   bridges.sort((a,b)=>b.cutOff-a.cutOff||byLabel(a.node,b.node));
+
+  // Critical links (bridge edges): resolve each pair back to the real edge,
+  // same a|b / b|a lookup the CLD/stakeholder work already uses elsewhere.
+  const byId3=new Map(pool.map(n=>[n.id,n]));
+  const edgeByPair3=new Map();
+  edgesIn.forEach(e=>{
+    const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+    const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+    edgeByPair3.set(a+'|'+b,e); edgeByPair3.set(b+'|'+a,e);
+  });
+  const criticalLinks=bridgeEdgePairs.map(p=>({
+    edge:edgeByPair3.get(p.a+'|'+p.b),
+    a:byId3.get(p.a), b:byId3.get(p.b),
+    cutOff:Math.min(p.size,pool.length-p.size)
+  })).filter(x=>x.edge).sort((x,y)=>y.cutOff-x.cutOff);
+
+  // Density: of every possible connection, how many actually exist.
+  const density=pool.length>1?Math.round(edgesIn.length/(pool.length*(pool.length-1)/2)*100):0;
+
+  // Betweenness centrality (Brandes' algorithm): how often a node sits on the
+  // shortest path between two others. Capped at 200 pool nodes - O(V*E), fine
+  // at that size, not something to run uncapped on a huge map.
+  const BETWEENNESS_CAP=200;
+  let betweenness=null, betweennessCapped=false;
+  if(pool.length>BETWEENNESS_CAP){
+    betweennessCapped=true;
+  } else if(pool.length>2){
+    betweenness=new Map(pool.map(n=>[n.id,0]));
+    pool.forEach(s=>{
+      const S=[], P=new Map(pool.map(n=>[n.id,[]])), sigma=new Map(pool.map(n=>[n.id,0])), d=new Map(pool.map(n=>[n.id,-1]));
+      sigma.set(s.id,1); d.set(s.id,0);
+      const Q=[s.id];
+      while(Q.length){
+        const v=Q.shift(); S.push(v);
+        (adj.get(v)||new Set()).forEach(w=>{
+          if(d.get(w)<0){ Q.push(w); d.set(w,d.get(v)+1); }
+          if(d.get(w)===d.get(v)+1){ sigma.set(w,sigma.get(w)+sigma.get(v)); P.get(w).push(v); }
+        });
+      }
+      const delta=new Map(pool.map(n=>[n.id,0]));
+      while(S.length){
+        const w=S.pop();
+        (P.get(w)||[]).forEach(v=>{ delta.set(v,delta.get(v)+(sigma.get(v)/sigma.get(w))*(1+delta.get(w))); });
+        if(w!==s.id) betweenness.set(w,betweenness.get(w)+delta.get(w));
+      }
+    });
+    // Undirected: every pair's path is found from both ends, so halve.
+    pool.forEach(n=>betweenness.set(n.id,betweenness.get(n.id)/2));
+  }
+  const topBetweenness=betweenness
+    ? [...pool].filter(n=>betweenness.get(n.id)>0).sort((x,y)=>betweenness.get(y.id)-betweenness.get(x.id)||byLabel(x,y)).slice(0,5)
+    : [];
 
   // Groups: separate linked clusters, with the best-connected person in each.
   const groupMap=new Map();
@@ -3124,6 +3185,14 @@ function computeInsights(){
   });
   const drivers=[...pool].filter(n=>outDeg.get(n.id)>0).sort((x,y)=>outDeg.get(y.id)-outDeg.get(x.id)||byLabel(x,y)).slice(0,5);
   const sinks=[...pool].filter(n=>inDeg.get(n.id)>0).sort((x,y)=>inDeg.get(y.id)-inDeg.get(x.id)||byLabel(x,y)).slice(0,5);
+
+  // Overloaded hubs: many things arrive, almost nothing leaves - everything
+  // piles up here before moving on. Needs arrows actually set; on a network
+  // map that is often optional, so this stays empty unless direction was used.
+  const overloadedHubs=[...pool]
+    .filter(n=>inDeg.get(n.id)>=3&&outDeg.get(n.id)<=1)
+    .sort((x,y)=>(inDeg.get(y.id)-outDeg.get(y.id))-(inDeg.get(x.id)-outDeg.get(x.id))||byLabel(x,y))
+    .slice(0,5);
 
   // Feedback loops (systems maps): directed cycles of 3 to 20 steps. Capped at LOOP_CAP loops and a
   // work budget so a huge, dense map can't freeze the page. loopsCapped says the list may be incomplete.
@@ -3191,6 +3260,66 @@ function computeInsights(){
     }
   }
 
+  // Stakeholder power dynamics: Silent Giants, Gridlock Risks, Influence
+  // Bridges, Alignment Health - all built from the stakeholder attributes set
+  // on each node plus the same +/- polarity field systems maps use, just read
+  // as alliance/friction here rather than cause/effect.
+  let silentGiants=[], gridlockRisks=[], influenceBridges=[], alignmentHealth=null;
+  if(MAP_TYPE==='stakeholder'){
+    silentGiants=pool.filter(n=>n.stakePower==='high'&&n.stakeInterest==='low');
+
+    const byId=new Map(pool.map(n=>[n.id,n]));
+    const posAdj=new Map(pool.map(n=>[n.id,new Set()]));
+    edgesIn.forEach(e=>{
+      const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+      const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+      if(e.polarity==='positive'){ posAdj.get(a)?.add(b); posAdj.get(b)?.add(a); }
+      if(e.polarity==='negative'){
+        const na=byId.get(a), nb=byId.get(b);
+        if(na&&nb&&na.stakePower==='high'&&nb.stakePower==='high') gridlockRisks.push({a:na,b:nb});
+      }
+    });
+
+    // Influence Bridges: for each Skeptic/Blocker, the nearest Champion
+    // reachable through alliance (+) links only - a trusted path to work
+    // through, not a straight line that may not exist socially.
+    const champions=pool.filter(n=>n.stakeStance==='champion');
+    const atRisk=pool.filter(n=>n.stakeStance==='skeptic'||n.stakeStance==='blocker');
+    if(champions.length&&atRisk.length){
+      const champSet=new Set(champions.map(n=>n.id));
+      atRisk.forEach(target=>{
+        const dist=new Map([[target.id,0]]), par=new Map();
+        const q=[target.id];
+        let reached=null;
+        while(q.length&&!reached){
+          const u=q.shift();
+          if(champSet.has(u)&&u!==target.id){ reached=u; break; }
+          (posAdj.get(u)||new Set()).forEach(v=>{ if(!dist.has(v)){ dist.set(v,dist.get(u)+1); par.set(v,u); q.push(v); } });
+        }
+        if(reached){
+          const path=[reached]; let cur=reached;
+          while(par.has(cur)){ cur=par.get(cur); path.push(cur); }
+          influenceBridges.push({target,champion:byId.get(reached),steps:dist.get(reached),path:path.map(id=>byId.get(id))});
+        }
+      });
+      influenceBridges.sort((x,y)=>x.steps-y.steps);
+      influenceBridges=influenceBridges.slice(0,5);
+    }
+
+    // Alignment Health: among the high-power stakeholders specifically - a
+    // friction link between two people with no real authority barely matters
+    // to whether the initiative stalls.
+    const highPower=new Set(pool.filter(n=>n.stakePower==='high').map(n=>n.id));
+    let posC=0, negC=0;
+    edgesIn.forEach(e=>{
+      const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
+      const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
+      if(!highPower.has(a)||!highPower.has(b)) return;
+      if(e.polarity==='positive') posC++; else if(e.polarity==='negative') negC++;
+    });
+    if(posC+negC>0) alignmentHealth={positive:posC,negative:negC,total:posC+negC,pct:Math.round(posC/(posC+negC)*100)};
+  }
+
   pool.forEach(n=>{ const y=yearOf(n.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].p++; });
   edgesIn.forEach(e=>{ const y=yearOf(e.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].c++; });
 
@@ -3198,6 +3327,8 @@ function computeInsights(){
           groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length,
           outDeg,inDeg,drivers,sinks,directedEdges,loops,loopsCapped,compCount,compBig,focus,focusGuessed,fD,fCounts,
           loopClass,limitsToGrowth,unassignedPolarityCount,nodeLoopCount,
+          silentGiants,gridlockRisks,influenceBridges,alignmentHealth,
+          criticalLinks,density,betweenness,betweennessCapped,topBetweenness,overloadedHubs,
           arg:MAP_TYPE==='argument'?argumentAnalysis(pool):null};
 }
 function classifySystemsLoop(loopNodes, edgeByPair){
@@ -3347,7 +3478,7 @@ function renderInsights(){
   let h = I.filtered
     ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--surf-3);font-size:11.5px;"><span><strong>Filtered view:</strong> ${plural(I.pool.length,'person')}</span><button onclick="clearSearch()" style="font-size:10.5px;height:24px;padding:0 8px;">Show full map</button></div>`
     : `<div style="font-size:11.5px;color:var(--ink-h);">Full map: ${plural(I.pool.length,'person')}. Search or filter to look at part of it.</div>`;
-  h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these ${NOUN[1]}. ${plural(I.isolated,'person')} with none.</div>`;
+  h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these ${NOUN[1]}. ${plural(I.isolated,'person')} with none.${(MAP_TYPE==='general'||MAP_TYPE==='network')?` ${I.density}% of possible connections exist.`:''}</div>`;
 
   const S=insightSummaryLines(I);
   if(S.length) h += `<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--ink);background:var(--surf-2);border-radius:6px;font-size:11.5px;line-height:1.55;">${S.map(t=>`<div style="margin:2px 0;">${esc(t)}</div>`).join('')}</div>`;
@@ -3357,6 +3488,32 @@ function renderInsights(){
     const direct=I.pool.filter(n=>I.fD&&I.fD.get(n.id)===1).sort((a,b)=>I.total.get(b.id)-I.total.get(a.id));
     h += grp('focus',`Directly linked to ${esc(I.focus.label)}`,direct.length,
       direct.length ? direct.slice(0,10).map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('Nothing is linked to the centre yet.'));
+  }
+  if(MAP_TYPE==='stakeholder'){
+    const missingAttrs=I.pool.filter(n=>!n.stakePower||!n.stakeInterest||!n.stakeStance).length;
+    if(missingAttrs>0) h += `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--surf-3);font-size:11px;color:var(--ink-m);margin-bottom:6px;"><span>${plural(missingAttrs,'stakeholder')} ${missingAttrs===1?'is':'are'} missing power, interest or stance.</span><span style="color:var(--ink-h);">Open a node to set them</span></div>`;
+
+    h += grp('silentgiants','Silent giants',I.silentGiants.length,
+      I.silentGiants.length
+        ? `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">High power, low interest - a risk if surprised late.</div>`+I.silentGiants.map(n=>row(n,'')).join('')
+        : none('None found. Needs power and interest set on every stakeholder.'));
+
+    if(I.gridlockRisks.length){
+      h += grp('gridlock','Gridlock risks',I.gridlockRisks.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Friction between two high-power stakeholders - can stall progress.</div>`+
+        I.gridlockRisks.map(p=>`<div style="padding:4px 6px;font-size:11.5px;">${esc(p.a.label)} <span style="color:var(--ink-h);">↔ friction ↔</span> ${esc(p.b.label)}</div>`).join(''));
+    }
+
+    if(I.influenceBridges.length){
+      h += grp('bridges2','Influence bridges',I.influenceBridges.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">A trusted route from a Champion to someone at risk, through alliance links only.</div>`+
+        I.influenceBridges.map(b=>`<div style="padding:4px 6px;font-size:11.5px;">${b.path.map(n=>esc(n.label)).join(' → ')} <span style="color:var(--ink-h);">(${b.steps} step${b.steps===1?'':'s'})</span></div>`).join(''));
+    }
+
+    if(I.alignmentHealth){
+      const A=I.alignmentHealth;
+      h += `<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surf-3);font-size:11.5px;line-height:1.5;"><strong>Alignment health (high-power stakeholders):</strong> ${A.pct}% positive - ${A.positive} alliance${A.positive===1?'':'s'}, ${A.negative} friction point${A.negative===1?'':'s'}.</div>`;
+    }
   }
   if(MAP_TYPE==='argument'&&I.arg){
     const A=I.arg;
@@ -3421,9 +3578,29 @@ function renderInsights(){
       I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.'));
     h += grp('least','Fewest connections',null, I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') || none('None yet.'));
   }
-  h += grp('bridges', MAP_TYPE==='systems' ? 'Choke points' : 'Bridges', I.bridges.length,
+  h += grp('bridges', MAP_TYPE==='systems' ? 'Choke points' : 'Critical nodes', I.bridges.length,
     `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Removing one ${NOUN[0]} cuts others off.</div>`+
     (I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none(`No single ${NOUN[0]} links separate groups.`)));
+
+  if(MAP_TYPE==='general'||MAP_TYPE==='network'){
+    h += grp('critlinks','Critical links',I.criticalLinks.length,
+      `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">The only connection between two parts of the map - remove it and they split.</div>`+
+      (I.criticalLinks.length ? I.criticalLinks.map(c=>`<div style="padding:4px 6px;font-size:11.5px;">${esc(c.a.label)} — ${esc(c.b.label)} <span style="color:var(--ink-h);">cuts off ${c.cutOff}</span></div>`).join('') : none('No single connection splits the map.')));
+
+    if(I.betweennessCapped){
+      h += `<div style="font-size:10.5px;color:var(--ink-h);padding:4px 6px;">Bottleneck score skipped: map has more than 200 ${NOUN[1]}.</div>`;
+    } else {
+      h += grp('bottleneck','Bottleneck score',null,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Sits on the most paths between everyone else - a pinch point even without being the most connected.</div>`+
+        (I.topBetweenness.length ? I.topBetweenness.map(n=>row(n,Math.round(I.betweenness.get(n.id)))).join('') : none('No node sits between others on a path.')));
+    }
+
+    if(I.overloadedHubs.length){
+      h += grp('overloaded','Overloaded hubs',I.overloadedHubs.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Many arrows in, almost none out - everything piles up here.</div>`+
+        I.overloadedHubs.map(n=>row(n,`${I.inDeg.get(n.id)} in, ${I.outDeg.get(n.id)} out`)).join(''));
+    }
+  }
 
   h += grp('groups','Groups',I.linked.length,
     pair(plural(I.linked.length,'linked group'), plural(I.alone,'person')+' on their own') + I.linked.slice(0,5).map(g=>row(g.best,`group of ${g.size}`)).join(''));
@@ -4022,6 +4199,34 @@ function buildSummaryReport(){
     html+=`</div>`;
   }
 
+  if(MAP_TYPE==='general'||MAP_TYPE==='network'){
+    const NI=computeInsights();
+    html+=`<div class="report-section"><h4>Network structure</h4>
+      <div class="report-row">${NI.density}% of possible connections exist. ${NI.compCount>1?NI.compCount+' separate clusters, the biggest holding '+NI.compBig+'.':'One connected piece.'}</div></div>`;
+
+    if(NI.bridges.length){
+      html+=`<div class="report-section"><h4>Critical nodes</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Removing this one node cuts others off from the rest.</div>`+
+        NI.bridges.map(b=>`<div class="report-row">${escHtml(b.node.label)} <span class="report-stat">cuts off ${b.cutOff}</span></div>`).join('')+`</div>`;
+    }
+    if(NI.criticalLinks.length){
+      html+=`<div class="report-section"><h4>Critical links</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">The only connection between two parts of the map.</div>`+
+        NI.criticalLinks.map(c=>`<div class="report-row">${escHtml(c.a.label)} — ${escHtml(c.b.label)} <span class="report-stat">cuts off ${c.cutOff}</span></div>`).join('')+`</div>`;
+    }
+    if(NI.betweennessCapped){
+      html+=`<div class="report-section"><h4>Bottleneck score</h4><div class="report-row" style="color:var(--txt-m);">Skipped: map has more than 200 nodes.</div></div>`;
+    } else if(NI.topBetweenness.length){
+      html+=`<div class="report-section"><h4>Bottleneck score</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Sits on the most paths between everyone else.</div>`+
+        NI.topBetweenness.map(n=>`<div class="report-row">${escHtml(n.label)} <span class="report-stat">${Math.round(NI.betweenness.get(n.id))}</span></div>`).join('')+`</div>`;
+    }
+    if(NI.overloadedHubs.length){
+      html+=`<div class="report-section"><h4>Overloaded hubs</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Many arrows in, almost none out.</div>`+
+        NI.overloadedHubs.map(n=>`<div class="report-row">${escHtml(n.label)} <span class="report-stat">${NI.inDeg.get(n.id)} in, ${NI.outDeg.get(n.id)} out</span></div>`).join('')+`</div>`;
+    }
+  }
   if(MAP_TYPE==='argument'){
     const AI=computeInsights();
     if(AI.arg) html+=`<div class="report-section"><h4>Argument</h4>`+insightSummaryLines(AI).map(t=>`<div class="report-row">${escHtml(t)}</div>`).join('')+`</div>`;
@@ -4055,6 +4260,33 @@ function buildSummaryReport(){
           </div>`;
         }).join('');
       html+=`</div>`;
+    }
+  }
+  if(MAP_TYPE==='stakeholder'){
+    const SI=computeInsights();
+    if(SI.focus){
+      html+=`<div class="report-section"><h4>Distance from ${escHtml(SI.focus.label)}</h4>
+        <div class="report-row">${SI.fCounts.d1} directly linked, ${SI.fCounts.d2} two steps away, ${SI.fCounts.far+SI.fCounts.un} further out or not connected.</div></div>`;
+    }
+    if(SI.silentGiants.length){
+      html+=`<div class="report-section"><h4>Silent giants</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">High power, low interest - a risk if surprised late in the project.</div>`+
+        SI.silentGiants.map(n=>`<div class="report-row">${escHtml(n.label)}</div>`).join('')+`</div>`;
+    }
+    if(SI.gridlockRisks.length){
+      html+=`<div class="report-section"><h4>Gridlock risks</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Friction between two high-power stakeholders - can stall progress.</div>`+
+        SI.gridlockRisks.map(p=>`<div class="report-row">${escHtml(p.a.label)} ↔ friction ↔ ${escHtml(p.b.label)}</div>`).join('')+`</div>`;
+    }
+    if(SI.influenceBridges.length){
+      html+=`<div class="report-section"><h4>Influence bridges</h4>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">A trusted route from a Champion to someone at risk, through alliance links only.</div>`+
+        SI.influenceBridges.map(b=>`<div class="report-row">${b.path.map(n=>escHtml(n.label)).join(' → ')} (${b.steps} step${b.steps===1?'':'s'})</div>`).join('')+`</div>`;
+    }
+    if(SI.alignmentHealth){
+      const A=SI.alignmentHealth;
+      html+=`<div class="report-section"><h4>Alignment health</h4>
+        <div class="report-row">Among high-power stakeholders: ${A.pct}% positive - ${A.positive} alliance${A.positive===1?'':'s'}, ${A.negative} friction point${A.negative===1?'':'s'}.</div></div>`;
     }
   }
   return html;
