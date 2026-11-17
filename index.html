@@ -13627,6 +13627,10 @@ async function afterSignIn(){
   const ok = await cloudInit();
   const btn = document.getElementById('btn-my-maps');
   if (btn) btn.style.display = '';
+  if(new URLSearchParams(location.search).get('imageImport')==='1'){
+    window.dispatchEvent(new Event('puddl-auth-ready'));
+    return;
+  }
   if (!ok) { if(listRecoveryCopies().length) openMyMaps(); return; }
   try {
     const maps = await cloudListMaps();

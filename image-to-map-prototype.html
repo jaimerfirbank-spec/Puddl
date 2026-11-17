@@ -14,24 +14,27 @@
 </head>
 <body>
   <main class="page">
-    <div class="top"><div><h1>Puddl AI Image-to-Map test</h1><p>The photo is read securely. Nothing is added to your real map.</p></div><span class="badge">AI test</span></div>
+    <div class="top"><div><h1>Puddl AI Image-to-Map test</h1><p>Review the photo reading, correct it, then create a new editable map.</p></div><span class="badge">AI test</span></div>
+    <p><a href="/" target="_blank" rel="noopener">Open Puddle to sign in</a></p>
     <section class="card">
-      <label class="upload" for="file"><strong>Choose one hand-drawn map photo</strong><span>JPG, PNG or WebP — black marker on white paper works best</span></label>
+      <label class="upload" for="file"><strong>Choose one hand-drawn map photo</strong><span>JPG, PNG or WebP — black marker on white paper works best. Sign in to Puddle first.</span></label>
       <input id="file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
       <div class="controls"><button id="read" disabled>Read map with AI</button><button id="clear" class="clear" type="button">Clear</button><span id="status" class="status">Choose a photo.</span></div>
       <div id="error" class="error hidden"></div>
     </section>
     <section id="result" class="card result hidden"></section>
   </main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const $=id=>document.getElementById(id);let chosen=null,previewUrl='',currentData=null;
+const $=id=>document.getElementById(id);let chosen=null,previewUrl='',requestNumber=0,readController=null,photoAuthClient=null;
+function cancelReading(){ requestNumber++; if(readController) readController.abort(); readController=null; }
 function setStatus(text){$('status').textContent=text}
 function showError(text){$('error').textContent=text;$('error').classList.remove('hidden')}
 function clearError(){$('error').classList.add('hidden');$('error').textContent=''}
-$('file').addEventListener('change',()=>{chosen=$('file').files&&$('file').files[0]||null;$('read').disabled=!chosen;clearError();$('result').classList.add('hidden');setStatus(chosen?chosen.name:'Choose a photo.')});
-$('clear').addEventListener('click',()=>{chosen=null;$('file').value='';$('read').disabled=true;$('result').classList.add('hidden');clearError();setStatus('Choose a photo.')});
-function loadImage(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),image=new Image();image.onload=()=>{URL.revokeObjectURL(url);resolve(image)};image.onerror=reject;image.src=url})}
-async function prepareImage(file){const image=await loadImage(file),maxSide=2000,scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*scale);canvas.height=Math.round(image.naturalHeight*scale);const context=canvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/jpeg',.86)}
+$('file').addEventListener('change',()=>{cancelReading();chosen=$('file').files&&$('file').files[0]||null;$('read').disabled=!chosen;clearError();$('result').classList.add('hidden');setStatus(chosen?chosen.name:'Choose a photo.')});
+$('clear').addEventListener('click',()=>{cancelReading();chosen=null;$('file').value='';$('read').disabled=true;$('result').classList.add('hidden');clearError();setStatus('Choose a photo.')});
+function loadImage(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),image=new Image();image.onload=()=>{URL.revokeObjectURL(url);resolve(image)};image.onerror=()=>{URL.revokeObjectURL(url);reject(Error('This photo could not be opened. Use JPG, PNG or WebP.'))};image.src=url})}
+async function prepareImage(file){if(file.size>25*1024*1024)throw Error('Choose a photo smaller than 25 MB.');const image=await loadImage(file),maxSide=2000,scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*scale);canvas.height=Math.round(image.naturalHeight*scale);const context=canvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/jpeg',.86)}
 function confidenceClass(value){return value>=70?'good':'low'}
 function addCell(row,text,className){const cell=document.createElement('td');cell.textContent=String(text);if(className)cell.className=className;row.appendChild(cell)}
 function addInputCell(row,value,onchange,options){const cell=document.createElement('td');let input;if(options){input=document.createElement('select');options.forEach(option=>{const item=document.createElement('option'),optionValue=typeof option==='object'?option.value:option,optionLabel=typeof option==='object'?option.label:option;item.value=optionValue;item.textContent=optionLabel;item.selected=optionValue===value;input.appendChild(item)})}else{input=document.createElement('input');input.type='text';input.value=value}input.style.cssText='width:100%;min-width:90px;padding:7px;border:1px solid #cbd5e1;border-radius:7px;font:inherit';input.addEventListener('change',()=>onchange(input.value));cell.appendChild(input);row.appendChild(cell)}
@@ -42,7 +45,7 @@ function connectionText(edge,nodes){const a=nodeName(nodes,edge.source),b=nodeNa
 function drawOverlay(svg,nodes,edges){const ns='http://www.w3.org/2000/svg';edges.forEach(edge=>{const a=nodes.find(n=>n.id===edge.source),b=nodes.find(n=>n.id===edge.target);if(!a||!b)return;const line=document.createElementNS(ns,'line');line.setAttribute('x1',a.x+a.width/2);line.setAttribute('y1',a.y+a.height/2);line.setAttribute('x2',b.x+b.width/2);line.setAttribute('y2',b.y+b.height/2);line.setAttribute('stroke','#e39a15');line.setAttribute('stroke-width','4');line.setAttribute('opacity','.8');svg.appendChild(line)});nodes.forEach((node,index)=>{const rect=document.createElementNS(ns,'rect');rect.setAttribute('x',node.x);rect.setAttribute('y',node.y);rect.setAttribute('width',node.width);rect.setAttribute('height',node.height);rect.setAttribute('fill','none');rect.setAttribute('stroke',node.confidence>=70?'#14a36f':'#e05252');rect.setAttribute('stroke-width','4');svg.appendChild(rect);const text=document.createElementNS(ns,'text');text.setAttribute('x',node.x);text.setAttribute('y',Math.max(22,node.y-7));text.setAttribute('fill',node.confidence>=70?'#087a50':'#c23d3d');text.setAttribute('font-size','22');text.setAttribute('font-weight','800');text.textContent=(index+1)+' '+node.label;svg.appendChild(text)})}
 function heading(text,level=3){const h=document.createElement('h'+level);h.textContent=text;return h}
 function render(imageUrl,data){
-  currentData=data;const result=$('result');result.replaceChildren();const grid=document.createElement('div');grid.className='grid';
+  const result=$('result');result.replaceChildren();const grid=document.createElement('div');grid.className='grid';
   const picture=document.createElement('div');picture.className='picture';const img=document.createElement('img');img.src=imageUrl;img.alt='Uploaded hand-drawn map';picture.appendChild(img);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('overlay');svg.setAttribute('viewBox','0 0 1000 1000');svg.setAttribute('preserveAspectRatio','none');picture.appendChild(svg);drawOverlay(svg,data.nodes,data.edges);
   const side=document.createElement('div');side.className='side';side.appendChild(heading('AI reading',2));const pills=document.createElement('div');pills.className='pills';for(const text of [data.nodes.length+' nodes',data.edges.length+' connections']){const p=document.createElement('span');p.className='pill';p.textContent=text;pills.appendChild(p)}side.appendChild(pills);
   if(data.warnings.length){const warning=document.createElement('div');warning.className='warning';warning.textContent=data.warnings.join(' • ');side.appendChild(warning)}
@@ -50,10 +53,37 @@ function render(imageUrl,data){
   const addNode=document.createElement('button');addNode.type='button';addNode.className='clear';addNode.style.marginTop='10px';addNode.textContent='+ Add missing node';addNode.addEventListener('click',()=>{const id='n'+Date.now();data.nodes.push({id,label:'NEW NODE',shape:'circle',x:450,y:450,width:100,height:100,confidence:100,notes:'Added by user'});render(imageUrl,data)});side.appendChild(addNode);
   side.appendChild(heading('Check and correct connections'));const et=document.createElement('table');const eh=document.createElement('tr');for(const t of ['From','Direction','To','Reading','']){const th=document.createElement('th');th.textContent=t;eh.appendChild(th)}et.appendChild(eh);data.edges.forEach((edge,index)=>{const row=document.createElement('tr');addNodeNameCell(row,edge.source,value=>{edge.source=value;render(imageUrl,data)},data);addInputCell(row,edge.direction,value=>{edge.direction=value;render(imageUrl,data)},['source_to_target','both','target_to_source','unclear']);addNodeNameCell(row,edge.target,value=>{edge.target=value;render(imageUrl,data)},data);addCell(row,edge.confidence+'%',confidenceClass(edge.confidence));addDeleteCell(row,()=>{data.edges.splice(index,1);render(imageUrl,data)});et.appendChild(row)});side.appendChild(et);
   const addEdge=document.createElement('button');addEdge.type='button';addEdge.className='clear';addEdge.style.marginTop='10px';addEdge.textContent='+ Add missing connection';addEdge.disabled=data.nodes.length<2;addEdge.addEventListener('click',()=>{data.edges.push({source:data.nodes[0].id,target:data.nodes[1].id,direction:'source_to_target',confidence:100,notes:'Added by user'});render(imageUrl,data)});side.appendChild(addEdge);
-  const actions=document.createElement('div');actions.className='controls';actions.style.cssText='margin-top:24px;padding-top:18px;border-top:1px solid #dce3ec';const create=document.createElement('button');create.type='button';create.textContent='Create Puddle map';create.addEventListener('click',()=>{sessionStorage.setItem('puddl_image_import',JSON.stringify({version:1,title:(chosen&&chosen.name?chosen.name.replace(/\.[^.]+$/,''):'Photo map'),nodes:data.nodes,edges:data.edges}));window.location.href='/?imageImport=1'});actions.appendChild(create);side.appendChild(actions);
-  const note=document.createElement('p');note.className='note';note.textContent='Correct anything that is wrong, then create the editable Puddle map.';side.appendChild(note);grid.append(picture,side);result.appendChild(grid);result.classList.remove('hidden');
+  const actions=document.createElement('div');actions.className='controls';actions.style.cssText='margin-top:24px;padding-top:18px;border-top:1px solid #dce3ec';const create=document.createElement('button');create.type='button';create.textContent='Create a new Puddle map';create.disabled=!data.nodes.length;create.addEventListener('click',async()=>{try{await img.decode();sessionStorage.setItem('puddl_image_import',JSON.stringify({version:1,title:(chosen&&chosen.name?chosen.name.replace(/\.[^.]+$/,''):'Photo map'),nodes:data.nodes,edges:data.edges,imageWidth:img.naturalWidth,imageHeight:img.naturalHeight}));window.location.href='/?imageImport=1'}catch(_){showError('Could not prepare the map. Browser storage may be full.')}});actions.appendChild(create);side.appendChild(actions);
+  const note=document.createElement('p');note.className='note';note.textContent='Correct anything that is wrong, then create a new Puddle map. Node shapes and sizes are simplified, and connection strengths can be set afterwards.';side.appendChild(note);grid.append(picture,side);result.appendChild(grid);result.classList.remove('hidden');
 }
-$('read').addEventListener('click',async()=>{if(!chosen)return;$('read').disabled=true;clearError();$('result').classList.add('hidden');try{setStatus('Preparing photo…');const image=await prepareImage(chosen);previewUrl=image;setStatus('AI is reading the map… This may take a minute.');const response=await fetch('/api/image-to-map',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image,filename:chosen.name})});const body=await response.json();if(!response.ok)throw new Error(body.error||'The photo reader failed.');render(previewUrl,body.result);setStatus('Finished. Check the reading.')}catch(error){showError(error.message||'The photo reader failed.');setStatus('Could not finish.')}finally{$('read').disabled=!chosen}});
+$('read').addEventListener('click',async()=>{
+  if(!chosen)return;
+  cancelReading();
+  const request=requestNumber,file=chosen;
+  readController=new AbortController();
+  const signal=readController.signal;
+  $('read').disabled=true;clearError();$('result').classList.add('hidden');
+  try{
+    if(!window.supabase)throw Error('The sign-in service could not load. Please reload the page.');
+    if(!photoAuthClient)photoAuthClient=window.supabase.createClient('https://amjkbkbmqpaifqurzozg.supabase.co','sb_publishable_cEmd4G8xYwwUEqOZSV9jsA_bO4vh6gG');
+    const {data:{session}}=await photoAuthClient.auth.getSession();
+    if(!session)throw Error('Sign in to Puddle in another tab, then return here and try again.');
+    if(request!==requestNumber)return;
+    setStatus('Preparing photo…');
+    const image=await prepareImage(file);
+    if(request!==requestNumber)return;
+    previewUrl=image;
+    setStatus('AI is reading the map… This may take a minute.');
+    const response=await fetch('/api/image-to-map',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({image}),signal});
+    const body=await response.json();
+    if(request!==requestNumber)return;
+    if(!response.ok)throw Error(body.error||'The photo reader failed.');
+    render(image,body.result);setStatus('Finished. Check names, connections and arrow directions.');
+  }catch(error){
+    if(request!==requestNumber||error.name==='AbortError')return;
+    showError(error.message||'The photo reader failed.');setStatus('Could not finish.');
+  }finally{if(request===requestNumber){$('read').disabled=!chosen;readController=null;}}
+});
 </script>
 </body>
 </html>

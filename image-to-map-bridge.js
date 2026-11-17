@@ -1,98 +1,51 @@
 (function () {
-  function importImageMap() {
-    const params = new URLSearchParams(location.search);
-    if (params.get('imageImport') !== '1') return;
-
-    let payload;
-    try { payload = JSON.parse(sessionStorage.getItem('puddl_image_import') || 'null'); }
-    catch (_) { payload = null; }
-    if (!payload || !Array.isArray(payload.nodes) || !Array.isArray(payload.edges)) return;
-
+  let importing=false;
+  async function importImageMap() {
+    if(importing||document.readyState!=='complete'||!_authUser) return;
+    const params=new URLSearchParams(location.search);
+    if(params.get('imageImport')!=='1') return;
+    importing=true;
     try {
-      nodes.length = 0;
-      edges.length = 0;
-      if (Array.isArray(loops)) loops.length = 0;
-      idCtr = 0;
-
-      const worldLeft = -panX / zoom;
-      const worldTop = -panY / zoom;
-      const worldWidth = W / zoom;
-      const worldHeight = H / zoom;
-      const idMap = new Map();
-
-      payload.nodes.forEach(function (source) {
-        const id = ++idCtr;
-        idMap.set(source.id, id);
-        const centreX = (Number(source.x || 0) + Number(source.width || 80) / 2) / 1000;
-        const centreY = (Number(source.y || 0) + Number(source.height || 80) / 2) / 1000;
-        const node = {
-          id: id,
-          x: worldLeft + worldWidth * (0.1 + centreX * 0.8),
-          y: worldTop + worldHeight * (0.1 + centreY * 0.8),
-          fx: null,
-          fy: null,
-          vx: 0,
-          vy: 0,
-          pinned: true,
-          label: String(source.label || 'Unnamed node'),
-          colour: '#A8D8EA',
-          shape: source.shape === 'rectangle' ? 'rectangle' : 'circle',
-          nodeSize: Number(source.width || 0) > 170 ? 'large' : 'medium',
-          titleSize: 'medium',
-          notes: source.notes || '',
-          videoUrl: '',
-          customFields: {},
-          tags: [],
-          history: [{ ts: Date.now(), text: 'Imported from a hand-drawn photo' }],
-          date: new Date().toISOString().slice(0, 10),
-          type: 'process',
-          lastUpdated: Date.now()
-        };
-        node.fx = node.x;
-        node.fy = node.y;
-        nodes.push(node);
+      const payload=JSON.parse(sessionStorage.getItem('puddl_image_import')||'null');
+      if(!payload||!Array.isArray(payload.nodes)||!payload.nodes.length||!Array.isArray(payload.edges)) throw Error('The photo reading is missing. Return to the photo review page.');
+      const ids=new Map();
+      const iw=Number(payload.imageWidth)||1000,ih=Number(payload.imageHeight)||1000;
+      if(!Number.isFinite(iw)||!Number.isFinite(ih)||iw<=0||ih<=0) throw Error('Invalid photo dimensions.');
+      const scale=Math.min(W/zoom/iw,H/zoom/ih)*0.8;
+      const cx=(W/2-panX)/zoom,cy=(H/2-panY)/zoom;
+      const draftNodes=payload.nodes.map((source,index)=>{
+        if(!source||typeof source.id!=='string'||ids.has(source.id)) throw Error('The reading contains duplicate or invalid nodes.');
+        for(const k of ['x','y','width','height']) if(!Number.isFinite(source[k])||source[k]<0||source[k]>1000) throw Error('The reading contains invalid positions.');
+        const id=index+1;ids.set(source.id,id);
+        const x=cx+((source.x+source.width/2)/1000-0.5)*iw*scale;
+        const y=cy+((source.y+source.height/2)/1000-0.5)*ih*scale;
+        return {id,x,y,pinned:true,label:String(source.label||'Unnamed node'),colour:'#A8D8EA',shape:source.shape==='rectangle'?'rectangle':'circle',nodeSize:source.width>170?'large':'medium',titleSize:'medium',notes:String(source.notes||''),videoUrl:'',customFields:{},tags:[],history:[{ts:Date.now(),text:'Imported from a hand-drawn photo'}],date:new Date().toISOString().slice(0,10),type:'process',lastUpdated:Date.now()};
       });
-
-      payload.edges.forEach(function (source) {
-        let from = idMap.get(source.source);
-        let to = idMap.get(source.target);
-        if (from == null || to == null || from === to) return;
-        let arrow = 'forward';
-        let twoWay = false;
-        if (source.direction === 'target_to_source') { const swap = from; from = to; to = swap; }
-        if (source.direction === 'both') { arrow = 'both'; twoWay = true; }
-        if (source.direction === 'unclear') arrow = 'none';
-        const style = CONNECTION_STYLES.find(function (item) { return item.id === 'moderate'; });
-        edges.push({
-          source: from,
-          target: to,
-          strength: 'moderate',
-          colour: style ? style.colour : '#888888',
-          arrow: arrow,
-          twoWay: twoWay,
-          note: source.notes || '',
-          date: ''
-        });
+      const draftEdges=payload.edges.map(source=>{
+        let from=ids.get(source.source),to=ids.get(source.target);
+        if(from==null||to==null||!['source_to_target','target_to_source','both','unclear'].includes(source.direction)) throw Error('Check the connection endpoints and directions before creating the map.');
+        if(source.direction==='target_to_source') [from,to]=[to,from];
+        const style=CONNECTION_STYLES.find(item=>item.id==='moderate');
+        return {from,to,strength:'moderate',colour:style?style.colour:'#888888',arrow:source.direction==='both'?'both':source.direction==='unclear'?'none':'forward',twoWay:source.direction==='both',note:String(source.notes||''),date:''};
       });
-
-      mapTitle = payload.title || 'Photo map';
-      const title = document.getElementById('header-project-name');
-      if (title) title.textContent = mapTitle;
+      const draft={nodes:draftNodes,edges:draftEdges,mapTitle:String(payload.title||'Photo map'),mapType:'general',currentMapMode:'team'};
+      validateMapSnapshot(draft);
+      if(!await saveBeforeMapChange()) return;
+      _executeReset();
+      restoreSnap(JSON.stringify(draft));
+      const title=document.getElementById('header-project-name');
+      if(title) title.textContent=mapTitle;
+      document.getElementById('who-modal-bg').style.display='none';
+      saveState();markUnsaved();fitAll();
       sessionStorage.removeItem('puddl_image_import');
-      history.length = 0;
-      histIdx = -1;
-      saveState();
-      markUnsaved();
-      buildSim();
-      draw();
-      showStatus('Photo map created. Check it, then add connection strengths.');
-      window.history.replaceState({}, '', location.pathname);
-    } catch (error) {
-      console.error('Could not create map from photo', error);
-      if (typeof showStatus === 'function') showStatus('The photo was read, but the map could not be created.');
-    }
+      showStatus('New photo map created. Check arrow directions, then set connection strengths.');
+      params.delete('imageImport');
+      window.history.replaceState({},'',location.pathname+(params.size?'?'+params.toString():'')+location.hash);
+    } catch(error) {
+      showStatus(error.message||'The photo map could not be created. Your browser recovery copies are available in Your maps.');
+    } finally { importing=false; }
   }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', importImageMap);
-  else setTimeout(importImageMap, 0);
+  window.addEventListener('load',importImageMap);
+  window.addEventListener('puddl-auth-ready',importImageMap);
+  if(document.readyState==='complete') importImageMap();
 })();
