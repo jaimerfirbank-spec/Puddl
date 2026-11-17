@@ -14,7 +14,7 @@ The database grants ten photo reads per active team member in a rolling hour. Th
 
 The prototype continues to simplify ovals to circles and node sizes to Puddle's standard sizes. Connection strengths start at moderate. Its review screen says so; inference of relationship strength is not implemented.
 
-Tests: `node --test tests/*.test.cjs`; browser steps are documented in `tests/README.md`. The browser photo test mocks authentication and provider responses. No accuracy claim is made for the larger drawing that has not yet been supplied.
+Tests: `node --test tests/*.test.cjs`; browser steps are documented in `tests/README.md`. The browser photo test mocks authentication and provider responses. Accuracy observations distinguish synthetic integration checks from the user-reported hand-drawn-map tests below.
 
 ## Staging integration checks, 17 November 2026
 
@@ -27,3 +27,9 @@ Credential fixtures live outside the repository and are not committed. `tests/st
 The hosted Vercel preview completed one real OpenAI image read using a generated test drawing: School → Parents → Library. All three labels and both arrow directions were correct, and the imported 3-node/2-connection map was verified in the staging database. This is an integration check, not an accuracy benchmark for photographed handwriting.
 
 That live run exposed an initialization race: the bridge could consume the import before team lookup finished, causing the saved-maps panel to open over the canvas. Import now waits for explicit account/team readiness, and afterSignIn captures the pending-import intent before asynchronous initialization. A real-staging browser regression verifies that the import saves separately and the maps panel remains closed.
+
+## Handwriting guidance
+
+The user reported correct recognition on a 15-node drawing and on a 30-node/30-connection drawing. A further angled, shadowed photo retained the map structure but flagged an uncertain curly L and read a name beginning with C. These are user-reported results, not an independently captured benchmark.
+
+The upload screen now links to `hand-drawn-map-guide.html`, a printable guide with drawn examples for L/C, I/J, U/V and O/0, plus LOUIS written with an angular L. It recommends separated capitals, clear spacing and arrowheads while preserving actual spelling, accents and punctuation. It explains that naturally curved letters retain their curves and that every reading should be reviewed.
