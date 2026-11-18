@@ -3559,6 +3559,15 @@ function renderInsights(){
     h += grp('most','Most connected',null,
       I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.'));
     h += grp('least','Fewest connections',null, I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') || none('None yet.'));
+    // Stakeholder maps often set arrows too: who pushes influence out, and who takes it.
+    if(MAP_TYPE==='stakeholder'&&I.directedEdges){
+      h += grp('drivers','Driving: most influence out',null,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Arrows point away from these stakeholders - they set the direction others follow.</div>`+
+        (I.drivers.length ? I.drivers.map(n=>row(n,`${I.outDeg.get(n.id)} out`)).join('') : none('No arrows point away from anyone yet.')));
+      h += grp('sinks','Most affected: influence coming in',null,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Arrows point at these stakeholders - they carry what everyone else decides.</div>`+
+        (I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows point at anyone yet.')));
+    }
   }
   h += grp('bridges', MAP_TYPE==='systems' ? 'Choke points' : 'Critical nodes', I.bridges.length,
     `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Removing one ${NOUN[0]} cuts others off.</div>`+
