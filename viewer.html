@@ -3460,7 +3460,7 @@ function renderInsights(){
   let h = I.filtered
     ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--surf-3);font-size:11.5px;"><span><strong>Filtered view:</strong> ${plural(I.pool.length,'person')}</span><button onclick="clearSearch()" style="font-size:10.5px;height:24px;padding:0 8px;">Show full map</button></div>`
     : `<div style="font-size:11.5px;color:var(--ink-h);">Full map: ${plural(I.pool.length,'person')}. Search or filter to look at part of it.</div>`;
-  h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these ${NOUN[1]}. ${plural(I.isolated,'person')} with none.${(MAP_TYPE==='general'||MAP_TYPE==='network')?` ${I.density}% of possible connections exist.`:''}</div>`;
+  h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these ${NOUN[1]}. ${plural(I.isolated,'person')} with none.${MAP_TYPE!=='argument'?` ${I.density}% of possible connections exist.`:''}</div>`;
 
   const S=insightSummaryLines(I);
   if(S.length) h += `<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--ink);background:var(--surf-2);border-radius:6px;font-size:11.5px;line-height:1.55;">${S.map(t=>`<div style="margin:2px 0;">${esc(t)}</div>`).join('')}</div>`;
@@ -3559,27 +3559,36 @@ function renderInsights(){
     h += grp('most','Most connected',null,
       I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.'));
     h += grp('least','Fewest connections',null, I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') || none('None yet.'));
+    // Stakeholder maps often set arrows too: who pushes influence out, and who takes it.
+    if(MAP_TYPE==='stakeholder'&&I.directedEdges){
+      h += grp('drivers','Driving: most influence out',null,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Arrows point away from these stakeholders - they set the direction others follow.</div>`+
+        (I.drivers.length ? I.drivers.map(n=>row(n,`${I.outDeg.get(n.id)} out`)).join('') : none('No arrows point away from anyone yet.')));
+      h += grp('sinks','Most affected: influence coming in',null,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Arrows point at these stakeholders - they carry what everyone else decides.</div>`+
+        (I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows point at anyone yet.')));
+    }
   }
   h += grp('bridges', MAP_TYPE==='systems' ? 'Choke points' : 'Critical nodes', I.bridges.length,
     `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Removing one ${NOUN[0]} cuts others off.</div>`+
     (I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none(`No single ${NOUN[0]} links separate groups.`)));
 
-  if(MAP_TYPE==='general'||MAP_TYPE==='network'){
+  if(MAP_TYPE!=='argument'){
     h += grp('critlinks','Critical links',I.criticalLinks.length,
-      `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">The only connection between two parts of the map - remove it and they split.</div>`+
+      `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'The only route influence can take between two parts of the system - remove it and they split.':'The only connection between two parts of the map - remove it and they split.'}</div>`+
       (I.criticalLinks.length ? I.criticalLinks.map(c=>`<div style="padding:4px 6px;font-size:11.5px;">${esc(c.a.label)} — ${esc(c.b.label)} <span style="color:var(--ink-h);">cuts off ${c.cutOff}</span></div>`).join('') : none('No single connection splits the map.')));
 
     if(I.betweennessCapped){
       h += `<div style="font-size:10.5px;color:var(--ink-h);padding:4px 6px;">Bottleneck score skipped: map has more than 200 ${NOUN[1]}.</div>`;
     } else {
       h += grp('bottleneck','Bottleneck score',null,
-        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Sits on the most paths between everyone else - a pinch point even without being the most connected.</div>`+
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'Sits on the most paths between the other factors - influence has to pass through it.':MAP_TYPE==='stakeholder'?'Sits on the most routes between the other stakeholders - a gatekeeper even without being the most connected.':'Sits on the most paths between everyone else - a pinch point even without being the most connected.'}</div>`+
         (I.topBetweenness.length ? I.topBetweenness.map(n=>row(n,Math.round(I.betweenness.get(n.id)))).join('') : none('No node sits between others on a path.')));
     }
 
     if(I.overloadedHubs.length){
       h += grp('overloaded','Overloaded hubs',I.overloadedHubs.length,
-        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Many arrows in, almost none out - everything piles up here.</div>`+
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='stakeholder'?'Many arrows in, almost none out - demands pile up here.':'Many arrows in, almost none out - everything piles up here.'}</div>`+
         I.overloadedHubs.map(n=>row(n,`${I.inDeg.get(n.id)} in, ${I.outDeg.get(n.id)} out`)).join(''));
     }
   }
