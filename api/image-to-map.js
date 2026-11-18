@@ -95,11 +95,8 @@ export default async function handler(req, res) {
     if(!userResponse.ok) return send(res,401,{error:'Please sign in again before reading a photo.'});
     const user=await userResponse.json();
     if(!user.id) return send(res,401,{error:'Please sign in again.'});
-    const allowance=await fetch(process.env.SUPABASE_URL+'/rest/v1/rpc/consume_photo_read',{
-      method:'POST',headers:{...authHeaders,'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(10000)
-    });
-    if(!allowance.ok) return send(res,503,{error:'Photo reading is temporarily unavailable.'});
-    if(await allowance.json()!==true) { res.setHeader('Retry-After','3600'); return send(res,429,{error:'Your account cannot read another photo right now. Check your subscription or try again in an hour.'}); }
+    // Product usage allowances are still being decided. Keep server-verified
+    // sign-in above, but let every authenticated user reach the paid reader.
     const apiResponse = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
       signal: AbortSignal.timeout(90000),
