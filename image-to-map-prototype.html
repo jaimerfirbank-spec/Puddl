@@ -37,7 +37,9 @@ function clearError(){$('error').classList.add('hidden');$('error').textContent=
 $('file').addEventListener('change',()=>{cancelReading();chosen=$('file').files&&$('file').files[0]||null;$('read').disabled=!chosen;clearError();$('result').classList.add('hidden');setStatus(chosen?chosen.name:'Choose a photo.')});
 $('clear').addEventListener('click',()=>{cancelReading();chosen=null;$('file').value='';$('read').disabled=true;$('result').classList.add('hidden');clearError();setStatus('Choose a photo.')});
 function loadImage(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),image=new Image();image.onload=()=>{URL.revokeObjectURL(url);resolve(image)};image.onerror=()=>{URL.revokeObjectURL(url);reject(Error('This photo could not be opened. Use JPG, PNG or WebP.'))};image.src=url})}
-async function prepareImage(file){if(file.size>25*1024*1024)throw Error('Choose a photo smaller than 25 MB.');const image=await loadImage(file),maxSide=2000,scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*scale);canvas.height=Math.round(image.naturalHeight*scale);const context=canvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/jpeg',.86)}
+async function prepareImage(file){if(file.size>25*1024*1024)throw Error('Choose a photo smaller than 25 MB.');const image=await loadImage(file),maxSide=2000,scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*scale);canvas.height=Math.round(image.naturalHeight*scale);const context=canvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);return {image:canvas.toDataURL('image/jpeg',.86),canvas}}
+function zoomRegions(data){const regions=[{x:0,y:0,width:620,height:620},{x:380,y:0,width:620,height:620},{x:0,y:380,width:620,height:620},{x:380,y:380,width:620,height:620}],degree=new Map();data.edges.forEach(edge=>{degree.set(edge.source,(degree.get(edge.source)||0)+1);degree.set(edge.target,(degree.get(edge.target)||0)+1)});const ranked=data.nodes.map(node=>{const cx=node.x+node.width/2,cy=node.y+node.height/2,nearby=data.nodes.filter(other=>Math.abs(other.x+other.width/2-cx)<230&&Math.abs(other.y+other.height/2-cy)<230).length;return {cx,cy,score:nearby+(degree.get(node.id)||0)*2}}).sort((a,b)=>b.score-a.score),chosen=[];for(const hub of ranked){if(chosen.some(item=>Math.hypot(item.cx-hub.cx,item.cy-hub.cy)<220))continue;chosen.push(hub);const width=500,height=540,x=Math.max(0,Math.min(1000-width,Math.round(hub.cx-width/2))),y=Math.max(0,Math.min(1000-height,Math.round(hub.cy-height/2)));regions.push({x,y,width,height});if(chosen.length===2)break}return regions}
+function createZoomCrops(canvas,data){const crops=[],limit=3350000;let total=0;for(const region of zoomRegions(data)){const sx=Math.round(region.x/1000*canvas.width),sy=Math.round(region.y/1000*canvas.height),sw=Math.max(1,Math.round(region.width/1000*canvas.width)),sh=Math.max(1,Math.round(region.height/1000*canvas.height)),scale=Math.min(1,1000/Math.max(sw,sh)),cropCanvas=document.createElement('canvas');cropCanvas.width=Math.max(1,Math.round(sw*scale));cropCanvas.height=Math.max(1,Math.round(sh*scale));const context=cropCanvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,cropCanvas.width,cropCanvas.height);context.drawImage(canvas,sx,sy,sw,sh,0,0,cropCanvas.width,cropCanvas.height);const image=cropCanvas.toDataURL('image/jpeg',.72);if(total+image.length>limit)continue;total+=image.length;crops.push({...region,image})}return crops}
 function confidenceClass(value){return value>=70?'good':'low'}
 function addCell(row,text,className){const cell=document.createElement('td');cell.textContent=String(text);if(className)cell.className=className;row.appendChild(cell)}
 function addInputCell(row,value,onchange,options){const cell=document.createElement('td');let input;if(options){input=document.createElement('select');options.forEach(option=>{const item=document.createElement('option'),optionValue=typeof option==='object'?option.value:option,optionLabel=typeof option==='object'?option.label:option;item.value=optionValue;item.textContent=optionLabel;item.selected=optionValue===value;input.appendChild(item)})}else{input=document.createElement('input');input.type='text';input.value=value}input.style.cssText='width:100%;min-width:90px;padding:7px;border:1px solid #cbd5e1;border-radius:7px;font:inherit';input.addEventListener('change',()=>onchange(input.value));cell.appendChild(input);row.appendChild(cell)}
@@ -74,15 +76,29 @@ $('read').addEventListener('click',async()=>{
     if(!session)throw Error('Sign in to Puddle in another tab, then return here and try again.');
     if(request!==requestNumber)return;
     setStatus('Preparing photo…');
-    const image=await prepareImage(file);
+    const prepared=await prepareImage(file),image=prepared.image;
     if(request!==requestNumber)return;
     previewUrl=image;
-    setStatus('AI is reading nodes, then tracing each connection… This may take a little longer.');
-    const response=await fetch('/api/image-to-map',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({image}),signal});
+    setStatus('AI is locating nodes and making a first connection pass…');
+    const headers={'Content-Type':'application/json',Authorization:'Bearer '+session.access_token};
+    const response=await fetch('/api/image-to-map',{method:'POST',headers,body:JSON.stringify({phase:'initial',image}),signal});
     const body=await response.json();
     if(request!==requestNumber)return;
     if(!response.ok)throw Error(body.error||'The photo reader failed.');
-    render(image,body.result);setStatus('Finished. Check names, connections and arrow directions.');
+    let result=body.result;
+    if(result.nodes.length){
+      setStatus('AI is zooming into overlapping regions and tracing crowded connections…');
+      const crops=createZoomCrops(prepared.canvas,result);
+      if(crops.length){
+        try{
+          const zoomResponse=await fetch('/api/image-to-map',{method:'POST',headers,body:JSON.stringify({phase:'zoom_connections',result,crops}),signal}),zoomBody=await zoomResponse.json();
+          if(request!==requestNumber)return;
+          if(!zoomResponse.ok)throw Error(zoomBody.error||'The close-up connection check failed.');
+          result=zoomBody.result;
+        }catch(error){if(error.name==='AbortError')throw error;result.warnings.push('The close-up connection check could not finish; review the first-pass connections carefully.')}
+      }
+    }
+    render(image,result);setStatus('Finished. Check names, connections and arrow directions.');
   }catch(error){
     if(request!==requestNumber||error.name==='AbortError')return;
     showError(error.message||'The photo reader failed.');setStatus('Could not finish.');

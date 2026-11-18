@@ -1,4 +1,5 @@
 const MAX_IMAGE_CHARS = 4_000_000;
+const MAX_ZOOM_IMAGE_CHARS = 3_500_000;
 
 const schema = {
   type: 'object',
@@ -69,12 +70,12 @@ Rules:
 - Do not invent lines that are not visible. Put doubtful details in warnings and lower confidence.
 - Return empty arrays if the image is not a map.`;
 
-const connectionInstructions = `You are performing a second, connections-only inspection of a hand-drawn systems map.
+const connectionInstructions = `You are performing a connections-only inspection of close-up crops from a hand-drawn systems map.
 The nodes have already been detected and their ids, labels, and boxes are supplied. Do not add, rename, merge, or remove nodes.
 
-Inspect every supplied node one at a time:
+Inspect every crop and every supplied node visible in it:
 - Look around the full outline for every line that touches or clearly enters/leaves it.
-- Follow each line through crossings until it reaches another supplied node. A crossing without a marked junction is not a connection to the crossing line.
+- Follow each line through crossings until it reaches another supplied node. Lines may leave a crop and continue in an overlapping crop. A crossing without a marked junction is not a connection to the crossing line.
 - Return every visible connection, including connections already found by an earlier pass.
 - If endpoints are visible but arrow direction is not, return direction unclear with confidence below 70 rather than omitting the connection.
 - If a crowded crossing leaves two plausible routes, return the most visually supported endpoint with low confidence and explain the ambiguity in notes.
@@ -179,15 +180,35 @@ function validFocusedConnections(result, ids) {
   );
 }
 
+function isImage(value) {
+  return typeof value === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(value);
+}
+
+function validZoomCrop(crop) {
+  return crop && isImage(crop.image) && ['x', 'y', 'width', 'height'].every(key =>
+    Number.isInteger(crop[key]) && crop[key] >= 0 && crop[key] <= 1000
+  ) && crop.width > 0 && crop.height > 0 && crop.x + crop.width <= 1000 && crop.y + crop.height <= 1000;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return send(res, 405, { error: 'Use POST.' });
   if (!process.env.OPENAI_API_KEY||!process.env.SUPABASE_URL||!process.env.SUPABASE_ANON_KEY) return send(res, 503, { error: 'The photo reader is not configured yet.' });
 
+  const phase = req.body && req.body.phase === 'zoom_connections' ? 'zoom_connections' : 'initial';
   const image = req.body && req.body.image;
-  if (typeof image !== 'string' || !/^data:image\/(jpeg|png|webp);base64,/.test(image)) {
-    return send(res, 400, { error: 'Please upload a JPG, PNG, or WebP image.' });
+  const baseResult = req.body && req.body.result;
+  const crops = req.body && req.body.crops;
+  if (phase === 'initial') {
+    if (!isImage(image)) return send(res, 400, { error: 'Please upload a JPG, PNG, or WebP image.' });
+    if (image.length > MAX_IMAGE_CHARS) return send(res, 413, { error: 'The image is too large. Please use a smaller photo.' });
+  } else {
+    if (!validGraph(baseResult) || !Array.isArray(crops) || crops.length < 1 || crops.length > 8 || !crops.every(validZoomCrop)) {
+      return send(res, 400, { error: 'The close-up connection request was incomplete.' });
+    }
+    if (crops.reduce((total, crop) => total + crop.image.length, 0) > MAX_ZOOM_IMAGE_CHARS) {
+      return send(res, 413, { error: 'The close-up images are too large. Please try a smaller photo.' });
+    }
   }
-  if (image.length > MAX_IMAGE_CHARS) return send(res, 413, { error: 'The image is too large. Please use a smaller photo.' });
 
   const token=req.headers.authorization;
   if(typeof token!=='string'||!/^Bearer \S+$/.test(token)) return send(res,401,{error:'Sign in to Puddle before reading a photo.'});
@@ -199,6 +220,51 @@ export default async function handler(req, res) {
     if(!user.id) return send(res,401,{error:'Please sign in again.'});
     // Product usage allowances are still being decided. Keep server-verified
     // sign-in above, but let every authenticated user reach the paid reader.
+    if (phase === 'zoom_connections') {
+      if (!baseResult.nodes.length) return send(res, 200, { result: baseResult });
+      const nodeGuide = baseResult.nodes.map(node => ({
+        id: node.id,
+        label: node.label,
+        box: [node.x, node.y, node.width, node.height]
+      }));
+      const content = [{
+        type: 'input_text',
+        text: 'Trace connections using these overlapping crops. Node boxes and crop bounds use the same 0-1000 full-image grid.\nNODES:\n' + JSON.stringify(nodeGuide)
+      }];
+      crops.forEach((crop, index) => {
+        const visibleNodes = nodeGuide.filter(node => {
+          const cx = node.box[0] + node.box[2] / 2, cy = node.box[1] + node.box[3] / 2;
+          return cx >= crop.x && cx <= crop.x + crop.width && cy >= crop.y && cy <= crop.y + crop.height;
+        }).map(node => node.id);
+        content.push({
+          type: 'input_text',
+          text: `CROP ${index + 1}: full-image bounds [${crop.x},${crop.y},${crop.width},${crop.height}]. Visible node ids: ${visibleNodes.join(', ') || 'none centred in crop'}.`
+        });
+        content.push({ type: 'input_image', image_url: crop.image, detail: 'high' });
+      });
+      const focused = await readWithOpenAI({
+        model: 'gpt-6.1-terra',
+        store: false,
+        reasoning: { effort: 'low' },
+        instructions: connectionInstructions,
+        input: [{ role: 'user', content }],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'puddl_zoom_connection_pass',
+            description: 'Directed and uncertain connections found across overlapping close-up crops.',
+            strict: true,
+            schema: connectionSchema
+          }
+        }
+      }, 120000);
+      const ids = new Set(baseResult.nodes.map(node => node.id));
+      if (!validFocusedConnections(focused, ids)) return send(res, 502, { error: 'The close-up connection reading was incomplete.' });
+      baseResult.edges = mergeEdges(baseResult.edges, focused.edges);
+      baseResult.warnings = [...new Set([...baseResult.warnings, ...focused.warnings])];
+      return send(res, 200, { result: baseResult });
+    }
+
     const result = await readWithOpenAI({
         model: 'gpt-6.1-terra',
         store: false,
@@ -222,48 +288,6 @@ export default async function handler(req, res) {
         }
       });
     if(!validGraph(result)) return send(res,502,{error:'The photo reading was incomplete. Try a clearer photo.'});
-    if (!result.nodes.length) return send(res, 200, { result });
-
-    const nodeGuide = result.nodes.map(node => ({
-      id: node.id,
-      label: node.label,
-      box: [node.x, node.y, node.width, node.height]
-    }));
-    try {
-      const focused = await readWithOpenAI({
-        model: 'gpt-6.1-terra',
-        store: false,
-        reasoning: { effort: 'low' },
-        instructions: connectionInstructions,
-        input: [{
-          role: 'user',
-          content: [
-            { type: 'input_text', text: 'Trace connections for every node in this list. Boxes are [x, y, width, height] on a 0-1000 image grid.\n' + JSON.stringify(nodeGuide) },
-            { type: 'input_image', image_url: image, detail: 'high' }
-          ]
-        }],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'puddl_connection_pass',
-            description: 'Directed and uncertain connections found during a node-by-node inspection.',
-            strict: true,
-            schema: connectionSchema
-          }
-        }
-      }, 120000);
-      const ids = new Set(result.nodes.map(node => node.id));
-      if (validFocusedConnections(focused, ids)) {
-        result.edges = mergeEdges(result.edges, focused.edges);
-        result.warnings = [...new Set([...result.warnings, ...focused.warnings])];
-      } else {
-        result.warnings.push('The focused connection check returned incomplete data; review the first-pass connections carefully.');
-      }
-    } catch (error) {
-      console.error('image-to-map connection pass failed', error.name || 'Error');
-      result.warnings.push('The focused connection check could not finish; review the first-pass connections carefully.');
-    }
-
     return send(res, 200, { result });
   } catch (error) {
     console.error('image-to-map failed', error.name||'Error');
