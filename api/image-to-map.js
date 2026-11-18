@@ -108,10 +108,10 @@ function responseText(responseBody) {
     .join('');
 }
 
-async function readWithOpenAI(body) {
+async function readWithOpenAI(body, timeoutMs = 90000) {
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
-    signal: AbortSignal.timeout(90000),
+    signal: AbortSignal.timeout(timeoutMs),
     headers: {
       Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
       'Content-Type': 'application/json'
@@ -233,7 +233,7 @@ export default async function handler(req, res) {
       const focused = await readWithOpenAI({
         model: 'gpt-6.1-terra',
         store: false,
-        reasoning: { effort: 'medium' },
+        reasoning: { effort: 'low' },
         instructions: connectionInstructions,
         input: [{
           role: 'user',
@@ -251,7 +251,7 @@ export default async function handler(req, res) {
             schema: connectionSchema
           }
         }
-      });
+      }, 120000);
       const ids = new Set(result.nodes.map(node => node.id));
       if (validFocusedConnections(focused, ids)) {
         result.edges = mergeEdges(result.edges, focused.edges);
