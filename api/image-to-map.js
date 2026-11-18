@@ -227,41 +227,49 @@ export default async function handler(req, res) {
         label: node.label,
         box: [node.x, node.y, node.width, node.height]
       }));
-      const content = [{
-        type: 'input_text',
-        text: 'Trace connections using these overlapping crops. Node boxes and crop bounds use the same 0-1000 full-image grid.\nNODES:\n' + JSON.stringify(nodeGuide)
-      }];
-      crops.forEach((crop, index) => {
-        const visibleNodes = nodeGuide.filter(node => {
-          const cx = node.box[0] + node.box[2] / 2, cy = node.box[1] + node.box[3] / 2;
-          return cx >= crop.x && cx <= crop.x + crop.width && cy >= crop.y && cy <= crop.y + crop.height;
-        }).map(node => node.id);
-        content.push({
-          type: 'input_text',
-          text: `CROP ${index + 1}: full-image bounds [${crop.x},${crop.y},${crop.width},${crop.height}]. Visible node ids: ${visibleNodes.join(', ') || 'none centred in crop'}.`
-        });
-        content.push({ type: 'input_image', image_url: crop.image, detail: 'high' });
-      });
-      const focused = await readWithOpenAI({
-        model: 'gpt-6.1-terra',
-        store: false,
-        reasoning: { effort: 'low' },
-        instructions: connectionInstructions,
-        input: [{ role: 'user', content }],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'puddl_zoom_connection_pass',
-            description: 'Directed and uncertain connections found across overlapping close-up crops.',
-            strict: true,
-            schema: connectionSchema
-          }
-        }
-      }, 120000);
       const ids = new Set(baseResult.nodes.map(node => node.id));
-      if (!validFocusedConnections(focused, ids)) return send(res, 502, { error: 'The close-up connection reading was incomplete.' });
-      baseResult.edges = mergeEdges(baseResult.edges, focused.edges);
-      baseResult.warnings = [...new Set([...baseResult.warnings, ...focused.warnings])];
+      const batches = [];
+      for (let index = 0; index < crops.length; index += 2) batches.push(crops.slice(index, index + 2));
+      const batchResults = await Promise.allSettled(batches.map(async (batch, batchIndex) => {
+        const content = [{
+          type: 'input_text',
+          text: 'Exhaustively trace every connection visible in these two overlapping close-ups. Do not stop after the obvious lines. Node boxes and crop bounds use the same 0-1000 full-image grid.\nNODES:\n' + JSON.stringify(nodeGuide)
+        }];
+        batch.forEach((crop, cropIndex) => {
+          const visibleNodes = nodeGuide.filter(node => {
+            const cx = node.box[0] + node.box[2] / 2, cy = node.box[1] + node.box[3] / 2;
+            return cx >= crop.x && cx <= crop.x + crop.width && cy >= crop.y && cy <= crop.y + crop.height;
+          }).map(node => node.id);
+          content.push({
+            type: 'input_text',
+            text: `CROP ${batchIndex * 2 + cropIndex + 1}: full-image bounds [${crop.x},${crop.y},${crop.width},${crop.height}]. Visible node ids: ${visibleNodes.join(', ') || 'none centred in crop'}.`
+          });
+          content.push({ type: 'input_image', image_url: crop.image, detail: 'high' });
+        });
+        return readWithOpenAI({
+          model: 'gpt-6.1-terra',
+          store: false,
+          reasoning: { effort: 'low' },
+          instructions: connectionInstructions,
+          input: [{ role: 'user', content }],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'puddl_zoom_connection_pass',
+              description: 'Directed and uncertain connections found in a pair of overlapping close-up crops.',
+              strict: true,
+              schema: connectionSchema
+            }
+          }
+        }, 120000);
+      }));
+      const successful = batchResults.filter(item => item.status === 'fulfilled' && validFocusedConnections(item.value, ids)).map(item => item.value);
+      if (!successful.length) return send(res, 502, { error: 'The close-up connection reading was incomplete.' });
+      const focusedEdges = successful.reduce((all, item) => mergeEdges(all, item.edges), []);
+      baseResult.edges = mergeEdges(baseResult.edges, focusedEdges);
+      const zoomWarnings = successful.flatMap(item => item.warnings);
+      if (successful.length < batches.length) zoomWarnings.push('One close-up region could not be read; check that area carefully.');
+      baseResult.warnings = [...new Set([...baseResult.warnings, ...zoomWarnings])];
       return send(res, 200, { result: baseResult });
     }
 
