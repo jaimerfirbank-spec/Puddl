@@ -1063,6 +1063,7 @@ body.share-mode #present-exit{display:none !important;}
 #icon-picker-grid button:hover{background:var(--acc,#3B82F6);border-color:transparent;color:#fff;}
 </style>
 <!-- Supabase Auth -->
+<script src="/api/client-config"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -1107,6 +1108,7 @@ body.share-mode #present-exit{display:none !important;}
       <div class="dd-menu" id="menu-import">
         <button onclick="openImportModal();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg> Spreadsheet</button>
         <button onclick="openPuddlImportModal();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg> Puddle map</button>
+        <button onclick="location.href='image-to-map-prototype.html';closeMenus()" title="Turn a clear hand-drawn map photo into editable nodes and connections"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 15l-5-4-6 6-3-2-4 3"/></svg> Hand-drawn photo</button>
       </div>
     </div>
     <div class="dd-wrap">
@@ -13055,11 +13057,12 @@ document.addEventListener('click',function(e){
 <!-- Supabase Auth Logic -->
 <script>
 // Initialize Supabase
-const SUPABASE_URL = 'https://amjkbkbmqpaifqurzozg.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_cEmd4G8xYwwUEqOZSV9jsA_bO4vh6gG';
+const SUPABASE_URL = window.PUDDLE_CONFIG?.supabaseUrl || (location.hostname==='puddl.vercel.app'?'https://amjkbkbmqpaifqurzozg.supabase.co':'');
+const SUPABASE_ANON_KEY = window.PUDDLE_CONFIG?.supabaseKey || (location.hostname==='puddl.vercel.app'?'sb_publishable_cEmd4G8xYwwUEqOZSV9jsA_bO4vh6gG':'');
 
 let supabaseClient = null;
 let _authUser = null;
+let _cloudAuthInitialized=false;
 
 // Supabase sends invited people, and anyone resetting a password, back here
 // with a one-time token in the URL fragment. supabase-js consumes that
@@ -13117,7 +13120,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
 
 // Try to initialize Supabase client
 try {
-  if (window.supabase && window.supabase.createClient) {
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase && window.supabase.createClient) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   } else {
     console.error('Supabase library not loaded');
@@ -13623,9 +13626,16 @@ async function cloudRenameMap(id, title){
 // already have saved. Someone with nothing saved falls through to the normal
 // "name your project" splash.
 async function afterSignIn(){
+  const photoImportPending=new URLSearchParams(location.search).get('imageImport')==='1';
+  _cloudAuthInitialized=false;
   const ok = await cloudInit();
+  _cloudAuthInitialized=true;
   const btn = document.getElementById('btn-my-maps');
   if (btn) btn.style.display = '';
+  if(photoImportPending){
+    window.dispatchEvent(new Event('puddl-auth-ready'));
+    return;
+  }
   if (!ok) { if(listRecoveryCopies().length) openMyMaps(); return; }
   try {
     const maps = await cloudListMaps();
@@ -13782,5 +13792,6 @@ if (document.readyState === 'loading') {
   setTimeout(addLogoutButton, 1000);
 }
 </script>
+<script src="image-to-map-bridge.js"></script>
 </body>
 </html>
