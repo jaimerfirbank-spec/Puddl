@@ -1078,6 +1078,7 @@ body.share-mode #present-exit{display:none !important;}
 #icon-picker-grid button:hover{background:var(--acc,#3B82F6);border-color:transparent;color:#fff;}
 </style>
 <!-- Supabase Auth -->
+<script src="/api/client-config"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -1122,6 +1123,8 @@ body.share-mode #present-exit{display:none !important;}
       <div class="dd-menu" id="menu-import">
         <button onclick="openImportModal();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg> Spreadsheet</button>
         <button onclick="openPuddlImportModal();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M12 3v12"/><polyline points="7 10 12 15 17 10"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg> Puddle map</button>
+        <button onclick="location.href='image-to-map-prototype.html';closeMenus()" title="Turn a clear hand-drawn map photo into editable nodes and connections"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 15l-5-4-6 6-3-2-4 3"/></svg> Hand-drawn photo</button>
+        <button onclick="location.href='/lens/inbox.html';closeMenus()" title="Review photos sent from your phone">Puddle Lens · Photo inbox</button>
       </div>
     </div>
     <div class="dd-wrap">
@@ -3023,7 +3026,7 @@ function edgeAt(sx,sy){
 }
 
 // ── History ───────────────────────────────────────────────────────────────────
-function snap(){
+function snap(includeVersions=true){
   // Save personal maps into snapshot too
   if(currentUser&&currentMapMode==='personal'){
     personalMaps[currentUser]={
@@ -3035,6 +3038,9 @@ function snap(){
   return JSON.stringify({
     nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
     edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false})),
+    bgImageData:document.getElementById('bg-image-data')?.textContent||'',
+    namedVersions:includeVersions?namedVersions:[],
+
     colourLegendMap,
     categories:CATEGORIES,
     centralEventLabel,
@@ -3078,9 +3084,36 @@ function updateHistBtns(){
   document.getElementById('btn-undo').disabled=histIdx<=0;
   document.getElementById('btn-redo').disabled=histIdx>=history.length-1;
 }
+function validateMapSnapshot(d){
+  if(!d||!Array.isArray(d.nodes)||!Array.isArray(d.edges)) throw new Error('Invalid map data.');
+  const ids=new Set();
+  const safeColour=value=>value==null||value===''||/^(#[0-9a-f]{3,8}|[a-z]+|rgba?\([\d.,%\s]+\))$/i.test(String(value));
+  for(const n of d.nodes){
+    if(!n||!Number.isSafeInteger(n.id)||ids.has(n.id)||!Number.isFinite(n.x)||!Number.isFinite(n.y)) throw new Error('Invalid or duplicate node.');
+    if(!safeColour(n.colour)) throw new Error('Invalid node colour.');
+    ids.add(n.id);
+  }
+  for(const e of d.edges){
+    if(!e||!ids.has(e.from)||!ids.has(e.to)) throw new Error('A connection refers to a missing node.');
+    if(!safeColour(e.colour)) throw new Error('Invalid connection colour.');
+  }
+  for(const key of ['loops','categories','connectionStyles','presentationStops','savedPresentations','namedVersions','fieldDefs']){
+    if(d[key]!==undefined&&!Array.isArray(d[key])) throw new Error('Invalid map '+key+'.');
+  }
+  // These IDs become control IDs and handler arguments in older settings UI.
+  for(const key of ['categories','connectionStyles','fieldDefs']){
+    for(const item of d[key]||[]){
+      if(!item||!/^[-\w]+$/.test(String(item.id))||item.id==null) throw new Error('Invalid settings identifier.');
+      if(!safeColour(item.colour)) throw new Error('Invalid settings colour.');
+    }
+  }
+  return d;
+}
 function restoreSnap(s){
+  const d=validateMapSnapshot(JSON.parse(s));
+  const previousSkipSave=skipSave;
   skipSave=true;
-  const d=JSON.parse(s);
+  try {
   nodes=d.nodes.map(n=>({...n,vx:0,vy:0,fx:n.x,fy:n.y,tags:n.tags||[],history:n.history||[]}));
   edges=d.edges.map(e => {
     const isLoop = e.isLoop||e.strength==='loop';
@@ -3108,6 +3141,8 @@ function restoreSnap(s){
   if(d.loops) loops=d.loops; else loops=[];
   if(d.loopConnectionStyle) LOOP_CONNECTION_STYLE={...LOOP_CONNECTION_STYLE,...d.loopConnectionStyle};
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
+  namedVersions=Array.isArray(d.namedVersions)?d.namedVersions:[];
+  restoreBackground(d.bgImageData||'');
   presentationStops=d.presentationStops||[];
   savedPresentations=Array.isArray(d.savedPresentations)?d.savedPresentations:[];
   presMapOnly=!!d.presMapOnly;
@@ -3142,7 +3177,7 @@ function restoreSnap(s){
   rebuildTagList(); rebuildCatFilter(); rebuildAreaFilter(); updateColourLegend();
   buildSim();
   applyFilters();
-  skipSave=false;
+  } finally { skipSave=previousSkipSave; }
 }
 function undo(){
   if(histIdx<=0)return;
@@ -3152,9 +3187,10 @@ function undo(){
   // Hide undo-separate button only when there's nothing left to undo
   const usb=document.getElementById('btn-undo-separate');
   if(usb) usb.style.display=histIdx<=0?'none':'';
+  markUnsaved();
   showStatus('Undone.');
 }
-function redo(){if(histIdx>=history.length-1)return;histIdx++;restoreSnap(history[histIdx]);updateHistBtns();showStatus('Redone.');}
+function redo(){if(histIdx>=history.length-1)return;histIdx++;restoreSnap(history[histIdx]);updateHistBtns();markUnsaved();showStatus('Redone.');}
 
 // ── Adapt a hex colour for dark-mode canvas rendering (boosts lightness to ≥72%) ──
 // Relative luminance of a hex colour (0 = black, 1 = white); null if not a hex colour
@@ -4445,7 +4481,7 @@ function buildSearchSuggestions(){
     const col=n.colour||'#ddd';
     return `<div onclick="selectSearchSuggestion('${n.id}')" style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;font-size:12px;color:var(--ink);border-bottom:1px solid var(--bdr);" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''">
       <span style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block;"></span>
-      <span>${n.label}</span>
+      <span>${escHtml(n.label)}</span>
       ${n.colourLabel?`<span style="margin-left:auto;font-size:10px;color:var(--ink-h);">${n.colourLabel}</span>`:''}
     </div>`;
   }).join('');
@@ -5622,14 +5658,14 @@ function handlePuddlImportFile(file){
     const snapEl=doc.getElementById('puddl-saved-state');
     const raw=snapEl&&snapEl.textContent.trim();
     if(!raw){ showStatus('No Puddle map data found in this file'); return; }
-    try{ _puddlImportSnap=JSON.parse(raw); }catch(e){ showStatus('Map data is corrupted'); return; }
+    try{ _puddlImportSnap=validateMapSnapshot(JSON.parse(raw)); }catch(e){ showStatus('Map data is corrupted'); return; }
     const nc=(_puddlImportSnap.nodes||[]).length;
     const ec=(_puddlImportSnap.edges||[]).length;
     const lc=(_puddlImportSnap.loops||[]).length;
     const title=_puddlImportSnap.mapTitle||file.name;
     document.getElementById('puddl-import-file-info').textContent='📄 '+file.name;
     document.getElementById('puddl-import-file-info').style.display='block';
-    let preview='<strong>'+title+'</strong><br>'+nc+' node'+(nc!==1?'s':'')+' · '+ec+' connection'+(ec!==1?'s':'');
+    let preview='<strong>'+escHtml(title)+'</strong><br>'+nc+' node'+(nc!==1?'s':'')+' · '+ec+' connection'+(ec!==1?'s':'');
     if(lc) preview+=' · '+lc+' loop'+(lc!==1?'s':'');
     document.getElementById('puddl-import-preview').innerHTML=preview;
     document.getElementById('puddl-import-preview').style.display='block';
@@ -6907,7 +6943,7 @@ function populateEdgePopupStyles() {
   if(!select) return;
   
   select.innerHTML = offeredConnectionStyles().map(style => 
-    `<option value="${style.id}">${style.label}</option>`
+    `<option value="${style.id}">${escHtml(style.label)}</option>`
   ).join('');
 }
 
@@ -6916,7 +6952,7 @@ function populateConnectionFilterChips() {
   if(!container) return;
   
   container.innerHTML = offeredConnectionStyles().map(style => 
-    `<span class="ms-chip" onclick="toggleMsChip(this,'conn-type-filter','${style.id}')">${style.label}</span>`
+    `<span class="ms-chip" onclick="toggleMsChip(this,'conn-type-filter','${style.id}')">${escHtml(style.label)}</span>`
   ).join('');
 }
 
@@ -7292,7 +7328,7 @@ function buildCategoryGrid(){
   cats.forEach(cat=>{
     const btn=document.createElement('button');
     btn.style.cssText=`display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:7px;border:1.5px solid ${selectedCatId===cat.id?cat.colour:'var(--bdr-m)'};background:${selectedCatId===cat.id?cat.colour+'28':'var(--surf)'};color:var(--ink);font-size:11px;font-weight:${selectedCatId===cat.id?'600':'400'};cursor:pointer;text-align:left;transition:all .12s;`;
-    btn.innerHTML=`<span style="width:10px;height:10px;border-radius:50%;background:${cat.colour};flex-shrink:0;display:inline-block;"></span>${cat.label}`;
+    btn.innerHTML=`<span style="width:10px;height:10px;border-radius:50%;background:${cat.colour};flex-shrink:0;display:inline-block;"></span>${escHtml(cat.label)}`;
     btn.onclick=()=>{ selectedCatId=cat.id; buildCategoryGrid(); if(currentMapMode==='personal') showPersonalSubFields(cat.id); };
     grid.appendChild(btn);
   });
@@ -7500,7 +7536,7 @@ function renderNodeView(n, isCentre){
 
   const vp=document.getElementById('modal-view-content');
   const shapeLabels={circle:'Circle',square:'Square',rectangle:'Wide',diamond:'Diamond',triangle:'Triangle',hexagon:'Hexagon',pill:'Pill',star:'Star'};
-  let html=`<div style="font-size:20px;font-weight:600;color:var(--ink);margin-bottom:12px;">${n.label}</div>`;
+  let html=`<div style="font-size:20px;font-weight:600;color:var(--ink);margin-bottom:12px;">${escHtml(n.label)}</div>`;
   html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">`;
   html+=`<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${n.colour||'#ccc'};flex-shrink:0;"></span>`;
   html+=`<span style="font-size:12px;color:var(--ink-2);">${shapeLabels[n.shape||'circle']||n.shape||'Circle'}${argPartOf(n)?' · '+argPartOf(n).label:''}</span>`;
@@ -7576,6 +7612,7 @@ function deleteModalNode(){
 }
 
 // ── Map fields: user-named extra boxes on every node ────────────────────────
+function safeMapColour(value,fallback='#888888'){ return /^#[0-9a-f]{3,8}$/i.test(String(value))?value:fallback; }
 function escHtml(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function _fieldKey(name){ return String(name||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
 function findFieldByName(name){ const k=_fieldKey(name); return k?FIELD_DEFS.find(f=>_fieldKey(f.name)===k)||null:null; }
@@ -8234,7 +8271,7 @@ function renderCatEditList(){
     row.innerHTML=`
       <input type="color" value="${cat.colour}" onchange="${listRef}[${i}].colour=this.value;renderCatEditList();"
         style="width:28px;height:28px;border:1.5px solid var(--bdr-m);border-radius:6px;cursor:pointer;padding:2px;flex-shrink:0;">
-      <input type="text" value="${cat.label}" onchange="${listRef}[${i}].label=this.value;"
+      <input type="text" value="${escHtml(cat.label)}" onchange="${listRef}[${i}].label=this.value;"
         style="flex:1;height:28px;font-size:12px;">
       <select onchange="${listRef}[${i}].type=this.value;"
         style="height:28px;font-size:11px;border-radius:6px;border:1.5px solid var(--bdr-m);padding:0 6px;background:var(--surf);font-family:inherit;color:var(--txt);outline:none;">
@@ -8438,7 +8475,7 @@ function renderConnectionTypeList(){
       <button onclick="pickAndConfirmConn('${style.id}')" id="ctype-${style.id}" style="display:flex;align-items:center;gap:12px;padding:9px 12px;text-align:left;border-radius:var(--radius);${isSelected ? 'background:var(--surf-3);border-color:var(--ink);' : ''}">
         ${renderConnectionStyleIcon(style)}
         <div>
-          <div style="font-size:12px;font-weight:600;">${style.label}</div>
+          <div style="font-size:12px;font-weight:600;">${escHtml(style.label)}</div>
         </div>
       </button>
     `;
@@ -8455,7 +8492,7 @@ function renderEdgeStyleList(currentStrength){
       <button onclick="pickEdgeStyle('${style.id}')" style="display:flex;align-items:center;gap:12px;padding:8px 10px;text-align:left;border-radius:var(--radius);width:100%;${isSelected?'background:var(--surf-3);border-color:var(--ink);':''}">
         ${renderConnectionStyleIcon(style)}
         <div>
-          <div style="font-size:12px;font-weight:600;">${style.label}</div>
+          <div style="font-size:12px;font-weight:600;">${escHtml(style.label)}</div>
         </div>
       </button>`;
   }).join('') + _moreStylesBtn('renderEdgeStyleList(window._edgeListCur)');
@@ -8652,7 +8689,7 @@ function buildSummaryReport(){
       ${isolated.length>0?`<span class="report-stat warn">${isolated.length} isolated</span>`:''}
     </div>
     ${centreNode?`<div class="report-row"><strong style="color:var(--navy);">Central node:</strong> ${centreNode.label}</div>`:''}
-    <div class="report-row"><strong>Map:</strong> ${mapTitle}</div>
+    <div class="report-row"><strong>Map:</strong> ${escHtml(mapTitle)}</div>
     <div class="report-row"><strong>Mode:</strong> ${currentMapMode.charAt(0).toUpperCase()+currentMapMode.slice(1)} map</div>
   </div>`;
 
@@ -8679,7 +8716,7 @@ function buildSummaryReport(){
       html+=`<div class="report-row">
         <div class="report-node-dot" style="background:${col};"></div>
         <div style="flex:1;">
-          <div style="font-weight:600;color:var(--navy);">${n.label}</div>
+          <div style="font-weight:600;color:var(--navy);">${escHtml(n.label)}</div>
           ${detail?`<div style="font-size:11px;color:var(--txt-m);">${detail}</div>`:''}
         </div>
         <span class="report-stat">${cnt} link${cnt!==1?'s':''}</span>
@@ -8712,12 +8749,12 @@ function buildSummaryReport(){
       html+=`<div class="report-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
         <div style="display:flex;align-items:center;gap:8px;width:100%;">
           <div class="report-node-dot" style="background:${col};"></div>
-          <span style="font-weight:600;color:var(--navy);flex:1;">${n.label}</span>
+          <span style="font-weight:600;color:var(--navy);flex:1;">${escHtml(n.label)}</span>
           <span style="font-size:10px;color:var(--txt-h);">${connCount[n.id]||0} link${(connCount[n.id]||0)!==1?'s':''}</span>
         </div>
         ${detail?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;">${detail}</div>`:''}
         ${connLabels.length?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;">→ ${connLabels.join(', ')}</div>`:''}
-        ${notes?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;font-style:italic;border-top:1px dashed var(--bdr);padding-top:4px;margin-top:2px;white-space:pre-wrap;">${notes.substring(0,200)}${notes.length>200?'…':''}</div>`:''}
+        ${notes?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;font-style:italic;border-top:1px dashed var(--bdr);padding-top:4px;margin-top:2px;white-space:pre-wrap;">${escHtml(notes.substring(0,200))}${notes.length>200?'…':''}</div>`:''}
       </div>`;
     });
     html+=`</div>`;
@@ -8845,7 +8882,7 @@ function buildMatrixReport(){
     <thead><tr><th class="row-label">Node</th><th title="Total connections">#</th>`;
   sorted.forEach(n=>{
     const short=n.label.length>10?n.label.substring(0,9)+'…':n.label;
-    html+=`<th title="${n.label}">${short}</th>`;
+    html+=`<th title="${escHtml(n.label)}">${short}</th>`;
   });
   html+=`</tr></thead><tbody>`;
   sorted.forEach(a=>{
@@ -8920,7 +8957,7 @@ function buildStrengthReport(){
       const col=n.colour||'#888';
       html+=`<div class="report-row" style="gap:8px;">
         <div class="report-node-dot" style="background:${col};"></div>
-        <span style="flex:1;font-weight:500;">${n.label}</span>
+        <span style="flex:1;font-weight:500;">${escHtml(n.label)}</span>
         <div style="width:100px;height:8px;background:var(--surf-2);border-radius:4px;overflow:hidden;">
           <div style="height:100%;width:${pct}%;background:${col};border-radius:4px;transition:width .3s;"></div>
         </div>
@@ -8948,7 +8985,7 @@ function buildStrengthReport(){
       const col=n.colour||'#888';
       html+=`<div class="report-row">
         <div class="report-node-dot" style="background:${col};"></div>
-        <span style="flex:1;">${n.label}</span>
+        <span style="flex:1;">${escHtml(n.label)}</span>
         <span style="font-size:11px;color:var(--coral-t);">No connections</span>
       </div>`;
     });
@@ -8993,7 +9030,7 @@ function buildChangeReport(){
   const vname2=namedVersions[namedVersions.length-1].name;
 
   let html=`<div class="report-section">
-    <h4>Comparing "${vname1}" → "${vname2}"</h4>
+    <h4>Comparing "${escHtml(vname1)}" → "${escHtml(vname2)}"</h4>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
       <span class="report-stat">+${added.length} added</span>
       <span class="report-stat warn">${removed.length} removed</span>
@@ -9010,12 +9047,12 @@ function buildChangeReport(){
 
   if(added.length){
     html+=`<div class="report-section"><h4>Nodes added</h4>`;
-    added.forEach(n=>{ html+=`<div class="report-row report-pos"><span style="width:10px;height:10px;border-radius:50%;background:${n.colour||'#888'};display:inline-block;margin-right:8px;"></span>+ ${n.label}</div>`; });
+    added.forEach(n=>{ html+=`<div class="report-row report-pos"><span style="width:10px;height:10px;border-radius:50%;background:${n.colour||'#888'};display:inline-block;margin-right:8px;"></span>+ ${escHtml(n.label)}</div>`; });
     html+=`</div>`;
   }
   if(removed.length){
     html+=`<div class="report-section"><h4>Nodes removed</h4>`;
-    removed.forEach(n=>{ html+=`<div class="report-row" style="color:var(--coral-t);">− ${n.label}</div>`; });
+    removed.forEach(n=>{ html+=`<div class="report-row" style="color:var(--coral-t);">− ${escHtml(n.label)}</div>`; });
     html+=`</div>`;
   }
   if(changed.length){
@@ -9023,11 +9060,11 @@ function buildChangeReport(){
     changed.forEach(n=>{
       const old=n1.get(n.id);
       const diffs=[];
-      if(old.label!==n.label) diffs.push(`Name: "${old.label}" → "${n.label}"`);
+      if(old.label!==n.label) diffs.push(`Name: "${old.label}" → "${escHtml(n.label)}"`);
       if(old.colour!==n.colour) diffs.push(`Colour changed`);
       if(old.notes!==n.notes) diffs.push(`Notes updated`);
       html+=`<div class="report-row" style="flex-direction:column;align-items:flex-start;">
-        <span style="font-weight:600;">${n.label}</span>
+        <span style="font-weight:600;">${escHtml(n.label)}</span>
         <span style="font-size:11px;color:var(--txt-m);">${diffs.join(' · ')}</span>
       </div>`;
     });
@@ -9047,8 +9084,8 @@ function buildChangeReport(){
     <h4>All saved versions</h4>`;
   namedVersions.forEach((v,i)=>{
     html+=`<div class="report-row">
-      <span style="flex:1;font-weight:${i===namedVersions.length-1?'600':'400'};">${v.name}</span>
-      <span style="font-size:11px;color:var(--txt-h);">${v.date}</span>
+      <span style="flex:1;font-weight:${i===namedVersions.length-1?'600':'400'};">${escHtml(v.name)}</span>
+      <span style="font-size:11px;color:var(--txt-h);">${escHtml(v.date)}</span>
     </div>`;
   });
   html+=`</div>`;
@@ -9064,9 +9101,10 @@ function saveNamedVersion(){
   namedVersions.push({
     name: name.trim(),
     date: new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
-    snap: snap()
+    snap: snap(false)
   });
   if(namedVersions.length>20) namedVersions.shift();
+  saveState(); markUnsaved();
   showStatus(`Version "${name}" saved. ${namedVersions.length} version${namedVersions.length!==1?'s':''} stored.`);
 }
 
@@ -9078,8 +9116,8 @@ function openVersionsModal(){
     list.innerHTML=namedVersions.map((v,i)=>`
       <div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--bdr);gap:10px;">
         <div style="flex:1;">
-          <div style="font-weight:600;color:var(--navy);">${v.name}</div>
-          <div style="font-size:11px;color:var(--txt-h);">${v.date}</div>
+          <div style="font-weight:600;color:var(--navy);">${escHtml(v.name)}</div>
+          <div style="font-size:11px;color:var(--txt-h);">${escHtml(v.date)}</div>
         </div>
         <button onclick="restoreVersion(${i})" style="font-size:11px;padding:4px 10px;border:1.5px solid var(--teal);color:var(--teal);background:none;border-radius:6px;cursor:pointer;">Restore</button>
         <button onclick="deleteVersion(${i})" style="font-size:11px;padding:4px 8px;border:1.5px solid var(--coral);color:var(--coral-t);background:none;border-radius:6px;cursor:pointer;">✕</button>
@@ -9094,7 +9132,11 @@ function closeVersionsModal(){
 
 function restoreVersion(idx){
   if(!confirm(`Restore "${namedVersions[idx].name}"? Current map will be replaced.`)) return;
-  restoreSnap(namedVersions[idx].snap);
+  const versions=namedVersions;
+  const version=JSON.parse(versions[idx].snap);
+  version.namedVersions=versions;
+  restoreSnap(JSON.stringify(version));
+  saveState(); markUnsaved();
   closeVersionsModal();
   showStatus(`Restored: ${namedVersions[idx].name}`);
 }
@@ -9102,6 +9144,7 @@ function restoreVersion(idx){
 function deleteVersion(idx){
   if(!confirm(`Delete version "${namedVersions[idx].name}"?`)) return;
   namedVersions.splice(idx,1);
+  saveState(); markUnsaved();
   openVersionsModal();
 }
 
@@ -10481,7 +10524,7 @@ function addLog(action){
 function renderLog(){
   const el=document.getElementById('log-entries');
   if(!activityLog.length){el.innerHTML='<div style="color:var(--txt-h);font-style:italic;">No activity yet.</div>';return;}
-  el.innerHTML=[...activityLog].reverse().map(e=>`<div style="padding:5px 0;border-bottom:1px solid var(--bdr);"><span style="font-weight:600;color:var(--navy);">${e.user}</span> ${e.action}<span style="float:right;color:var(--txt-h);">${e.time}</span></div>`).join('');
+  el.innerHTML=[...activityLog].reverse().map(e=>`<div style="padding:5px 0;border-bottom:1px solid var(--bdr);"><span style="font-weight:600;color:var(--navy);">${escHtml(e.user)}</span> ${escHtml(e.action)}<span style="float:right;color:var(--txt-h);">${escHtml(e.time)}</span></div>`).join('');
 }
 function openLog(){
   renderLog();
@@ -10495,12 +10538,76 @@ function closeLog(){
 
 // ── Save reminder ─────────────────────────────────────────────────────────────
 let autoSaveTimer=null;
+let _localMapKey=crypto.randomUUID();
+let _editRevision=0;
+let _cloudNeedsSave=false;
+function recoveryKey(){
+  const account=(typeof _authUser!=='undefined'&&_authUser)?_authUser.id:'local';
+  return 'puddl_recovery_'+account+'_'+(_cloudMapId||_localMapKey);
+}
+function saveRecovery(){
+  if(!mapTitle&&!nodes.length) return;
+  localStorage.setItem(recoveryKey(),JSON.stringify({savedAt:Date.now(),data:JSON.parse(snap())}));
+}
+function listRecoveryCopies(){
+  const account=_authUser?_authUser.id:'local';
+  const prefix='puddl_recovery_'+account+'_';
+  const copies=[];
+  try {
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key.startsWith(prefix)) continue;
+      try {
+        const entry=JSON.parse(localStorage.getItem(key));
+        validateMapSnapshot(entry.data);
+        copies.push({key,...entry});
+      } catch(_) { /* Leave unreadable copies untouched. */ }
+    }
+  } catch(_) {}
+  return copies.sort((a,b)=>b.savedAt-a.savedAt);
+}
+async function recoverBrowserCopy(key){
+  const entry=JSON.parse(localStorage.getItem(key));
+  validateMapSnapshot(entry.data);
+  // A recovery operation already has a safe copy; never overwrite a conflicting online row.
+  try { saveRecovery(); } catch(_) { showStatus('Export the current map before recovering another.'); return; }
+  _executeReset();
+  restoreSnap(JSON.stringify(entry.data));
+  saveState(); markUnsaved(); fitAll();
+  document.getElementById('who-modal-bg').style.display='none';
+  document.getElementById('header-project-name').textContent=mapTitle;
+  cloudCloseModal();
+  showStatus('Recovered as a new map. The online original is unchanged.');
+}
+function renderRecoveryCopies(list){
+  const copies=listRecoveryCopies();
+  if(!copies.length) return;
+  const title=document.createElement('h3');
+  title.textContent='Browser recovery copies'; list.appendChild(title);
+  const help=document.createElement('p');
+  help.textContent='Recover a copy as a new map. Your saved online map stays available.';
+  list.appendChild(help);
+  copies.forEach(entry=>{
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;gap:8px;align-items:center;margin:8px 0';
+    const name=document.createElement('span'); name.style.flex='1';
+    name.textContent=(entry.data.mapTitle||'Untitled map')+' — '+new Date(entry.savedAt).toLocaleString();
+    const button=document.createElement('button'); button.textContent='Recover';
+    button.onclick=()=>recoverBrowserCopy(entry.key).catch(()=>showStatus('Could not read this recovery copy.'));
+    const remove=document.createElement('button'); remove.textContent='Remove';
+    remove.onclick=()=>{ if(!confirm('Remove this browser recovery copy?')) return; localStorage.removeItem(entry.key); openMyMaps(); };
+    row.append(name,button,remove); list.appendChild(row);
+  });
+}
+
 function markUnsaved(){
   hasUnsavedChanges=true;
+  _cloudNeedsSave=true; _editRevision++;
   // Debounce auto-save: save 3 seconds after last change
   clearTimeout(autoSaveTimer);
   autoSaveTimer=setTimeout(()=>{ autoSave(); }, 3000);
 }
+window.addEventListener('pagehide',()=>{ if(!IS_SHARE_VIEW&&!inDemoMode&&hasUnsavedChanges){ try{saveRecovery();}catch(_){} } });
 function markSaved(){
   hasUnsavedChanges=false;
 }
@@ -10524,8 +10631,7 @@ function autoSave(){
       // Also persist personal maps separately for reliable restore
       localStorage.setItem('puddl_autosave_personal_'+currentUser, JSON.stringify(personalMaps[currentUser]));
     }
-    const key='puddl_autosave_team';
-    localStorage.setItem(key, snap());
+    saveRecovery();
     markSaved();
     showAutoSaveToast();
     // localStorage is the fallback; the account copy is the one that survives
@@ -10550,7 +10656,7 @@ function showAutoSaveToast(){
     toast.style.cssText='position:fixed;bottom:72px;left:50%;transform:translateX(-50%);background:rgba(24,24,27,0.85);color:#fff;font-size:11px;padding:5px 14px;border-radius:20px;z-index:500;pointer-events:none;opacity:0;transition:opacity .3s;font-family:"DM Sans",sans-serif;white-space:nowrap;backdrop-filter:blur(8px);';
     document.body.appendChild(toast);
   }
-  toast.textContent='✓ Auto-saved';
+  toast.textContent='✓ Saved in this browser';
   toast.style.opacity='1';
   clearTimeout(toast._t);
   toast._t=setTimeout(()=>{ toast.style.opacity='0'; }, 2000);
@@ -11180,20 +11286,30 @@ document.addEventListener('click',e=>{
 
 // ── Background image ──────────────────────────────────────────────────────────
 let bgImg=null;
+let bgImageRevision=0;
+function restoreBackground(url){
+  const revision=++bgImageRevision;
+  bgImg=null;
+  const el=document.getElementById('bg-image-data');
+  if(el) el.textContent='';
+  if(!/^data:image\/(png|jpeg|webp);base64,/.test(url)){ draw(); return; }
+  if(el) el.textContent=url;
+  const image=new Image();
+  image.onload=()=>{ if(revision!==bgImageRevision) return; bgImg=image; draw(); updateBgMenuItems(); };
+  image.src=url;
+}
 function uploadBgImage(){ document.getElementById('bg-upload-input').click(); }
 function handleBgImageUpload(e){
   const file=e.target.files[0];
   if(!file) return;
   downscaleImageFile(file,IMG_BG_MAX_EDGE,function(url){
-    const img=new Image();
-    img.onload=()=>{ bgImg=img; document.getElementById('bg-image-data').textContent=url; draw(); updateBgMenuItems(); };
-    img.src=url;
+    restoreBackground(url); saveState(); markUnsaved();
   });
   e.target.value='';
 }
 function removeBgImage(){
-  bgImg=null;
-  document.getElementById('bg-image-data').textContent='';
+  restoreBackground('');
+  saveState(); markUnsaved();
   draw();
   updateBgMenuItems();
 }
@@ -12097,12 +12213,14 @@ function _resetStep2(){
 }
 function resetToLastSaved(){
   // Restore from autosave (localStorage)
-  const key='puddl_autosave_team';
+  const key=recoveryKey();
   let saved; try{ saved=localStorage.getItem(key); }catch(e){}
   if(!saved){ showStatus('No saved version found.'); closeResetModal(); return; }
   try{
     saveState(); // push current state to undo so user can go back from restore too
-    restoreSnap(saved);
+    const recovery=JSON.parse(saved);
+    restoreSnap(JSON.stringify(recovery.data||recovery));
+    saveState(); markUnsaved();
     closeResetModal();
     showStatus('Restored to last saved version.');
   } catch(e){
@@ -12111,11 +12229,23 @@ function resetToLastSaved(){
   }
 }
 function _executeReset(){
-  // Save current state to undo history so Ctrl+Z can recover
-  saveState();
+  // Starting another map must not share undo history or pending saves.
+  clearTimeout(autoSaveTimer);
+  _cloudGeneration++;
+  _cloudNeedsSave=false; _editRevision++;
+  _cloudUpdatedAt=null;
+  _localMapKey=crypto.randomUUID();
   // Now wipe everything
   nodes.length=0; edges.length=0; loops.length=0;
-  idCtr=0; history=[]; historyIdx=-1;
+  idCtr=0; history=[]; histIdx=-1;
+  presentationStops=[]; savedPresentations=[]; namedVersions=[]; presMapOnly=false;
+  if(presNarrationAudio) presNarrationAudio.pause();
+  presNarration=null; presNarrationAudio=null; presNarrationDur=0;
+  personalMaps={}; teamMapSnap=null; activityLog=[];
+  MAP_FOCUS=null; DATE_ASAT=null;
+  highlightIds.clear(); highlightEdges.clear();
+  bgImageRevision++;
+  updateHistBtns();
   bgImg=null;
   const bgDataEl=document.getElementById('bg-image-data');
   if(bgDataEl) bgDataEl.textContent='';
@@ -12948,7 +13078,7 @@ function updateConnectionSelects(){
   selects.forEach(select => {
     const currentValue = select.value;
     select.innerHTML = CONNECTION_STYLES.map(style => 
-      `<option value="${style.id}">${style.label}</option>`
+      `<option value="${style.id}">${escHtml(style.label)}</option>`
     ).join('');
     select.value = currentValue;
   });
@@ -13183,7 +13313,7 @@ function renderHoverPanel(n){
   const isCentre=n.type==='centre';
   document.getElementById('hover-panel-title').textContent=n.label;
 
-  const col=n.colour||'#C5E86C';
+  const col=safeMapColour(n.colour,'#C5E86C');
   // Colour chip for category
   const chip=document.getElementById('hover-panel-title').parentElement;
   // Reset any previous colour dot
@@ -13209,46 +13339,46 @@ function renderHoverPanel(n){
   if(!isCentre){
     // Category — stacked pill
     if(n.colourLabel){
-      html+=`<div class="sp-field"><div class="sp-label">Category</div><div class="sp-value" style="margin-top:2px;"><span style="display:inline-block;padding:1px 7px;border-radius:20px;background:${col};color:#18181b;font-size:10px;font-weight:600;">${n.colourLabel}</span></div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Category</div><div class="sp-value" style="margin-top:2px;"><span style="display:inline-block;padding:1px 7px;border-radius:20px;background:${col};color:#18181b;font-size:10px;font-weight:600;">${escHtml(n.colourLabel)}</span></div></div>`;
     }
 
     // Area — team map only
     if(currentMapMode!=='personal'&&n.area){
-      html+=`<div class="sp-field"><div class="sp-label">Area</div><div class="sp-value">${n.area}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Area</div><div class="sp-value">${escHtml(n.area)}</div></div>`;
     }
 
     // Group size — team map only
     if(currentMapMode!=='personal'&&n.groupSize){
-      html+=`<div class="sp-field"><div class="sp-label">Group size</div><div class="sp-value">${n.groupSize}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Group size</div><div class="sp-value">${escHtml(n.groupSize)}</div></div>`;
     }
 
     // Group status — team map only
     if(currentMapMode!=='personal'&&n.groupStatus){
-      html+=`<div class="sp-field"><div class="sp-label">Group status</div><div class="sp-value">${n.groupStatus}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Group status</div><div class="sp-value">${escHtml(n.groupStatus)}</div></div>`;
     }
     if(currentMapMode!=='personal'&&n.trainingCompleted){
-      html+=`<div class="sp-field"><div class="sp-label">Training Completed</div><div class="sp-value">${n.trainingCompleted}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Training Completed</div><div class="sp-value">${escHtml(n.trainingCompleted)}</div></div>`;
     }
     if(currentMapMode!=='personal'&&n.mainAreaOfDelivery){
-      html+=`<div class="sp-field"><div class="sp-label">Main Area of Delivery</div><div class="sp-value">${n.mainAreaOfDelivery}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Main Area of Delivery</div><div class="sp-value">${escHtml(n.mainAreaOfDelivery)}</div></div>`;
     }
     if(currentMapMode!=='personal'&&n.protectedCharacteristics?.length){
-      html+=`<div class="sp-field"><div class="sp-label">Protected Characteristics</div><div class="sp-value">${n.protectedCharacteristics.join(', ')}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Protected Characteristics</div><div class="sp-value">${escHtml(n.protectedCharacteristics.join(', '))}</div></div>`;
     }
     if(currentMapMode!=='personal'&&n.operationalTimetable){
-      html+=`<div class="sp-field"><div class="sp-label">Operational Timetable</div><div class="sp-value">${n.operationalTimetable}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Operational Timetable</div><div class="sp-value">${escHtml(n.operationalTimetable)}</div></div>`;
     }
 
     // Personal map fields — personal/combined only
     if(currentMapMode!=='team'){
-      if(n.pJobTitle) html+=`<div class="sp-field"><div class="sp-label">Job title</div><div class="sp-value">${n.pJobTitle}</div></div>`;
-      if(n.pCompany)  html+=`<div class="sp-field"><div class="sp-label">Organisation</div><div class="sp-value">${n.pCompany}</div></div>`;
-      if(n.pSector)   html+=`<div class="sp-field"><div class="sp-label">Sector</div><div class="sp-value">${n.pSector}</div></div>`;
-      if(n.pRole)     html+=`<div class="sp-field"><div class="sp-label">Role</div><div class="sp-value">${n.pRole}</div></div>`;
-      if(n.pTopic)    html+=`<div class="sp-field"><div class="sp-label">Topic</div><div class="sp-value">${n.pTopic}</div></div>`;
-      if(n.pDate)     html+=`<div class="sp-field"><div class="sp-label">Date</div><div class="sp-value">${n.pDate}</div></div>`;
-      if(n.pLocation) html+=`<div class="sp-field"><div class="sp-label">Location</div><div class="sp-value">${n.pLocation}</div></div>`;
-      if(n.pAttendees)html+=`<div class="sp-field"><div class="sp-label">Attendees</div><div class="sp-value">${n.pAttendees}</div></div>`;
+      if(n.pJobTitle) html+=`<div class="sp-field"><div class="sp-label">Job title</div><div class="sp-value">${escHtml(n.pJobTitle)}</div></div>`;
+      if(n.pCompany)  html+=`<div class="sp-field"><div class="sp-label">Organisation</div><div class="sp-value">${escHtml(n.pCompany)}</div></div>`;
+      if(n.pSector)   html+=`<div class="sp-field"><div class="sp-label">Sector</div><div class="sp-value">${escHtml(n.pSector)}</div></div>`;
+      if(n.pRole)     html+=`<div class="sp-field"><div class="sp-label">Role</div><div class="sp-value">${escHtml(n.pRole)}</div></div>`;
+      if(n.pTopic)    html+=`<div class="sp-field"><div class="sp-label">Topic</div><div class="sp-value">${escHtml(n.pTopic)}</div></div>`;
+      if(n.pDate)     html+=`<div class="sp-field"><div class="sp-label">Date</div><div class="sp-value">${escHtml(n.pDate)}</div></div>`;
+      if(n.pLocation) html+=`<div class="sp-field"><div class="sp-label">Location</div><div class="sp-value">${escHtml(n.pLocation)}</div></div>`;
+      if(n.pAttendees)html+=`<div class="sp-field"><div class="sp-label">Attendees</div><div class="sp-value">${escHtml(n.pAttendees)}</div></div>`;
     }
 
     // Grants
@@ -13256,7 +13386,7 @@ function renderHoverPanel(n){
       html+=`<div class="sp-field"><div class="sp-label">Grants</div>`;
       n.grants.forEach(g=>{
         const parts=[g.amount&&'£'+g.amount,g.source,g.date].filter(Boolean);
-        html+=`<div class="sp-value" style="margin-bottom:3px;">${parts.join(' · ')}</div>`;
+        html+=`<div class="sp-value" style="margin-bottom:3px;">${escHtml(parts.join(' · '))}</div>`;
       });
       html+=`</div>`;
     }
@@ -13265,7 +13395,7 @@ function renderHoverPanel(n){
     if(n.contacts&&n.contacts.length){
       html+=`<div class="sp-field"><div class="sp-label">Key contacts</div>`;
       n.contacts.forEach(c=>{
-        html+=`<div class="sp-value" style="margin-bottom:4px;"><strong style="font-weight:600;">${c.name||''}</strong>${c.role?`<br><span style="color:var(--ink-h);font-size:11px;">${c.role}</span>`:''}${c.email?`<br><span style="font-size:11px;">${c.email}</span>`:''}${c.phone?`<br><span style="font-size:11px;">${c.phone}</span>`:''}</div>`;
+        html+=`<div class="sp-value" style="margin-bottom:4px;"><strong style="font-weight:600;">${escHtml(c.name||'')}</strong>${c.role?`<br><span style="color:var(--ink-h);font-size:11px;">${escHtml(c.role)}</span>`:''}${c.email?`<br><span style="font-size:11px;">${escHtml(c.email)}</span>`:''}${c.phone?`<br><span style="font-size:11px;">${escHtml(c.phone)}</span>`:''}</div>`;
       });
       html+=`</div>`;
     }
@@ -13284,8 +13414,8 @@ function renderHoverPanel(n){
         const otherId=s===n.id?t:s;
         const other=nodes.find(nd=>nd.id===otherId);
         if(other){
-          const ec=other.colour||'#ddd';
-          html+=`<div style="display:flex;align-items:center;gap:5px;padding:2px 0;border-bottom:1px solid var(--bdr);"><span style="width:7px;height:7px;border-radius:50%;background:${ec};flex-shrink:0;"></span><span style="font-size:11px;color:var(--ink);">${other.label}</span><span style="font-size:9px;color:var(--ink-h);margin-left:auto;">${e.strength||'moderate'}</span></div>`;
+          const ec=safeMapColour(other.colour,'#ddd');
+          html+=`<div style="display:flex;align-items:center;gap:5px;padding:2px 0;border-bottom:1px solid var(--bdr);"><span style="width:7px;height:7px;border-radius:50%;background:${ec};flex-shrink:0;"></span><span style="font-size:11px;color:var(--ink);">${escHtml(other.label)}</span><span style="font-size:9px;color:var(--ink-h);margin-left:auto;">${escHtml(e.strength||'moderate')}</span></div>`;
         }
       });
       html+=`</div>`;
@@ -13294,19 +13424,19 @@ function renderHoverPanel(n){
     // Shared by (combined mode)
     if(currentMapMode==='combined'&&n.owners&&n.owners.length){
       html+=`<div class="sp-field"><div class="sp-label">Shared by</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">`;
-      n.owners.forEach(o=>html+=`<span class="sp-chip" style="background:#e8f5ec;color:#2A5C3A;border:1px solid #5BAD72;">${o}</span>`);
+      n.owners.forEach(o=>html+=`<span class="sp-chip" style="background:#e8f5ec;color:#2A5C3A;border:1px solid #5BAD72;">${escHtml(o)}</span>`);
       html+=`</div></div>`;
     }
   }
 
   // Notes
   const notes=n.notes||(currentMapMode!=='team'?(n.pNotesIndividual||n.pNotesOrganisation||n.pNotesProject||n.pNotesMeeting||''):'');
-  if(notes) html+=`<div class="sp-field"><div class="sp-label">Notes</div><div class="sp-value" style="white-space:pre-wrap;line-height:1.5;">${notes}</div></div>`;
+  if(notes) html+=`<div class="sp-field"><div class="sp-label">Notes</div><div class="sp-value" style="white-space:pre-wrap;line-height:1.5;">${escHtml(notes)}</div></div>`;
 
   // Tags
   if(n.tags&&n.tags.length){
     html+=`<div class="sp-field"><div class="sp-label">Tags</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">`;
-    n.tags.forEach(t=>{html+=`<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;background:var(--surf-3);color:var(--ink-m);border:1px solid var(--bdr);">${t}</span>`;});
+    n.tags.forEach(t=>{html+=`<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;background:var(--surf-3);color:var(--ink-m);border:1px solid var(--bdr);">${escHtml(t)}</span>`;});
     html+=`</div></div>`;
   }
 
@@ -13327,7 +13457,7 @@ function renderHoverPanel(n){
       html+=`<div style="position:relative;">
         <div style="position:absolute;left:-14px;top:4px;width:6px;height:6px;border-radius:50%;background:var(--bdr-m);border:1.5px solid var(--surf);"></div>
         <div style="font-size:10px;color:var(--ink-h);font-weight:600;">${ds}</div>
-        <div style="font-size:10px;color:var(--ink-m);">${h.text}</div>
+        <div style="font-size:10px;color:var(--ink-m);">${escHtml(h.text)}</div>
       </div>`;
     });
     if(n.history.length>5) html+=`<div style="font-size:10px;color:var(--ink-h);font-style:italic;">+${n.history.length-5} earlier entries</div>`;
@@ -13364,7 +13494,7 @@ function openEditConnectionPanel(){
     html+=`<div style="border:1px solid var(--bdr);border-radius:var(--radius);padding:8px 10px;margin-bottom:8px;">
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
         <span style="width:9px;height:9px;border-radius:50%;background:${other.colour||'#ddd'};flex-shrink:0;display:inline-block;"></span>
-        <span style="font-size:12px;font-weight:600;color:var(--ink);">${other.label}</span>
+        <span style="font-size:12px;font-weight:600;color:var(--ink);">${escHtml(other.label)}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;">
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);margin-bottom:4px;">Connection style</div>
@@ -13375,7 +13505,7 @@ function openEditConnectionPanel(){
               <button onclick="updateEdgeStyle(${idx},'${style.id}')" style="display:flex;align-items:center;gap:12px;padding:6px 8px;text-align:left;border-radius:var(--radius);${isSelected ? 'background:var(--surf-3);border-color:var(--ink);' : ''}">
                 ${renderConnectionStyleIcon(style)}
                 <div>
-                  <div style="font-size:11px;font-weight:600;">${style.label}</div>
+                  <div style="font-size:11px;font-weight:600;">${escHtml(style.label)}</div>
                 </div>
               </button>
             `;
@@ -13471,7 +13601,7 @@ function openHoverPanelDelete(){
   const body=document.getElementById('hover-panel-body');
   body.innerHTML=`
     <div style="background:#fff0f0;border:1.5px solid var(--coral);border-radius:var(--radius);padding:10px 12px;margin-bottom:10px;">
-      <div style="font-size:12px;font-weight:700;color:#b91c1c;margin-bottom:3px;">⚠ Delete "${n.label}"?</div>
+      <div style="font-size:12px;font-weight:700;color:#b91c1c;margin-bottom:3px;">⚠ Delete "${escHtml(n.label)}"?</div>
       <div style="font-size:11px;color:#7a2222;">This will remove the node and all its connections. This cannot be undone.</div>
     </div>
     <div style="display:flex;gap:6px;">
@@ -13567,11 +13697,12 @@ document.addEventListener('click',function(e){
 <!-- Supabase Auth Logic -->
 <script>
 // Initialize Supabase
-const SUPABASE_URL = 'https://amjkbkbmqpaifqurzozg.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_cEmd4G8xYwwUEqOZSV9jsA_bO4vh6gG';
+const SUPABASE_URL = window.PUDDLE_CONFIG?.supabaseUrl || (location.hostname==='puddl.vercel.app'?'https://amjkbkbmqpaifqurzozg.supabase.co':'');
+const SUPABASE_ANON_KEY = window.PUDDLE_CONFIG?.supabaseKey || (location.hostname==='puddl.vercel.app'?'sb_publishable_cEmd4G8xYwwUEqOZSV9jsA_bO4vh6gG':'');
 
 let supabaseClient = null;
 let _authUser = null;
+let _cloudAuthInitialized=false;
 
 // Supabase sends invited people, and anyone resetting a password, back here
 // with a one-time token in the URL fragment. supabase-js consumes that
@@ -13629,7 +13760,7 @@ document.getElementById('auth-form').addEventListener('submit', async (e) => {
 
 // Try to initialize Supabase client
 try {
-  if (window.supabase && window.supabase.createClient) {
+  if (SUPABASE_URL && SUPABASE_ANON_KEY && window.supabase && window.supabase.createClient) {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   } else {
     console.error('Supabase library not loaded');
@@ -13921,7 +14052,10 @@ function updateAccountMenu(){
 }
 async function logout() {
   try {
+    if(!await saveBeforeMapChange()) return;
+    _cloudGeneration++;
     await supabaseClient.auth.signOut();
+    _executeReset();
     _authUser = null;
     _cloudReady = false; _cloudTeam = null; _cloudMapId = null; _cloudNotice = false;
     cloudCloseModal();
@@ -13946,7 +14080,10 @@ let _cloudReady   = false;   // we have a team and may read/write rows
 let _cloudTeam    = null;    // { team_id, name, maps_per_user, subscription_ends_at }
 let _cloudMapId   = null;    // row id of the map currently open
 let _cloudSaving  = false;
-let _cloudDirty   = false;   // a save arrived while one was in flight
+let _cloudSavePromise=null;
+let _cloudGeneration=0;
+let _cloudUpdatedAt=null;
+let _cloudSwitching=false;
 let _cloudNotice  = false;   // local-only warning already shown
 
 // PostgREST will take more, but a map this size means images that belong in
@@ -13954,7 +14091,6 @@ let _cloudNotice  = false;   // local-only warning already shown
 const CLOUD_MAX_BYTES = 5 * 1024 * 1024;
 
 function cloudLocalOnly(why){
-  _cloudReady = false;
   if (_cloudNotice) return;
   _cloudNotice = true;
   if (typeof showStatus === 'function') {
@@ -14008,63 +14144,93 @@ async function cloudListMaps(){
 // One save path for both a brand-new map and an existing one, so nothing has
 // to remember to create the row first.
 async function cloudSaveCurrent(){
-  if (!_cloudReady || IS_SHARE_VIEW || inDemoMode) return;
-  if (_cloudSaving) { _cloudDirty = true; return; }
-  _cloudSaving = true;
-  try {
-    const dataStr = snap();
-    if (dataStr.length > CLOUD_MAX_BYTES) {
-      if (typeof showStatus === 'function') {
-        showStatus('This map is too large to save online (' + Math.round(dataStr.length/1048576) + ' MB). Remove a large image, or export it to a file.');
-      }
-      return;
-    }
-    const payload = {
-      title: (mapTitle || 'Untitled map').slice(0, 200),
-      data: JSON.parse(dataStr)
-    };
-    if (!_cloudMapId) {
-      payload.team_id = _cloudTeam.team_id;
-      payload.owner_id = _authUser.id;
-      payload.scope    = 'personal';
-      payload.kind     = (typeof MAP_TYPE !== 'undefined' && MAP_TYPE) ? MAP_TYPE : 'general';
-      const { data, error } = await supabaseClient.from('maps').insert(payload).select('id').single();
-      if (error) {
-        if (/Map limit reached/i.test(error.message || '')) {
-          if (typeof showStatus === 'function') showStatus(error.message);
-        } else {
-          cloudLocalOnly('Could not save online.');
-        }
-        return;
-      }
-      _cloudMapId = data.id;
-    } else {
-      const { error } = await supabaseClient.from('maps').update(payload).eq('id', _cloudMapId);
-      if (error) { cloudLocalOnly('Could not save online.'); return; }
-    }
-  } catch (err) {
-    cloudLocalOnly('Could not save online.');
-  } finally {
-    _cloudSaving = false;
-    if (_cloudDirty) { _cloudDirty = false; cloudSaveCurrent(); }
+  if (_cloudSavePromise) {
+    const ok=await _cloudSavePromise;
+    if(!ok) return false;
+    if(_cloudNeedsSave) return cloudSaveCurrent();
+    return true;
   }
+  if (!_cloudReady || IS_SHARE_VIEW || inDemoMode) return false;
+  const generation=_cloudGeneration;
+  const owner=_authUser.id;
+  const revision=_editRevision;
+  const mapId=_cloudMapId;
+  const dataStr=snap();
+  if(new Blob([dataStr]).size>CLOUD_MAX_BYTES){
+    showStatus('This map is too large to save online. Export it to keep a copy.');
+    return false;
+  }
+  const payload={title:(mapTitle||'Untitled map').slice(0,200),data:JSON.parse(dataStr)};
+  _cloudSaving=true;
+  _cloudSavePromise=(async()=>{
+    try {
+      let response;
+      if(!mapId){
+        Object.assign(payload,{team_id:_cloudTeam.team_id,owner_id:owner,scope:'personal',kind:MAP_TYPE||'general'});
+        response=await supabaseClient.from('maps').insert(payload).select('id, updated_at').single();
+      } else {
+        let query=supabaseClient.from('maps').update(payload).eq('id',mapId);
+        if(_cloudUpdatedAt) query=query.eq('updated_at',_cloudUpdatedAt);
+        response=await query.select('id, updated_at').maybeSingle();
+      }
+      if(generation!==_cloudGeneration||!_authUser||owner!==_authUser.id) return false;
+      if(response.error||!response.data){
+        showStatus(response.error?'Could not save online. Your browser copy is kept; try again before switching maps.':'This map changed in another tab. Export your work before reopening the online copy.');
+        return false;
+      }
+      _cloudMapId=response.data.id;
+      _cloudUpdatedAt=response.data.updated_at;
+      _cloudNeedsSave=revision!==_editRevision;
+      // Also retain recovery under the assigned ID after a first insert.
+      try { saveRecovery(); } catch (_) {}
+      if(!_cloudNeedsSave) showStatus('Saved online.');
+      return true;
+    } catch(err){
+      if(generation===_cloudGeneration) showStatus('Could not save online. Your browser copy is kept; try again before switching maps.');
+      return false;
+    }
+  })();
+  let ok;
+  try { ok=await _cloudSavePromise; }
+  finally { _cloudSaving=false; _cloudSavePromise=null; }
+  if(ok&&_cloudNeedsSave) return cloudSaveCurrent();
+  return ok;
+}
+
+async function saveBeforeMapChange(){
+  clearTimeout(autoSaveTimer);
+  try { saveRecovery(); }
+  catch(err){ showStatus('Could not keep a recovery copy. Export this map before switching.'); return false; }
+  if(!_cloudReady){ showStatus('Recovery copy kept in this browser.'); return true; }
+  if(_cloudSaving||_cloudNeedsSave||hasUnsavedChanges){
+    if(!await cloudSaveCurrent()) return false;
+  }
+  return true;
 }
 
 async function cloudOpenMap(id){
-  if (!_cloudReady) return false;
-  const { data, error } = await supabaseClient.from('maps').select('data, title').eq('id', id).single();
+  if (!_cloudReady||_cloudSwitching) return false;
+  _cloudSwitching=true;
+  try {
+  if(!await saveBeforeMapChange()) return false;
+  const { data, error } = await supabaseClient.from('maps').select('data, title, updated_at').eq('id', id).single();
   if (error || !data) {
     if (typeof showStatus === 'function') showStatus('Could not open that map.');
     return false;
   }
   try {
-    if (typeof saveState === 'function') saveState();   // so Ctrl+Z gets back
+    validateMapSnapshot(data.data);
     restoreSnap(JSON.stringify(data.data));
     // restoreSnap() never touches zoom/pan - whatever view was on screen
     // before (a different map's layout) would otherwise carry over. Fit this
     // map's own nodes to the screen, same as a freshly opened file.
     if (typeof fitAll === 'function') fitAll();
+    _cloudGeneration++;
     _cloudMapId = id;
+    _cloudUpdatedAt=data.updated_at;
+    _cloudNeedsSave=false;
+    history=[]; histIdx=-1; saveState();
+    clearTimeout(autoSaveTimer);
     markSaved();
     // The "name your project" splash is still underneath, because the panel
     // opened over it at startup. They have just picked a map, so asking them
@@ -14079,6 +14245,7 @@ async function cloudOpenMap(id){
     if (typeof showStatus === 'function') showStatus('That map could not be read.');
     return false;
   }
+  } finally { _cloudSwitching=false; }
 }
 
 async function cloudDeleteMap(id){
@@ -14099,13 +14266,20 @@ async function cloudRenameMap(id, title){
 // already have saved. Someone with nothing saved falls through to the normal
 // "name your project" splash.
 async function afterSignIn(){
+  const photoImportPending=new URLSearchParams(location.search).get('imageImport')==='1';
+  _cloudAuthInitialized=false;
   const ok = await cloudInit();
+  _cloudAuthInitialized=true;
   const btn = document.getElementById('btn-my-maps');
-  if (btn) btn.style.display = ok ? '' : 'none';
-  if (!ok) return;
+  if (btn) btn.style.display = '';
+  if(photoImportPending){
+    window.dispatchEvent(new Event('puddl-auth-ready'));
+    return;
+  }
+  if (!ok) { if(listRecoveryCopies().length) openMyMaps(); return; }
   try {
     const maps = await cloudListMaps();
-    if (maps.length) openMyMaps();
+    if (maps.length||listRecoveryCopies().length) openMyMaps();
   } catch (err) { /* nothing saved yet is not an error */ }
 }
 
@@ -14137,10 +14311,6 @@ function cloudCloseModal(){
 }
 
 async function openMyMaps(){
-  if (!_cloudReady) {
-    if (typeof showStatus === 'function') showStatus('Saved maps are unavailable - this browser is saving locally.');
-    return;
-  }
   cloudEnsureModal();
   const bg = document.getElementById('cloud-maps-bg');
   const list = document.getElementById('cloud-maps-list');
@@ -14149,10 +14319,11 @@ async function openMyMaps(){
 
   const maps = await cloudListMaps();
   const count = document.getElementById('cloud-maps-count');
-  if (count) count.textContent = maps.length + ' of ' + (_cloudTeam.maps_per_user || 25);
+  if (count) count.textContent = maps.length + ' of ' + (_cloudTeam?.maps_per_user || 25);
 
   if (!maps.length) {
     list.innerHTML = '<div style="color:var(--ink-m);font-size:13px;padding:8px 0;">Nothing saved yet. Start a new map and it will appear here.</div>';
+    renderRecoveryCopies(list);
     return;
   }
   list.innerHTML = '';
@@ -14181,7 +14352,6 @@ async function openMyMaps(){
       return b;
     };
     if (!isOpen) row.appendChild(mk('Open', 'Open this map', async function(){
-      if (hasUnsavedChanges) await cloudSaveCurrent();
       const ok = await cloudOpenMap(m.id);
       if (ok) { cloudCloseModal(); if (typeof showStatus === 'function') showStatus('Opened "' + (m.title||'Untitled map') + '".'); }
     }));
@@ -14205,14 +14375,19 @@ async function openMyMaps(){
     }));
     list.appendChild(row);
   });
+  renderRecoveryCopies(list);
 }
 
 async function cloudNewMap(){
-  if (hasUnsavedChanges) await cloudSaveCurrent();
+  if(_cloudSwitching) return;
+  _cloudSwitching=true;
+  try {
+  if(!await saveBeforeMapChange()) return;
   _cloudMapId = null;           // the next save creates a fresh row
   cloudCloseModal();
   if (typeof _executeReset === 'function') { _executeReset(); return; }
   window.location.reload();
+  } finally { _cloudSwitching=false; }
 }
 
 // ── Click outside a modal closes it ───────────────────────────────────────
@@ -14257,5 +14432,6 @@ if (document.readyState === 'loading') {
   setTimeout(addLogoutButton, 1000);
 }
 </script>
+<script src="image-to-map-bridge.js"></script>
 </body>
 </html>
