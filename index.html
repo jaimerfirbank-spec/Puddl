@@ -2803,6 +2803,10 @@ const BETWEENNESS_CAP=200;
 // Above this many factors the loop search is not attempted at all. The panel
 // names the number rather than reporting "no loops found".
 const LOOP_NODE_CAP=5000;
+// How many steps out from a factor the downstream trace follows. Beyond about
+// five, "X affects Y" on a connected map is true of almost everything and stops
+// being a finding.
+const KNOCK_MAX_STEPS=5;
 const _pinnedLoops=new Map();   // loop key -> [node ids]
 let _pinEdgeSig=-1;
 // Each highlighted loop gets its own colour, kept until it's removed. Past 10 the colours repeat, dashed.
@@ -4724,6 +4728,31 @@ function computeInsights(){
   const drivers=[...pool].filter(n=>outDeg.get(n.id)>0).sort((x,y)=>outDeg.get(y.id)-outDeg.get(x.id)||byLabel(x,y)).slice(0,5);
   const sinks=[...pool].filter(n=>inDeg.get(n.id)>0).sort((x,y)=>inDeg.get(y.id)-inDeg.get(x.id)||byLabel(x,y)).slice(0,5);
 
+  // Root causes and final outcomes. "Most outgoing arrows" answers a different
+  // question - who is busiest - and a factor can be busy while still being
+  // caused by everything around it. A root cause is one nothing on this map
+  // explains: no arrows point at it. An outcome is one nothing follows from.
+  //
+  // On a map where everything sits on a loop, no factor has zero arrows in, so
+  // the strict rule finds nobody. Rather than show an empty card, fall back to
+  // "almost a root cause" - at most one thing causes it, and it causes several -
+  // and say which rule produced the answer, because they mean different things.
+  let rootCauses=[...pool].filter(n=>inDeg.get(n.id)===0&&outDeg.get(n.id)>0);
+  let finalOutcomes=[...pool].filter(n=>outDeg.get(n.id)===0&&inDeg.get(n.id)>0);
+  let causeRule='strict', outcomeRule='strict';
+  if(!rootCauses.length&&directedEdges){
+    rootCauses=[...pool].filter(n=>inDeg.get(n.id)<=1&&outDeg.get(n.id)>=3);
+    // Neither rule found anything: on this map every factor is both caused by
+    // something and causes something. That is a real finding, not a blank.
+    causeRule=rootCauses.length?'loose':'circular';
+  }
+  if(!finalOutcomes.length&&directedEdges){
+    finalOutcomes=[...pool].filter(n=>outDeg.get(n.id)<=1&&inDeg.get(n.id)>=3);
+    outcomeRule=finalOutcomes.length?'loose':'circular';
+  }
+  rootCauses.sort((x,y)=>outDeg.get(y.id)-outDeg.get(x.id)||byLabel(x,y));
+  finalOutcomes.sort((x,y)=>inDeg.get(y.id)-inDeg.get(x.id)||byLabel(x,y));
+
   // Overloaded hubs: many things arrive, almost nothing leaves - everything
   // piles up here before moving on. Needs arrows actually set; on a network
   // map that is often optional, so this stays empty unless direction was used.
@@ -4896,7 +4925,8 @@ function computeInsights(){
           structureEligible,brokersMeaningful,labelledLinks,unlabelledLinks,
           bridges:bridges.slice(0,5),linked,alone,
           groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length,
-          outDeg,inDeg,drivers,sinks,directedEdges,loops,loopVariants,loopsComplete,loopSearchDepth,
+          outDeg,inDeg,drivers,sinks,rootCauses,finalOutcomes,causeRule,outcomeRule,
+          directedEdges,loops,loopVariants,loopsComplete,loopSearchDepth,
           loopsFoundTotal,loopsTruncated,compCount,compBig,focus,focusGuessed,fD,fCounts,
           loopClass,limitsToGrowth,unassignedPolarityCount,nodeLoopCount,
           silentGiants,gridlockRisks,influenceBridges,alignmentHealth,
@@ -5116,8 +5146,25 @@ function insightSummaryLines(I){
     if(!I.directedEdges){
       S.push("No arrows are set, so Puddle can't tell what drives what. Open a connection and give it an arrow to see drivers, outcomes and feedback loops.");
     } else {
-      if(I.drivers[0]) S.push(`${I.drivers[0].label} influences the most other factors: ${I.outDeg.get(I.drivers[0].id)} outgoing arrows.`);
-      if(I.sinks[0]) S.push(`${I.sinks[0].label} is affected by the most: ${I.inDeg.get(I.sinks[0].id)} incoming arrows.`);
+      // Naming one winner when several tie reads as a finding about that one
+      // factor. Say how many are level and name the first few instead.
+      // Count ties across the whole map, not just the top five the card shows,
+      // or "and 2 others" undercounts when more than five are level.
+      const tied=(list,deg)=>{
+        if(!list.length) return null;
+        const top=deg.get(list[0].id);
+        if(top<2) return null;   // "the most affected has 1 arrow" is not a finding
+        return I.pool.filter(n=>deg.get(n.id)===top);
+      };
+      const dTop=tied(I.drivers,I.outDeg), sTop=tied(I.sinks,I.inDeg);
+      const nameList=l=>l.length===1?l[0].label
+        :l.length===2?`${l[0].label} and ${l[1].label}`
+        :`${l.slice(0,2).map(n=>n.label).join(', ')} and ${l.length-2} other${l.length-2===1?'':'s'}`;
+      const arrows=(k,dir)=>`${k} ${dir} arrow${k===1?'':'s'}`;
+      if(dTop) S.push(`${nameList(dTop)} ${dTop.length===1?'influences':'each influence'} the most other factors: ${arrows(I.outDeg.get(dTop[0].id),'outgoing')}${dTop.length>1?' each':''}.`);
+      if(sTop) S.push(`${nameList(sTop)} ${sTop.length===1?'is':'are'} affected by the most: ${arrows(I.inDeg.get(sTop[0].id),'incoming')}${sTop.length>1?' each':''}.`);
+      if(I.rootCauses.length&&I.causeRule==='strict')
+        S.push(`${I.rootCauses.length===1?'1 factor has':`${I.rootCauses.length} factors have`} nothing on this map causing ${I.rootCauses.length===1?'it':'them'}: ${nameList(I.rootCauses)}.`);
       if(I.loops.length){
         const rC=I.loopClass.filter(c=>c.type==='R').length, bC=I.loopClass.filter(c=>c.type==='B').length, uC=I.loopClass.filter(c=>c.type==='unassigned').length;
         const scope=I.loopsComplete
@@ -5362,10 +5409,43 @@ function renderInsights(){
       A.branches.length ? A.branches.map(b=>row(b.node,`${b.ev} evidence`)).join('') : none('No evidence linked yet.'));
   }
   if(MAP_TYPE==='systems'&&I.directedEdges){
-    h += grp('drivers','Drivers: most outgoing influence',null,
-      I.drivers.length ? I.drivers.map(n=>row(n,`${I.outDeg.get(n.id)} out`)).join('') : none('No arrows in this view.'));
-    h += grp('sinks','Most affected: incoming influence',null,
-      I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows in this view.'));
+    // Root causes and outcomes in one card, with the rule that produced them
+    // written out. The previous pair ranked by arrow count, which answers "who
+    // is busiest" - a factor can be busy and still be caused by everything
+    // around it, so it was never a root cause in the sense people read it as.
+    {
+      const LIM=6;
+      const half=(label,what,list,rule,deg,unit)=>
+        `<div style="margin-top:4px;"><div style="font-size:10.5px;font-weight:700;color:var(--ink-m);padding:0 6px;">${label} <span style="font-weight:400;color:var(--ink-h);">${list.length}</span></div>`+
+        `<div style="font-size:10px;color:var(--ink-h);padding:0 6px 2px;">${what} <em>${rule}</em></div>`+
+        (list.length?list.slice(0,LIM).map(n=>row(n,`${deg.get(n.id)} ${unit}`)).join('')
+                    :`<div style="color:var(--ink-h);font-size:10.5px;padding:1px 6px 3px;">None.</div>`)+
+        (list.length>LIM?`<div style="color:var(--ink-h);font-size:10px;padding:0 6px 3px;">+${list.length-LIM} more</div>`:'')+
+        `</div>`;
+      h += grp('causes','Root causes and outcomes',I.rootCauses.length+I.finalOutcomes.length,
+        half('Root causes',
+          I.causeRule==='circular'?'Every factor here is caused by something else on the map.':'Nothing on this map explains these.',
+          I.rootCauses,
+          I.causeRule==='strict'?'No arrows point at them.'
+            :I.causeRule==='loose'?'Nothing here has zero causes, so these are the nearest thing: at most one cause, and they drive three or more.'
+            :'There is no starting point to pull on — the causes run in circles. Look at the feedback loops instead.',
+          I.outDeg,'out')+
+        half('Final outcomes',
+          I.outcomeRule==='circular'?'Every factor here leads on to something else.':'Nothing follows on from these.',
+          I.finalOutcomes,
+          I.outcomeRule==='strict'?'No arrows lead out of them.'
+            :I.outcomeRule==='loose'?'Nothing here is a dead end, so these are the nearest thing: at most one thing follows, and three or more feed in.'
+            :'There is no end point — every factor feeds something else.',
+          I.inDeg,'in'));
+      const sub=(label,list,deg,unit)=>
+        `<div style="margin-top:4px;"><div style="font-size:10.5px;font-weight:700;color:var(--ink-m);padding:0 6px 2px;">${label}</div>`+
+        (list.length?list.map(n=>row(n,`${deg.get(n.id)} ${unit}`)).join('')
+                    :`<div style="color:var(--ink-h);font-size:10.5px;padding:1px 6px 3px;">None.</div>`)+`</div>`;
+      h += grp('drivers','Busiest factors',null,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Being busy is not the same as being a root cause — these can be both cause and effect.</div>`+
+        sub('Influence the most',I.drivers,I.outDeg,'out')+
+        sub('Affected by the most',I.sinks,I.inDeg,'in'));
+    }
     _insightLoops=I.loops;
     const rbBadge=(cls)=>{
       if(!cls||cls.type==='unassigned') return '<span style="display:inline-block;min-width:16px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:var(--surf-3);color:var(--ink-h);" title="One or more connections in this loop have no polarity yet">?</span>';
@@ -11175,33 +11255,74 @@ function knockNodeAlpha(n,base){
   if(!KNOCK) return base;
   return KNOCK.step.get(n.id)===3?0.25:base;
 }
+// What a change here reaches, and which way it pushes.
+//
+// This used to walk arrow-less links in BOTH directions, so on a map with no
+// arrows the "ripple" was just everything within three hops - an answer that
+// looked like causation and was not. It also ignored the +/- signs entirely, so
+// a chain of two minuses came out looking the same as a chain of two pluses.
+//
+// Now: only arrows are followed, so a map with no direction returns nothing and
+// says why. Signs multiply along each path, the way a causal chain actually
+// composes - two negatives make a positive. A factor reached by one path that
+// pushes it up and another that pushes it down is "mixed", which matters more
+// than either sign on its own: it is where an intervention fights itself.
+//
+// Direction only. Nothing here says how MUCH, because the map does not record
+// strengths and inventing them would be the most misleading thing it could do.
 function computeKnock(originId){
   const out=new Map();
-  const add=(from,to,i)=>{ if(!out.has(from)) out.set(from,[]); out.get(from).push({to,i}); };
+  const add=(from,to,i,sign)=>{ if(!out.has(from)) out.set(from,[]); out.get(from).push({to,i,sign}); };
+  let directed=0;
   edges.forEach((e,i)=>{
     const s=(e.source&&typeof e.source==='object')?e.source.id:e.source;
     const t=(e.target&&typeof e.target==='object')?e.target.id:e.target;
     if(s===t) return;
     const a=arrowOf(e);
-    if(a!=='backward') add(s,t,i);    // forward, both, and plain lines
-    if(a!=='forward')  add(t,s,i);    // backward, both, and plain lines
+    if(a==='none') return;                       // no arrow, no claim about cause
+    // 0 = sign not set on this link, so anything beyond it is direction-only
+    const sign=e.polarity==='positive'?1:e.polarity==='negative'?-1:0;
+    if(a!=='backward'){ add(s,t,i,sign); directed++; }
+    if(a!=='forward'){ add(t,s,i,sign); directed++; }
   });
-  const step=new Map([[originId,0]]), edgeStep=new Map();
+
+  // Breadth-first by steps. effect: 1 up, -1 down, 0 unknown (an unsigned link
+  // somewhere on the way), 'mixed' when both directions reach the same factor.
+  // One step of a path: compose this link's sign onto what the path carried so
+  // far. 'mixed' and 0 (unknown) both survive everything downstream of them -
+  // nothing further along can un-muddy a path that is already unclear.
+  const compose=(carried,sign)=>
+    carried==='mixed' ? 'mixed' :
+    (carried===0||sign===0) ? 0 : carried*sign;
+  // Two paths arriving at the same factor.
+  const reconcile=(a,b)=>{
+    if(a===b) return a;
+    if(a==='mixed'||b==='mixed') return 'mixed';
+    if(a===0||b===0) return 0;        // one path's sign is unknown
+    return 'mixed';                   // one pushes up, the other pushes down
+  };
+  const step=new Map([[originId,0]]), edgeStep=new Map(), effect=new Map([[originId,1]]);
   let frontier=[originId];
-  for(let k=1;k<=3&&frontier.length;k++){
+  for(let k=1;k<=KNOCK_MAX_STEPS&&frontier.length;k++){
     const next=[];
     frontier.forEach(u=>{
-      (out.get(u)||[]).forEach(({to,i})=>{
-        if(step.has(to)) return;
-        step.set(to,k); edgeStep.set(i,k); next.push(to);
+      const carried=effect.get(u);
+      (out.get(u)||[]).forEach(({to,i,sign})=>{
+        if(to===originId) return;
+        const here=compose(carried,sign);
+        if(!step.has(to)){ step.set(to,k); effect.set(to,here); next.push(to); }
+        else effect.set(to,reconcile(effect.get(to),here));
+        if(!edgeStep.has(i)) edgeStep.set(i,k);
       });
     });
     frontier=next;
   }
-  step.delete(originId);
-  const counts=[0,0,0,0];
-  step.forEach(k=>counts[k]++);
-  return {step,edgeStep,counts};
+  step.delete(originId); effect.delete(originId);
+  const counts=[0,0,0,0,0,0];
+  step.forEach(k=>{ if(k<counts.length) counts[k]++; });
+  let up=0,down=0,mixed=0,unknown=0;
+  effect.forEach(v=>{ if(v==='mixed') mixed++; else if(v===1) up++; else if(v===-1) down++; else unknown++; });
+  return {step,edgeStep,effect,counts,directed,totals:{up,down,mixed,unknown,all:step.size}};
 }
 function ctxMakeFocus(){
   const id=ctxMenuNodeId; closeNodeCtxMenu();
@@ -11217,18 +11338,32 @@ function ctxKnockOn(){
   highlightIds.add(id);
   r.step.forEach((k,nid)=>{ if(k===1) highlightIds.add(nid); else secondaryIds.add(nid); });
   r.edgeStep.forEach((k,i)=>{ if(k===1) highlightEdges.add(i); });
-  KNOCK={origin:id,label:n.label,step:r.step,edgeStep:r.edgeStep,counts:r.counts};
+  KNOCK={origin:id,label:n.label,step:r.step,edgeStep:r.edgeStep,counts:r.counts,
+         effect:r.effect,totals:r.totals,directed:r.directed};
   showKnockBanner();
   draw();
 }
 function showKnockBanner(){
   const el=document.getElementById('knock-banner');
   if(!el||!KNOCK) return;
-  const [,d1,d2,d3]=KNOCK.counts;
   const name=escHtml(KNOCK.label);
-  const body=(d1+d2+d3)
-    ? `<strong>Ripple from ${name}:</strong>&nbsp;${d1} direct &middot; ${d2} at step 2 &middot; ${d3} at step 3`
-    : `<strong>${name}</strong> has no arrows leading out to follow.`;
+  const T=KNOCK.totals||{up:0,down:0,mixed:0,unknown:0,all:0};
+  let body;
+  if(!KNOCK.directed){
+    // The old version followed arrow-less links both ways and called the result
+    // a ripple. Saying nothing is the honest answer when nothing has a direction.
+    body=`<strong>Nothing to follow from ${name}.</strong> No connection on this map has an arrow, so there is no way to tell what affects what.`;
+  } else if(!T.all){
+    body=`<strong>${name}</strong> has no arrows leading out, so nothing downstream of it is recorded.`;
+  } else {
+    const bits=[];
+    if(T.up) bits.push(`${T.up} pushed up`);
+    if(T.down) bits.push(`${T.down} pushed down`);
+    if(T.mixed) bits.push(`${T.mixed} mixed`);
+    if(T.unknown) bits.push(`${T.unknown} direction only`);
+    body=`<strong>If ${name} rises:</strong>&nbsp;${bits.join(' &middot; ')}`
+       +`<span style="color:var(--ink-h);">&nbsp;within ${KNOCK_MAX_STEPS} steps</span>`;
+  }
   el.innerHTML=`<span>${body}</span><span style="color:var(--ink-h);margin-left:4px;">Esc clears</span>`;
   el.style.display='flex';
 }
