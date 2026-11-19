@@ -3254,8 +3254,36 @@ function computeInsights(){
   // on each node plus the same +/- polarity field systems maps use, just read
   // as alliance/friction here rather than cause/effect.
   let silentGiants=[], gridlockRisks=[], influenceBridges=[], alignmentHealth=null;
+  let stakeGrid=null, powerNotOnSide=[], highInterestLowPower=[], notEngaged=null;
   if(MAP_TYPE==='stakeholder'){
     silentGiants=pool.filter(n=>n.stakePower==='high'&&n.stakeInterest==='low');
+
+    // The power/interest grid. Power and interest are each high or low (or not
+    // set), so four boxes is the whole picture, not a simplification of it -
+    // this is the grid people are taught, and the one they expect to see.
+    // Within a box, order by how connected someone is: that is real data off
+    // the map, where a finer power score would be a number somebody made up.
+    const scored=pool.filter(n=>n.stakePower&&n.stakeInterest);
+    const box=(p,i)=>scored.filter(n=>n.stakePower===p&&n.stakeInterest===i)
+                           .sort((a,b)=>(total.get(b.id)||0)-(total.get(a.id)||0)||byLabel(a,b));
+    stakeGrid={
+      scored:scored.length, unscored:pool.length-scored.length,
+      // high power + high interest: the people the work lives or dies by
+      manage:box('high','high'),
+      // high power + low interest: the silent giants, a risk if surprised late
+      satisfy:box('high','low'),
+      // low power + high interest: care most, heard least
+      inform:box('low','high'),
+      // low power + low interest: keep an eye, spend little
+      monitor:box('low','low')
+    };
+    highInterestLowPower=stakeGrid.inform;
+
+    // Power, but not on side. Deliberately separate from gridlock risks, which
+    // is about friction BETWEEN two powerful people; this is about one powerful
+    // person's own stance, whoever they are in conflict with.
+    powerNotOnSide=pool.filter(n=>n.stakePower==='high'&&(n.stakeStance==='skeptic'||n.stakeStance==='blocker'))
+                       .sort((a,b)=>(total.get(b.id)||0)-(total.get(a.id)||0)||byLabel(a,b));
 
     const byId=new Map(pool.map(n=>[n.id,n]));
     const posAdj=new Map(pool.map(n=>[n.id,new Set()]));
@@ -3307,6 +3335,20 @@ function computeInsights(){
       if(e.polarity==='positive') posC++; else if(e.polarity==='negative') negC++;
     });
     if(posC+negC>0) alignmentHealth={positive:posC,negative:negC,total:posC+negC,pct:Math.round(posC/(posC+negC)*100)};
+
+    // Who is going unattended. Three different kinds of "not engaged", kept
+    // apart because the thing to do about each one differs: nobody has drawn a
+    // link to them at all; they are on the map but no chain of links reaches
+    // the centre; or nobody has decided where they stand yet. fCounts.un
+    // already counted the unreachable but nothing ever showed who they were.
+    const unlinked=pool.filter(n=>deg.get(n.id)===0);
+    const unlinkedIds=new Set(unlinked.map(n=>n.id));
+    const unreachable=focus
+      ? pool.filter(n=>n.id!==focus.id&&!unlinkedIds.has(n.id)&&fD&&!fD.has(n.id))
+      : [];
+    const unscored=pool.filter(n=>!n.stakePower||!n.stakeInterest||!n.stakeStance);
+    notEngaged={unlinked,unreachable,unscored,
+                total:new Set([...unlinked,...unreachable,...unscored].map(n=>n.id)).size};
   }
 
   pool.forEach(n=>{ const y=yearOf(n.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].p++; });
@@ -3320,6 +3362,7 @@ function computeInsights(){
           loopsFoundTotal,loopsTruncated,compCount,compBig,focus,focusGuessed,fD,fCounts,
           loopClass,limitsToGrowth,unassignedPolarityCount,nodeLoopCount,
           silentGiants,gridlockRisks,influenceBridges,alignmentHealth,
+          stakeGrid,powerNotOnSide,highInterestLowPower,notEngaged,
           criticalLinks,density,betweenness,betweennessCapped,topBetweenness,overloadedHubs,
           arg:MAP_TYPE==='argument'?argumentAnalysis(pool):null};
 }
@@ -3657,18 +3700,67 @@ function renderInsights(){
       direct.length ? direct.slice(0,10).map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('Nothing is linked to the centre yet.'));
   }
   if(MAP_TYPE==='stakeholder'){
-    // "0 silent giants" means nothing until somebody has actually been scored.
-    // Count how many stakeholders have both the fields this card reads.
-    const scored=I.pool.filter(n=>n.stakePower&&n.stakeInterest).length;
-    if(!scored){
-      h += skipped('silentgiants','Silent giants',
-        `Nobody on this map has power and interest set yet, so there is nothing to compare. Open a stakeholder and set both to see who is high power but low interest.`);
+    const G=I.stakeGrid||{scored:0,unscored:0,manage:[],satisfy:[],inform:[],monitor:[]};
+    const basedOn=G.unscored?` Based on the ${G.scored} of ${I.pool.length} stakeholders scored so far.`:'';
+    // Who matters most: the whole power/interest grid, not one corner of it.
+    // Each box says what to DO, because that is the only reason to sort people
+    // into boxes at all.
+    if(!G.scored){
+      h += skipped('grid','Who matters most',
+        `Nobody on this map has power and interest set yet, so there is nothing to sort. Open a stakeholder and set both to see the power and interest grid.`);
     } else {
-      h += grp('silentgiants','Silent giants',I.silentGiants.length,
-        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">High power, low interest - a risk if surprised late.${scored<I.pool.length?` Based on the ${scored} of ${I.pool.length} stakeholders scored so far.`:''}</div>`+
-        (I.silentGiants.length
-          ? I.silentGiants.map(n=>row(n,'')).join('')
-          : none(`None of the ${scored} scored so far is high power with low interest.`)));
+      const quad=(label,what,list)=>
+        `<div style="margin-top:4px;"><div style="font-size:10.5px;font-weight:700;color:var(--ink-m);padding:0 6px;">${label} <span style="font-weight:400;color:var(--ink-h);">${list.length}</span></div>`+
+        `<div style="font-size:10px;color:var(--ink-h);padding:0 6px 2px;">${what}</div>`+
+        (list.length?list.slice(0,6).map(n=>row(n,plural(I.total.get(n.id)||0,'connection'))).join('')
+                    :`<div style="color:var(--ink-h);font-size:10.5px;padding:1px 6px 3px;">Nobody.</div>`)+
+        (list.length>6?`<div style="color:var(--ink-h);font-size:10px;padding:0 6px 3px;">+${list.length-6} more</div>`:'')+
+        `</div>`;
+      h += grp('grid','Who matters most',G.scored,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Power against interest. Most connected first within each box.${basedOn}</div>`+
+        quad('High power, high interest','Work closely with these. The job lives or dies by them.',G.manage)+
+        quad('High power, low interest','Keep them satisfied. They can stop this, and will not see it coming.',G.satisfy)+
+        quad('Low power, high interest','Keep them informed. They care most and are heard least.',G.inform)+
+        quad('Low power, low interest','Light touch. Check now and then.',G.monitor));
+    }
+
+    // Power, but not on side.
+    const stanceScored=I.pool.filter(n=>n.stakePower&&n.stakeStance).length;
+    if(!stanceScored){
+      h += skipped('notonside','Power, but not on side',
+        `No stakeholder has both power and a stance set, so there is nothing to check. Set where people stand to see who can block this.`);
+    } else {
+      h += grp('notonside','Power, but not on side',I.powerNotOnSide.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">High power, and sceptical or blocking. These are the people who can stop this.${stanceScored<I.pool.length?` Based on the ${stanceScored} with both set.`:''}</div>`+
+        (I.powerNotOnSide.length
+          ? I.powerNotOnSide.map(n=>row(n,n.stakeStance==='blocker'?'blocker':'sceptic')).join('')
+          : none(`Nobody with high power is currently sceptical or blocking.`)));
+    }
+
+    // High interest, little influence. Same box as the grid's "keep informed",
+    // surfaced on its own because it is the group most often left out of a plan.
+    if(G.scored){
+      h += grp('quietstake','High interest, little influence',I.highInterestLowPower.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">They care most about the outcome and have least say in it. Often the people the work is actually for.${basedOn}</div>`+
+        (I.highInterestLowPower.length
+          ? I.highInterestLowPower.map(n=>row(n,plural(I.total.get(n.id)||0,'connection'))).join('')
+          : none(`Nobody scored so far has high interest with low power.`)));
+    }
+
+    // Not yet engaged: three separate problems with three different answers.
+    const NE=I.notEngaged;
+    if(NE&&NE.total>0){
+      const part=(label,list,what)=>list.length
+        ? `<div style="margin-top:4px;"><div style="font-size:10.5px;font-weight:700;color:var(--ink-m);padding:0 6px;">${label} <span style="font-weight:400;color:var(--ink-h);">${list.length}</span></div>`+
+          `<div style="font-size:10px;color:var(--ink-h);padding:0 6px 2px;">${what}</div>`+
+          list.slice(0,6).map(n=>row(n,'')).join('')+
+          (list.length>6?`<div style="color:var(--ink-h);font-size:10px;padding:0 6px 3px;">+${list.length-6} more</div>`:'')+`</div>`
+        : '';
+      h += grp('notengaged','Not yet engaged',NE.total,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Nobody here is being worked with yet, for three different reasons.</div>`+
+        part('No connections at all',NE.unlinked,'On the map, but joined to nothing. Nobody has recorded a relationship.')+
+        part('Cannot be reached from the centre',NE.unreachable,'Linked to others, but no chain of links leads back to the centre of this map.')+
+        part('Not scored yet',NE.unscored,'Missing power, interest or stance, so they are left out of the figures above.'));
     }
 
     if(I.gridlockRisks.length){
