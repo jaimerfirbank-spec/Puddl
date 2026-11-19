@@ -1524,7 +1524,8 @@ class PinSet extends Set{
   clearAll(){ this.pins=null; super.clear(); }
 }
 let highlightIds=new PinSet(),highlightEdges=new PinSet(),secondaryIds=new Set();
-const LOOP_CAP=100, LOOP_MAX_STEPS=20;
+const LOOP_MAX_STEPS=8, LOOP_BUDGET=2000000, LOOP_FOUND_MAX=20000;
+const LOOP_MERGE_J=0.8, LOOP_LIST_MAX=200;
 const _pinnedLoops=new Map();   // loop key -> [node ids]
 let _pinEdgeSig=-1;
 const LOOP_COLOURS=['#E11D48','#2563EB','#16A34A','#D97706','#9333EA','#0D9488','#EA580C','#DB2777','#65A30D','#92400E'];
@@ -3176,29 +3177,15 @@ function computeInsights(){
     .sort((x,y)=>(inDeg.get(y.id)-outDeg.get(y.id))-(inDeg.get(x.id)-outDeg.get(x.id))||byLabel(x,y))
     .slice(0,5);
 
-  // Feedback loops (systems maps): directed cycles of 3 to 20 steps. Capped at LOOP_CAP loops and a
-  // work budget so a huge, dense map can't freeze the page. loopsCapped says the list may be incomplete.
-  const loops=[]; let loopsCapped=false;
-  if(MAP_TYPE==='systems'&&directedEdges&&pool.length<=2000){
-    const idx=new Map(pool.map((n,i)=>[n.id,i]));
-    const byId2=new Map(pool.map(n=>[n.id,n]));
-    const seenKey=new Set();
-    let budget=1500000;
-    const dfs=(start,cur,path,onPath)=>{
-      if(budget--<0||loops.length>=LOOP_CAP) return;
-      for(const nxt of dirAdj.get(cur)||[]){
-        if(budget<0||loops.length>=LOOP_CAP) return;
-        if(nxt===start){
-          if(path.length>=3){ const k=path.join('>'); if(!seenKey.has(k)){ seenKey.add(k); loops.push(path.map(id=>byId2.get(id))); } }
-        } else if(!onPath.has(nxt)&&path.length<LOOP_MAX_STEPS&&idx.get(nxt)>idx.get(start)){
-          onPath.add(nxt); path.push(nxt); dfs(start,nxt,path,onPath); path.pop(); onPath.delete(nxt);
-        }
-      }
-    };
-    for(const n of pool){ if(loops.length>=LOOP_CAP||budget<0) break; dfs(n.id,n.id,[n.id],new Set([n.id])); }
-    loopsCapped=loops.length>=LOOP_CAP||budget<0;
-    loops.sort((a,b)=>a.length-b.length);
-  }
+  // Feedback loops (systems maps). Shortest first, and complete to whatever depth
+  // it finished - see findFeedbackLoops() for why that matters.
+  const LOOPS=findFeedbackLoops(pool,dirAdj,MAP_TYPE==='systems'&&directedEdges&&pool.length<=5000);
+  const loops=LOOPS.loops;                    // representative loops, shortest first
+  const loopVariants=LOOPS.variants;          // near-duplicates folded into each one
+  const loopsComplete=LOOPS.complete;         // did the search finish every depth it tried
+  const loopSearchDepth=LOOPS.depth;          // the longest length it searched exhaustively
+  const loopsFoundTotal=LOOPS.foundTotal;     // loops found before near-duplicates were merged
+  const loopsTruncated=LOOPS.truncated;       // more distinct loops exist than the list shows
   // R/B classification and Limits-to-Growth, systems maps only. edgeByPair
   // resolves each loop's consecutive node pairs back to the real edge, the
   // same a|b / b|a lookup pattern refreshLoopPins() already uses for pins.
@@ -3213,7 +3200,10 @@ function computeInsights(){
     loopClass=loops.map(L=>classifySystemsLoop(L,edgeByPair));
     limitsToGrowth=findLimitsToGrowth(loops,loopClass,total,5);
     edgesIn.forEach(e=>{ if(arrowOf(e)!=='none'&&!e.polarity) unassignedPolarityCount++; });
-    loops.forEach(L=>{ L.forEach(n=>{ nodeLoopCount.set(n.id,(nodeLoopCount.get(n.id)||0)+1); }); });
+    // Counted over every loop found, not just the representatives left after
+    // near-duplicates were merged, so "in 48 loops" describes the real structure.
+    // loopsFoundTotal is the denominator the UI quotes alongside it.
+    nodeLoopCount=LOOPS.nodeCounts;
   }
 
   // Clusters: separate pieces of the map that don't touch (within this view)
@@ -3307,11 +3297,117 @@ function computeInsights(){
 
   return {filtered,pool,deg,total,most,least,isolated,bridges:bridges.slice(0,5),linked,alone,
           groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length,
-          outDeg,inDeg,drivers,sinks,directedEdges,loops,loopsCapped,compCount,compBig,focus,focusGuessed,fD,fCounts,
+          outDeg,inDeg,drivers,sinks,directedEdges,loops,loopVariants,loopsComplete,loopSearchDepth,
+          loopsFoundTotal,loopsTruncated,compCount,compBig,focus,focusGuessed,fD,fCounts,
           loopClass,limitsToGrowth,unassignedPolarityCount,nodeLoopCount,
           silentGiants,gridlockRisks,influenceBridges,alignmentHealth,
           criticalLinks,density,betweenness,betweennessCapped,topBetweenness,overloadedHubs,
           arg:MAP_TYPE==='argument'?argumentAnalysis(pool):null};
+}
+function findFeedbackLoops(pool,dirAdj,enabled){
+  const empty={loops:[],variants:[],complete:true,depth:0,foundTotal:0,truncated:false,nodeCounts:new Map()};
+  if(!enabled||!pool.length) return empty;
+
+  // --- strongly connected components (Tarjan, iterative so a deep graph can't
+  // overflow the stack). Only a component of 2+ can hold a directed cycle.
+  const index=new Map(), low=new Map(), onStack=new Map(), comp=new Map();
+  const stack=[]; let counter=0, compId=0;
+  for(const root of pool){
+    if(index.has(root.id)) continue;
+    const work=[{v:root.id,it:(dirAdj.get(root.id)||[])[Symbol.iterator]()}];
+    index.set(root.id,counter); low.set(root.id,counter); counter++;
+    stack.push(root.id); onStack.set(root.id,true);
+    while(work.length){
+      const f=work[work.length-1];
+      let descended=false;
+      let step=f.it.next();
+      while(!step.done){
+        const w=step.value;
+        if(!index.has(w)){
+          index.set(w,counter); low.set(w,counter); counter++;
+          stack.push(w); onStack.set(w,true);
+          work.push({v:w,it:(dirAdj.get(w)||[])[Symbol.iterator]()});
+          descended=true; break;
+        }
+        if(onStack.get(w)) low.set(f.v,Math.min(low.get(f.v),index.get(w)));
+        step=f.it.next();
+      }
+      if(descended) continue;
+      work.pop();
+      if(work.length){ const p=work[work.length-1].v; low.set(p,Math.min(low.get(p),low.get(f.v))); }
+      if(low.get(f.v)===index.get(f.v)){
+        for(;;){ const w=stack.pop(); onStack.set(w,false); comp.set(w,compId); if(w===f.v) break; }
+        compId++;
+      }
+    }
+  }
+  const compSize=new Map();
+  comp.forEach(c=>compSize.set(c,(compSize.get(c)||0)+1));
+
+  // Keep only the nodes that can be on a cycle, and only the links that stay
+  // inside their own component - a link leaving its component can never come back.
+  const order=pool.filter(n=>(compSize.get(comp.get(n.id))||0)>=2);
+  if(!order.length) return empty;
+  const idx=new Map(order.map((n,i)=>[n.id,i]));
+  const byId=new Map(pool.map(n=>[n.id,n]));
+  const cyc=new Map();
+  order.forEach(n=>cyc.set(n.id,(dirAdj.get(n.id)||[]).filter(m=>idx.has(m)&&comp.get(m)===comp.get(n.id))));
+
+  // --- search, one length at a time
+  let budget=LOOP_BUDGET, stopped=false, depthDone=0;
+  const found=[];
+  for(let depth=3;depth<=LOOP_MAX_STEPS;depth++){
+    const atDepth=[];
+    for(const s of order){
+      if(stopped) break;
+      const sid=s.id, si=idx.get(sid);
+      const path=[sid], onPath=new Set([sid]);
+      const walk=cur=>{
+        for(const nxt of cyc.get(cur)||[]){
+          if(--budget<=0||found.length+atDepth.length>=LOOP_FOUND_MAX){ stopped=true; return; }
+          if(nxt===sid){ if(path.length===depth) atDepth.push(path.slice()); continue; }
+          // skip anything already on this path, and anything that would start the
+          // loop somewhere other than its lowest-indexed node (found once, not N times)
+          if(onPath.has(nxt)||idx.get(nxt)<si||path.length>=depth) continue;
+          onPath.add(nxt); path.push(nxt);
+          walk(nxt);
+          path.pop(); onPath.delete(nxt);
+          if(stopped) return;
+        }
+      };
+      walk(sid);
+    }
+    // A depth that ran out of budget part-way is not a complete answer for that
+    // length, so its partial results are dropped rather than reported as the lot.
+    if(stopped) break;
+    found.push(...atDepth);
+    depthDone=depth;
+  }
+
+  // Count every loop found, not just the ones that survive merging below - the
+  // "in N loops" figure means more when it counts the real structure.
+  const nodeCounts=new Map();
+  found.forEach(L=>L.forEach(id=>nodeCounts.set(id,(nodeCounts.get(id)||0)+1)));
+
+  // --- fold near-duplicates together. found is already shortest-first, so the
+  // representative kept for each group is the shortest version of that story.
+  const reps=[], variants=[], sets=[];
+  let truncated=false;
+  for(const L of found){
+    const S=new Set(L);
+    let merged=false;
+    for(let i=0;i<sets.length;i++){
+      const T=sets[i];
+      let inter=0; S.forEach(x=>{ if(T.has(x)) inter++; });
+      const uni=S.size+T.size-inter;
+      if(uni&&inter/uni>=LOOP_MERGE_J){ variants[i]++; merged=true; break; }
+    }
+    if(merged) continue;
+    if(reps.length>=LOOP_LIST_MAX){ truncated=true; continue; }
+    sets.push(S); reps.push(L.map(id=>byId.get(id))); variants.push(1);
+  }
+  return {loops:reps,variants,complete:!stopped,depth:depthDone,
+          foundTotal:found.length,truncated,nodeCounts};
 }
 function classifySystemsLoop(loopNodes, edgeByPair){
   let minus=0, unknown=0;
@@ -3391,7 +3487,11 @@ function insightSummaryLines(I){
       if(I.sinks[0]) S.push(`${I.sinks[0].label} is affected by the most: ${I.inDeg.get(I.sinks[0].id)} incoming arrows.`);
       if(I.loops.length){
         const rC=I.loopClass.filter(c=>c.type==='R').length, bC=I.loopClass.filter(c=>c.type==='B').length, uC=I.loopClass.filter(c=>c.type==='unassigned').length;
-        S.push(`${I.loopsCapped?'At least '+I.loops.length:I.loops.length} feedback loop${I.loops.length===1?'':'s'} found: ${rC} reinforcing, ${bC} balancing${uC?`, ${uC} not yet classifiable (give every connection a + or -)`:''}.`);
+        const scope=I.loopsComplete
+          ? `every loop up to ${I.loopSearchDepth} steps`
+          : (I.loopSearchDepth>=3 ? `every loop up to ${I.loopSearchDepth} steps, then the search stopped: this map is too dense to find them all`
+                                  : `the search stopped early: this map is too dense to find every loop`);
+        S.push(`${I.loops.length} feedback loop${I.loops.length===1?'':'s'} found — ${scope}. ${rC} reinforcing, ${bC} balancing${uC?`, ${uC} not yet classifiable (give every connection a + or -)`:''}.`);
       } else {
         S.push('No feedback loops found in this view: influence flows one way.');
       }
@@ -3526,14 +3626,22 @@ function renderInsights(){
       const anyPin=I.loops.some(L=>_pinnedLoops.has(loopKey(L)));
       lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 6px;">${plural(rCount,'reinforcing loop')}, ${plural(bCount,'balancing loop')}${uCount?', '+plural(uCount,'loop')+' not yet classifiable (missing polarity)':''}.</div>`;
       lh += `<div style="display:flex;gap:6px;margin:2px 0 6px;"><button onclick="highlightAllLoops()" style="flex:1;font-size:10.5px;height:26px;">↻ Highlight all</button>${anyPin?`<button onclick="clearLoopPins()" style="font-size:10.5px;height:26px;padding:0 10px;">Clear</button>`:''}</div>`;
-      lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Click loops to highlight them. Click again to remove one.${I.loopsCapped?' Showing the first '+I.loops.length+'.':''}</div>`;
+      // Say exactly how much of the map was searched. "Showing the first 100"
+      // told the user nothing about what was missed; a depth they can check does.
+      const scopeLine=I.loopsComplete
+        ? `Searched every loop up to ${I.loopSearchDepth} steps. Longer loops are not listed.`
+        : (I.loopSearchDepth>=3
+            ? `Searched every loop up to ${I.loopSearchDepth} steps, then stopped: this map is too dense to find them all.`
+            : `The search stopped early: this map is too dense to find every loop.`);
+      const mergedCount=(I.loopVariants||[]).filter(v=>v>1).length;
+      lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Click loops to highlight them. Click again to remove one.<br>${scopeLine}${mergedCount?` ${plural(mergedCount,'loop')} had near-identical versions, folded in.`:''}${I.loopsTruncated?` More than ${LOOP_LIST_MAX} different loops exist; showing the ${I.loops.length} shortest.`:''}</div>`;
       lh += I.loops.map((L,li)=>{
         const on=_pinnedLoops.has(loopKey(L));
         const lc=on?loopColourOf(_pinColourIdx.get(loopKey(L))||0,document.documentElement.getAttribute('data-theme')==='dark').col:'';
-        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span>${rbBadge(I.loopClass[li])}<span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span></span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
+        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span>${rbBadge(I.loopClass[li])}<span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span>${(I.loopVariants&&I.loopVariants[li]>1)?`<span style="color:var(--ink-h);" title="Near-identical loops differing by a node or two, shown as this one">+${I.loopVariants[li]-1} similar</span>`:''}</span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
       }).join('');
     } else lh += none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
-    h += grp('loops','Feedback loops',(I.loopsCapped?I.loops.length+'+':I.loops.length),lh);
+    h += grp('loops','Feedback loops',(I.loopsTruncated?I.loops.length+'+':I.loops.length),lh);
 
     if(I.limitsToGrowth.length){
       let gh='';
@@ -3551,9 +3659,12 @@ function renderInsights(){
 
     const leverage=[...I.nodeLoopCount.entries()].filter(([id,c])=>c>=2).sort((a,b)=>b[1]-a[1]).slice(0,5);
     if(leverage.length){
+      // Always quote the denominator. "In 48 loops" on its own invites the reader
+      // to assume 48 of all the loops there are, when it is 48 of the ones searched.
+      const denom=I.loopsFoundTotal||0;
       h += grp('leverage','Structural leverage points',leverage.length,
-        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">In more than one feedback loop - a change here ripples furthest.</div>`+
-        leverage.map(([id,c])=>{ const n=I.pool.find(p=>p.id===id); return n?row(n,`in ${c} loops`):''; }).join(''));
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">In more than one feedback loop - a change here ripples furthest.${denom?` Counted over the ${denom} loop${denom===1?'':'s'} found up to ${I.loopSearchDepth} steps.`:''}</div>`+
+        leverage.map(([id,c])=>{ const n=I.pool.find(p=>p.id===id); return n?row(n,denom?`in ${c} of ${denom}`:`in ${c} loops`):''; }).join(''));
     }
   } else {
     h += grp('most','Most connected',null,
