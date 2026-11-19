@@ -37,7 +37,7 @@
         const id=index+1;ids.set(source.id,id);
         const x=((source.x+source.width/2)/1000-0.5)*iw;
         const y=((source.y+source.height/2)/1000-0.5)*ih;
-        return {id,x,y,pinned:true,label:String(source.label||'Unnamed node'),colour:'#A8D8EA',shape:source.shape==='rectangle'?'rectangle':'circle',nodeSize:source.width>170?'large':'medium',titleSize:'medium',notes:String(source.notes||''),videoUrl:'',customFields:{},tags:[],history:[{ts:Date.now(),text:'Imported from a hand-drawn photo'}],date:new Date().toISOString().slice(0,10),type:'process',lastUpdated:Date.now()};
+        return {id,x,y,pinned:true,label:String(source.label||'Unnamed node'),colour:'#A8D8EA',shape:source.shape==='rectangle'?'rectangle':'circle',nodeSize:source.nodeSize==='large'||source.width>170?'large':'medium',titleSize:'medium',notes:String(source.notes||''),videoUrl:'',customFields:{},tags:source.groupTitle?[String(source.groupTitle)]:[],history:[{ts:Date.now(),text:'Imported from a hand-drawn photo'}],date:new Date().toISOString().slice(0,10),type:'process',lastUpdated:Date.now()};
       });
       const scale=photoLayoutScale(draftNodes,viewportScale);
       draftNodes.forEach(node=>{node.x=cx+node.x*scale;node.y=cy+node.y*scale;});

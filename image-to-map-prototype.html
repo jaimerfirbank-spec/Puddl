@@ -19,7 +19,7 @@
 </head>
 <body>
   <main class="page">
-    <div class="top"><div><h1>Puddle Lens</h1><p>Review the photo reading, correct it, then create a new editable map.</p></div><a class="button secondary" href="/lens/inbox.html">Photo inbox</a></div>
+    <div class="top"><div><h1>Puddle Lens</h1><p>Review the photo reading, correct it, then approve it or create one editable map.</p></div><a class="button secondary" href="/lens/inbox.html">Photo inbox</a></div>
     <p><a href="/lens/">Sign in to Lens</a> · <a href="/">Back to Puddle</a></p>
     <section class="card">
       <label class="upload" for="file"><strong>Choose one hand-drawn map photo</strong><span>JPG, PNG or WebP — black marker on white paper works best. Sign in to Lens first.</span></label>
@@ -34,8 +34,9 @@
 <script src="/api/client-config"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/lens/shared.js"></script>
+<script src="/lens/reviews.js"></script>
 <script>
-const $=id=>document.getElementById(id);let chosen=null,previewUrl='',requestNumber=0,readController=null,photoAuthClient=null;
+const $=id=>document.getElementById(id),lensPhotoName=new URLSearchParams(location.search).get('lensPhoto');let chosen=null,previewUrl='',requestNumber=0,readController=null,photoAuthClient=null;
 function cancelReading(){ requestNumber++; if(readController) readController.abort(); readController=null; }
 function setStatus(text){$('status').textContent=text}
 function showError(text){$('error').textContent=text;$('error').classList.remove('hidden')}
@@ -64,8 +65,10 @@ function render(imageUrl,data){
   const addNode=document.createElement('button');addNode.type='button';addNode.className='clear';addNode.style.marginTop='10px';addNode.textContent='+ Add missing node';addNode.addEventListener('click',()=>{const id='n'+Date.now();data.nodes.push({id,label:'NEW NODE',shape:'circle',x:450,y:450,width:100,height:100,confidence:100,notes:'Added by user'});render(imageUrl,data)});side.appendChild(addNode);
   side.appendChild(heading('Check and correct connections'));const et=document.createElement('table');const eh=document.createElement('tr');for(const t of ['From','Direction','To','Reading','']){const th=document.createElement('th');th.textContent=t;eh.appendChild(th)}et.appendChild(eh);data.edges.forEach((edge,index)=>{const row=document.createElement('tr');addNodeNameCell(row,edge.source,value=>{edge.source=value;render(imageUrl,data)},data);addInputCell(row,edge.direction,value=>{edge.direction=value;render(imageUrl,data)},['source_to_target','both','target_to_source','unclear']);addNodeNameCell(row,edge.target,value=>{edge.target=value;render(imageUrl,data)},data);addCell(row,edge.confidence+'%',confidenceClass(edge.confidence));addDeleteCell(row,()=>{data.edges.splice(index,1);render(imageUrl,data)});et.appendChild(row)});side.appendChild(et);
   const addEdge=document.createElement('button');addEdge.type='button';addEdge.className='clear';addEdge.style.marginTop='10px';addEdge.textContent='+ Add missing connection';addEdge.disabled=data.nodes.length<2;addEdge.addEventListener('click',()=>{data.edges.push({source:data.nodes[0].id,target:data.nodes[1].id,direction:'source_to_target',confidence:100,notes:'Added by user'});render(imageUrl,data)});side.appendChild(addEdge);
-  const actions=document.createElement('div');actions.className='controls';actions.style.cssText='margin-top:24px;padding-top:18px;border-top:1px solid #dce3ec';const create=document.createElement('button');create.type='button';create.textContent='Create a new Puddle map';create.disabled=!data.nodes.length;create.addEventListener('click',async()=>{try{await img.decode();sessionStorage.setItem('puddl_image_import',JSON.stringify({version:1,title:(chosen&&chosen.name?chosen.name.replace(/\.[^.]+$/,''):'Photo map'),nodes:data.nodes,edges:data.edges,imageWidth:img.naturalWidth,imageHeight:img.naturalHeight}));window.location.href='/?imageImport=1'}catch(_){showError('Could not prepare the map. Browser storage may be full.')}});actions.appendChild(create);side.appendChild(actions);
-  const note=document.createElement('p');note.className='note';note.textContent='Correct anything that is wrong, then create a new Puddle map. Node shapes and sizes are simplified, and connection strengths can be set afterwards.';side.appendChild(note);grid.append(picture,side);result.appendChild(grid);result.classList.remove('hidden');
+  const actions=document.createElement('div');actions.className='controls';actions.style.cssText='margin-top:24px;padding-top:18px;border-top:1px solid #dce3ec';const title=(chosen&&chosen.name?chosen.name.replace(/\.[^.]+$/,''):'Photo map');
+  if(lensPhotoName){const approve=document.createElement('button');approve.type='button';approve.textContent='Approve for combined map';approve.disabled=!data.nodes.length;approve.addEventListener('click',async()=>{try{await img.decode();const session=await PuddleLens.session(photoAuthClient);PuddleLensReviews.save(session.user.id,lensPhotoName,title,data,img.naturalWidth,img.naturalHeight);approve.textContent='Approved ✓';setStatus('Approved. Return to the Photo inbox to select it for a combined map.')}catch(error){showError(error.message||'Could not approve this map.')}});actions.appendChild(approve);PuddleLens.session(photoAuthClient).then(session=>{if(PuddleLensReviews.get(session.user.id,lensPhotoName))approve.textContent='Update approval ✓'}).catch(()=>{});}
+  const create=document.createElement('button');create.type='button';create.className=lensPhotoName?'clear':'';create.textContent='Create one Puddle map now';create.disabled=!data.nodes.length;create.addEventListener('click',async()=>{try{await img.decode();const payload={version:1,title,nodes:data.nodes.map(node=>({...node,notes:String(node.notes||'')})),edges:data.edges.map(edge=>({...edge,notes:''})),imageWidth:img.naturalWidth,imageHeight:img.naturalHeight};sessionStorage.setItem('puddl_image_import',JSON.stringify(payload));window.location.href='/?imageImport=1'}catch(_){showError('Could not prepare the map. Browser storage may be full.')}});actions.appendChild(create);side.appendChild(actions);
+  const note=document.createElement('p');note.className='note';note.textContent=lensPhotoName?'Correct anything that is wrong, then approve it. In the Photo inbox, select approved maps and add them to one Puddl map.':'Correct anything that is wrong, then create one Puddle map. Node shapes and sizes are simplified, and connection strengths can be set afterwards.';side.appendChild(note);grid.append(picture,side);result.appendChild(grid);result.classList.remove('hidden');
 }
 $('read').addEventListener('click',async()=>{
   if(!chosen)return;
@@ -99,7 +102,7 @@ $('read').addEventListener('click',async()=>{
 
 // Phone uploads enter the same review flow; opening one never starts a paid read.
 (async()=>{
- const name=new URLSearchParams(location.search).get('lensPhoto');if(!name)return;const request=requestNumber;
+ const name=lensPhotoName;if(!name)return;const request=requestNumber;
  try{
   setStatus('Loading photo from Lens…');photoAuthClient=PuddleLens.createClient();
   const photo=await PuddleLens.download(photoAuthClient,name);if(request!==requestNumber)return;
