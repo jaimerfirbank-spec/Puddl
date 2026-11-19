@@ -5904,6 +5904,7 @@ const IMPORT_ROLES=[
   {id:'connto',   label:'Connected to'},
   {id:'conntype', label:'Connection type'},
   {id:'arrow', label:'Arrow'},
+  {id:'polarity', label:'Polarity (+/-)'},
   {id:'notes',    label:'Notes'},
   {id:'colour',   label:'Node colour'},
   {id:'date',     label:'Date added'},
@@ -5922,9 +5923,27 @@ function importArrowOf(raw){
   if(['↔','<->','both','both ways','two way','two-way','mutual'].includes(t)) return 'both';
   return 'none';
 }
+// Polarity (+/-) on a causal link. Returns 'positive', 'negative', or '' when the
+// cell is empty or says nothing we recognise. '' means "not set yet" and is what
+// every unreadable cell becomes - never a guess, because a wrong sign flips a loop
+// from reinforcing to balancing and the user would have no way to tell.
+// Spreadsheets reach us with words far more often than symbols, so the word forms
+// are first-class. The en dash is here because Excel autocorrects a typed '-' to it.
+function importPolarityOf(raw){
+  const t=String(raw==null?'':raw).trim().toLowerCase();
+  if(!t) return '';
+  if(['+','positive','pos','p','same','s','increases','increase','plus','reinforcing'].includes(t)) return 'positive';
+  if(['-','−','–','—','negative','neg','n','opposite','o','decreases','decrease','minus','balancing'].includes(t)) return 'negative';
+  return '';
+}
 function _importGuessRole(h,nameTaken){
   const k=_fieldKey(h);
   if(/^(arrow|arrows|direction)$/.test(k)) return 'arrow';
+  // Deliberately narrow. A column called "Influence" or "Effect" is usually a
+  // value someone wants kept as a field, and guessing it as polarity would drop
+  // those values silently. Unlisted headers fall through to 'field' as before,
+  // and the user can still pick Polarity by hand in the mapper.
+  if(/^(polarity|sign|posneg|positivenegative|causaldirection)$/.test(k)) return 'polarity';
   if(!nameTaken&&/^(name|nodename|organisation|organization|organisationname|organizationname|orgname|label|title|node)$/.test(k)) return 'name';
   if(/main/.test(k)&&/(connect|link)/.test(k)) return 'mainconn';
   if(/^(part|argumentpart|argpart)$/.test(k)) return 'part';
@@ -6113,14 +6132,27 @@ function runImportMapper(){
 
   const nodeMap=new Map();
   let skipped=0;
+  // Polarity cells we could not read, so the summary screen can own up to them
+  // instead of silently leaving those links unsigned.
+  let polarityUnreadable=0;
+  const polarityUnreadableSamples=[];
   importRawRows.forEach(row=>{
     const name=val(row,nameIdx);
     if(!name){ skipped++; return; }
     const nl=name.toLowerCase();
     if(!nodeMap.has(nl)) nodeMap.set(nl,{name,notes:'',colour:'',date:'',fields:{},connToRaw:[],connToMain:false,grants:[],tags:[]});
     const e=nodeMap.get(nl);
-    let ctype='moderate', cdate='', carrow='none';
+    let ctype='moderate', cdate='', carrow='none', cpol='';
     cols.forEach((c,i)=>{ if(c.role==='arrow'&&val(row,i)) carrow=importArrowOf(val(row,i)); });
+    cols.forEach((c,i)=>{
+      if(c.role!=='polarity') return;
+      const raw=val(row,i); if(!raw) return;      // blank is "not set", not an error
+      cpol=importPolarityOf(raw);
+      if(!cpol){
+        polarityUnreadable++;
+        if(polarityUnreadableSamples.length<3&&!polarityUnreadableSamples.includes(raw)) polarityUnreadableSamples.push(raw);
+      }
+    });
     cols.forEach((c,i)=>{ if(c.role==='conntype'&&val(row,i)) ctype=connTypeOf(val(row,i)); if(c.role==='conndate'&&row[i]!==''&&row[i]!=null) cdate=parseFlexDate(row[i]); });
     cols.forEach((c,i)=>{
       const v=val(row,i); if(!v) return;
@@ -6131,7 +6163,7 @@ function runImportMapper(){
       else if(c.role==='mainconn'&&/^(yes|y|true|1)$/i.test(v)) e.connToMain=true;
       else if(c.role==='part'&&!e.part) e.part=argPartFromText(v);
       else if(c.role==='supports'||c.role==='opposes') v.split(/[,;\n]/).map(t=>t.trim()).filter(Boolean).forEach(t=>e.connToRaw.push({to:t,type:c.role,date:cdate,arrow:'forward'}));
-      else if(c.role==='connto') v.split(/[,;\n]/).map(t=>t.trim()).filter(Boolean).forEach(t=>e.connToRaw.push({to:t,type:ctype,date:cdate,arrow:carrow}));
+      else if(c.role==='connto') v.split(/[,;\n]/).map(t=>t.trim()).filter(Boolean).forEach(t=>e.connToRaw.push({to:t,type:ctype,date:cdate,arrow:carrow,polarity:cpol}));
     });
   });
 
@@ -6168,8 +6200,8 @@ function runImportMapper(){
   // Build planned edges (will be resolved at confirmImport time)
   const toAddEdges=[];
   incoming.forEach(r=>{
-    r.connToRaw.forEach(({to,type,date,arrow})=>{
-      toAddEdges.push({fromName:r.name,toName:to,type,date:date||'',arrow:arrow||'none'});
+    r.connToRaw.forEach(({to,type,date,arrow,polarity})=>{
+      toAddEdges.push({fromName:r.name,toName:to,type,date:date||'',arrow:arrow||'none',polarity:polarity||''});
     });
   });
 
@@ -6188,7 +6220,14 @@ function runImportMapper(){
   const known=new Set(incoming.map(r=>r.name.toLowerCase()));
   if(_importMode!=='replace') nodes.forEach(n=>known.add(String(n.label||'').trim().toLowerCase()));
   const unmatched=toAddEdges.filter(e=>!known.has(String(e.toName).trim().toLowerCase()));
-  importPlan={toAdd,toUpdate,dupeCandidates,toAddEdges,skipped,mainNodeName,mainConnCount,unmatched};
+  // Count connections, not spreadsheet rows: one "Connected to" cell can hold
+  // several targets, and they all inherit that row's sign. Connections whose
+  // target is not a node in the file are dropped later, so they are left out
+  // here too - the same thing the "up to N connections" count does.
+  const _unmSet=new Set(unmatched);
+  const polaritySet=toAddEdges.filter(e=>e.polarity&&!_unmSet.has(e)).length;
+  importPlan={toAdd,toUpdate,dupeCandidates,toAddEdges,skipped,mainNodeName,mainConnCount,unmatched,
+              polaritySet,polarityUnreadable,polarityUnreadableSamples};
 
   if(dupeCandidates.length>0){
     _showImportDupesScreen(importPlan);
@@ -6321,6 +6360,18 @@ function _showImportSummaryScreen(plan){
   if(plan.mainConnCount>0)
     html+=row('🎯',`${plan.mainConnCount} node${plan.mainConnCount!==1?'s':''} will connect to "${plan.mainNodeName}"`,
       'Based on "Connected to main node" column');
+  if(plan.polaritySet>0)
+    html+=row('±',`${plan.polaritySet} connection${plan.polaritySet!==1?'s':''} will get a + or -`,
+      MAP_TYPE==='systems'
+        ? 'Needed to tell reinforcing loops from balancing ones. A signed connection with no arrow is read in the direction it was written.'
+        : 'Read as alliance (+) or friction (-) between two stakeholders.');
+  // Own up to cells we could not read. Silently leaving them unsigned is how you
+  // end up with a map that looks finished and classifies no loops.
+  if(plan.polarityUnreadable>0)
+    html+=row('⚠️',`${plan.polarityUnreadable} polarity cell${plan.polarityUnreadable!==1?'s':''} could not be read — left unset`,
+      (plan.polarityUnreadableSamples||[]).length
+        ? `Not recognised: ${escHtml((plan.polarityUnreadableSamples||[]).map(s=>'"'+s+'"').join(', '))}. Use + or -, or the words positive/negative. Set these by hand after importing.`
+        : 'Use + or -, or the words positive/negative. Set these by hand after importing.');
   const fieldCols=(_importCurrentMapping.cols||[]).filter(c=>c.role==='field');
   if(fieldCols.length){
     const newF=fieldCols.filter(c=>!findFieldByName(c.fname)).map(c=>c.fname);
@@ -6837,7 +6888,7 @@ function confirmImport(){
     if(mergeMap[nl]) return mergeMap[nl];
     return nodes.find(n=>n.label.trim().toLowerCase()===nl)||null;
   };
-  toAddEdges.forEach(({fromName,toName,type,date,arrow})=>{
+  toAddEdges.forEach(({fromName,toName,type,date,arrow,polarity})=>{
     const srcNode=resolveNode(fromName);
     const tgtNode=resolveNode(toName);
     if(!srcNode||!tgtNode||srcNode.id===tgtNode.id) return;
@@ -6848,7 +6899,14 @@ function confirmImport(){
     });
     if(dup) return;
     const style=CONNECTION_STYLES.find(s=>s.id===type);
-    edges.push({source:srcNode.id,target:tgtNode.id,strength:type,colour:style?style.colour:'#888888',arrow:arrow||'none',twoWay:arrow==='both',date:date||''});
+    // A sign only means something on a link that has a direction, so on a systems
+    // map a signed link with no arrow gets the direction it was written in. Same
+    // rule setEdgePolarity() applies when someone sets a sign by hand. Stakeholder
+    // maps read +/- as alliance/friction between two people, which is not a
+    // cause->effect claim, so direction is never forced there.
+    let eArrow=arrow||'none';
+    if(polarity&&MAP_TYPE==='systems'&&eArrow==='none') eArrow='forward';
+    edges.push({source:srcNode.id,target:tgtNode.id,strength:type,colour:style?style.colour:'#888888',arrow:eArrow,twoWay:eArrow==='both',date:date||'',polarity:polarity||null});
     connsAdded++;
   });
 
@@ -7261,7 +7319,12 @@ function confirmLoop(){
       return s===sid&&t===tid;
     });
     if(!exists){
-      edges.push({source:sid,target:tid,strength:'loop',note:'',colour:'',isLoop:true});
+      // arrow:'none' on purpose. A loop group is a drawing aid, not a claim about
+      // cause and effect, and arrowOf() treats a missing arrow as 'forward' - which
+      // would feed phantom direction into Insights (drivers, outcomes, feedback loops).
+      // The loop arc draws its own arrowhead from the circle tangent, so this is
+      // invisible on the canvas.
+      edges.push({source:sid,target:tid,strength:'loop',note:'',colour:'',isLoop:true,arrow:'none'});
       added++;
     }
   }
@@ -11367,7 +11430,10 @@ function loadDemo(){
     [15,4,'dashed','#B09FFF'],  // Akeela → Dr Osei (dashed = informal)
     [19,16,'moderate','#FFB347'], // Be Reyt → Mind
   ];
-  de.forEach(([f,t,s,c])=>edges.push({source:f,target:t,strength:s,colour:c||'rgba(0,0,0,0.25)',note:''}));
+  // arrow:'none' is explicit: these demo links were never given a direction, and
+  // arrowOf() reads a missing arrow as 'forward', which would show made-up drivers
+  // and feedback loops in Insights for the demo map.
+  de.forEach(([f,t,s,c])=>edges.push({source:f,target:t,strength:s,colour:c||'rgba(0,0,0,0.25)',note:'',arrow:'none'}));
 
   mapTitle='Doncaster Systems Map — Demo';
   document.getElementById('map-title-display').textContent=mapTitle;
