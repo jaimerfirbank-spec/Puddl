@@ -2228,31 +2228,33 @@ function selectConnColour(col){
       <!-- Step 4: Near-duplicate review (one pair at a time) -->
       <div id="import-step-dupes" style="display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-          <div style="font-size:12px;font-weight:700;color:var(--ink-h);text-transform:uppercase;letter-spacing:0.06em;">Step 4 — Possible matches</div>
+          <div id="import-dupe-step-title" style="font-size:12px;font-weight:700;color:var(--ink-h);text-transform:uppercase;letter-spacing:0.06em;">Step 4 — Possible matches</div>
           <div id="import-dupe-progress" style="font-size:11px;color:var(--ink-h);font-weight:600;"></div>
         </div>
-        <div style="font-size:11px;color:var(--ink-h);margin-bottom:14px;">These look like the same organisation. Are they?</div>
+        <div id="import-dupe-intro" style="font-size:11px;color:var(--ink-h);margin-bottom:14px;">These look like the same organisation. Are they?</div>
         <!-- Single-pair card -->
         <div id="import-dupe-card" style="background:var(--surf-2);border:1.5px solid var(--bdr);border-radius:var(--radius-lg);padding:16px 18px;">
           <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:16px;">
             <div style="background:var(--surf);border:1px solid var(--bdr-m);border-radius:var(--radius);padding:10px 14px;text-align:center;">
-              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);margin-bottom:4px;">Incoming</div>
+              <div id="dupe-card-incoming-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);margin-bottom:4px;">Incoming</div>
               <div id="dupe-card-incoming" style="font-size:14px;font-weight:700;color:var(--ink);"></div>
+              <div id="dupe-card-incoming-sub" style="font-size:10.5px;color:var(--ink-h);margin-top:3px;"></div>
             </div>
             <div style="font-size:18px;color:var(--ink-h);font-weight:300;">≈</div>
             <div style="background:var(--surf);border:1px solid var(--bdr-m);border-radius:var(--radius);padding:10px 14px;text-align:center;">
-              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);margin-bottom:4px;">On map</div>
+              <div id="dupe-card-existing-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);margin-bottom:4px;">On map</div>
               <div id="dupe-card-existing" style="font-size:14px;font-weight:700;color:var(--ink);"></div>
+              <div id="dupe-card-existing-sub" style="font-size:10.5px;color:var(--ink-h);margin-top:3px;"></div>
             </div>
           </div>
           <div id="dupe-card-score" style="text-align:center;font-size:11px;color:var(--ink-h);margin-bottom:14px;"></div>
-          <div style="font-size:13px;font-weight:600;color:var(--ink);text-align:center;margin-bottom:12px;">Are these the same organisation?</div>
+          <div id="dupe-card-question" style="font-size:13px;font-weight:600;color:var(--ink);text-align:center;margin-bottom:12px;">Are these the same organisation?</div>
           <div style="display:flex;gap:8px;">
-            <button onclick="advanceDupePair('merge')"
+            <button id="dupe-btn-yes" onclick="advanceDupePair('merge')"
               style="flex:1;height:40px;font-size:13px;font-weight:700;background:var(--acc);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-family:'DM Sans',sans-serif;">
               Yes, merge them
             </button>
-            <button onclick="advanceDupePair('separate')"
+            <button id="dupe-btn-no" onclick="advanceDupePair('separate')"
               style="flex:1;height:40px;font-size:13px;font-weight:600;border-radius:var(--radius);cursor:pointer;font-family:'DM Sans',sans-serif;">
               No, keep separate
             </button>
@@ -6138,6 +6140,60 @@ function runImportMapper(){
   const incoming=[...nodeMap.values()];
   if(!incoming.length){ status.textContent='No rows with a node name were found.'; return; }
 
+  // Pass 1: near-duplicate names inside the spreadsheet itself. A sheet several people have
+  // filled in carries "DMBC" and "Doncaster Council" as separate rows. Neither is on the canvas
+  // yet, so the canvas pass below has nothing to compare them against, and in replace mode that
+  // pass never runs at all. Exact repeats of a name were already folded together by nodeMap.
+  const _wf=_withinFileDupes(incoming);
+  if(_wf.length){
+    importPlan={dupeCandidates:_wf,_stage:'withinfile',_rows:incoming,_skipped:skipped};
+    _showImportDupesScreen(importPlan);
+    return;
+  }
+  _buildImportPlan(incoming,skipped,null);
+}
+
+// Near-duplicate names within one spreadsheet. Compares each row against the rows already
+// accepted as distinct, so the first spelling of a name becomes the one kept.
+function _withinFileDupes(rows){
+  if(typeof jaroWinkler!=='function') return [];
+  const out=[], kept=[];
+  rows.forEach(r=>{
+    const rn=String(r.name||'').trim().toLowerCase();
+    let best=null,bestScore=0;
+    kept.forEach(c=>{
+      const sc=jaroWinkler(String(c.name||'').trim().toLowerCase(),rn);
+      if(sc>=_DUPE_THRESHOLD&&sc>bestScore){bestScore=sc;best=c;}
+    });
+    if(best) out.push({incoming:r,canonical:best,existing:{label:best.name},score:bestScore,action:'merge',withinFile:true});
+    else kept.push(r);
+  });
+  return out;
+}
+
+// Fold a confirmed duplicate row into the row being kept. Empty wins nothing: existing values
+// stay, blanks get filled, and connections from both rows are kept so no link is lost.
+function _mergeIncomingRow(t,s){
+  if(!t.notes) t.notes=s.notes||'';
+  else if(s.notes&&!t.notes.includes(s.notes)) t.notes+='\n'+s.notes;
+  if(!t.colour&&s.colour) t.colour=s.colour;
+  if(s.date&&(!t.date||s.date<t.date)) t.date=s.date;
+  if(!t.part&&s.part) t.part=s.part;
+  if(s.connToMain) t.connToMain=true;
+  if(!t.fields) t.fields={};
+  Object.entries(s.fields||{}).forEach(([k,v])=>{ if(!t.fields[k]) t.fields[k]=v; });
+  (s.connToRaw||[]).forEach(c=>t.connToRaw.push(c));
+  (s.grants||[]).forEach(g=>{ if(!t.grants.some(eg=>eg.source===g.source&&eg.rawAmount===g.rawAmount&&eg.date===g.date)) t.grants.push(g); });
+  (s.tags||[]).forEach(tg=>{ if(!t.tags.includes(tg)) t.tags.push(tg); });
+  t._mergedFrom=(t._mergedFrom||[]).concat([s.name]);
+}
+
+// Pass 2: compare the de-duplicated rows against what is already on the canvas, then build the
+// edge list and the import plan. Split out of runImportMapper so the within-file review above
+// can hand control back here once the user has resolved it.
+function _buildImportPlan(incoming,skipped,nameAlias){
+  // An edge endpoint can still name a row that was merged away, so put every name through the alias.
+  const _canonName=nm=>{ const k=String(nm||'').trim().toLowerCase(); return (nameAlias&&nameAlias[k])?nameAlias[k]:nm; };
   // In replace mode, skip dupe detection (canvas will be cleared on import)
   const toAdd=[], toUpdate=[], dupeCandidates=[];
   incoming.forEach(r=>{
@@ -6169,7 +6225,7 @@ function runImportMapper(){
   const toAddEdges=[];
   incoming.forEach(r=>{
     r.connToRaw.forEach(({to,type,date,arrow})=>{
-      toAddEdges.push({fromName:r.name,toName:to,type,date:date||'',arrow:arrow||'none'});
+      toAddEdges.push({fromName:_canonName(r.name),toName:_canonName(to),type,date:date||'',arrow:arrow||'none'});
     });
   });
 
@@ -6179,7 +6235,7 @@ function runImportMapper(){
   if(mainNodeName){
     incoming.forEach(r=>{
       if(r.connToMain&&r.name.toLowerCase()!==mainNodeName.toLowerCase()){
-        toAddEdges.push({fromName:r.name,toName:mainNodeName,type:'moderate',isMainConn:true,arrow:'none'});
+        toAddEdges.push({fromName:_canonName(r.name),toName:mainNodeName,type:'moderate',isMainConn:true,arrow:'none'});
         mainConnCount++;
       }
     });
@@ -6193,14 +6249,85 @@ function runImportMapper(){
   if(dupeCandidates.length>0){
     _showImportDupesScreen(importPlan);
   } else {
-    _showImportSummaryScreen(importPlan);
+    _showConnNameStage(importPlan);
   }
+}
+
+// Every name that will exist once this import is applied, lowercase -> how to spell it.
+function _knownImportNames(plan){
+  const k=new Map();
+  (plan.toAdd||[]).forEach(r=>{ const d=String(r.name||'').trim(); if(d) k.set(d.toLowerCase(),d); });
+  (plan.toUpdate||[]).forEach(u=>{
+    const i=String((u.incoming&&u.incoming.name)||'').trim(); if(i) k.set(i.toLowerCase(),i);
+    const e=String((u.existing&&u.existing.label)||'').trim(); if(e) k.set(e.toLowerCase(),e);
+  });
+  if(_importMode!=='replace') nodes.forEach(n=>{ const d=String(n.label||'').trim(); if(d) k.set(d.toLowerCase(),d); });
+  return k;
+}
+
+// Pass 3: a name typed in a "Connected to" cell with no row of its own. Matched exactly until
+// now, so one partner's "St Ledger Homes" against another's "St Leger Homes" row was simply
+// dropped. Offers the near match instead of silently skipping the link.
+function _connNameDupes(plan){
+  if(typeof jaroWinkler!=='function') return [];
+  const unm=plan.unmatched||[];
+  if(!unm.length) return [];
+  const known=_knownImportNames(plan);
+  const out=[], seen=new Set();
+  unm.forEach(e=>{
+    const raw=String(e.toName||'').trim(), key=raw.toLowerCase();
+    if(!raw||seen.has(key)) return;
+    seen.add(key);
+    let best=null,bestScore=0;
+    known.forEach((disp,kk)=>{ const sc=jaroWinkler(kk,key); if(sc>=_DUPE_THRESHOLD&&sc>bestScore){bestScore=sc;best=disp;} });
+    if(best){
+      const bl=best.trim().toLowerCase();
+      const isRow=(plan.toAdd||[]).some(r=>String(r.name||'').trim().toLowerCase()===bl)
+        ||(plan.toUpdate||[]).some(u=>String((u.incoming&&u.incoming.name)||'').trim().toLowerCase()===bl);
+      out.push({incoming:{name:raw},existing:{label:best},score:bestScore,action:'merge',connName:true,
+        src:isRow?'has its own row':'already on the map',
+        from:unm.filter(x=>String(x.toName||'').trim().toLowerCase()===key).map(x=>x.fromName)});
+    }
+  });
+  return out;
+}
+function _showConnNameStage(plan){
+  const c=_connNameDupes(plan);
+  if(!c.length){ _showImportSummaryScreen(plan); return; }
+  plan._stage='connames';
+  plan.dupeCandidates=c;
+  _showImportDupesScreen(plan);
 }
 
 // ── Step 4: Near-duplicate review (one pair at a time) ────────────────────────
 function _showImportDupesScreen(plan){
   _importStep='dupes';
   _dupeReviewIdx=0;
+  // The same card serves both passes: duplicates inside the sheet, then duplicates against the map.
+  const _st=(plan&&plan._stage)||'canvas';
+  const _set=(id,txt)=>{ const e=document.getElementById(id); if(e) e.textContent=txt; };
+  if(_st==='withinfile'){
+    _set('import-dupe-step-title','Step 4 — Same thing, typed twice?');
+    _set('import-dupe-intro','Two rows in this spreadsheet look like the same thing. That happens when several people fill one sheet in.');
+    _set('dupe-card-incoming-label','In the sheet');
+    _set('dupe-card-existing-label','Also in sheet');
+    _set('dupe-card-question','Are these the same organisation?');
+    _set('dupe-btn-yes','Yes, merge them'); _set('dupe-btn-no','No, keep separate');
+  } else if(_st==='connames'){
+    _set('import-dupe-step-title','Step 4 — Connections with no match');
+    _set('import-dupe-intro','This name was typed into a connection, but nothing of that name exists. Without a match the connection is dropped.');
+    _set('dupe-card-incoming-label','Typed as');
+    _set('dupe-card-existing-label','Nearest name');
+    _set('dupe-card-question','Did they mean this one?');
+    _set('dupe-btn-yes','Yes, connect to it'); _set('dupe-btn-no','No, skip it');
+  } else {
+    _set('import-dupe-step-title','Step 4 — Possible matches');
+    _set('import-dupe-intro','These look like the same organisation. Are they?');
+    _set('dupe-card-incoming-label','Incoming');
+    _set('dupe-card-existing-label','On map');
+    _set('dupe-card-question','Are these the same organisation?');
+    _set('dupe-btn-yes','Yes, merge them'); _set('dupe-btn-no','No, keep separate');
+  }
   document.getElementById('import-step-mapper').style.display='none';
   document.getElementById('import-step-dupes').style.display='block';
   document.getElementById('import-step-summary').style.display='none';
@@ -6231,6 +6358,17 @@ function _renderDupePair(plan){
   if(inEl) inEl.textContent=d.incoming.name;
   if(exEl) exEl.textContent=d.existing.label;
   if(scEl) scEl.textContent=`${pct}% similarity`;
+  const _sub=(id,txt)=>{ const e=document.getElementById(id); if(e) e.textContent=txt||''; };
+  if(d.withinFile){
+    const _cn=r=>{ const k=((r&&r.connToRaw)||[]).length; return k?`${k} connection${k===1?'':'s'}`:'no connections'; };
+    _sub('dupe-card-incoming-sub',_cn(d.incoming));
+    _sub('dupe-card-existing-sub',_cn(d.canonical));
+  } else if(d.connName){
+    const f=(d.from||[]).filter(Boolean);
+    const uniq=[...new Set(f)];
+    _sub('dupe-card-incoming-sub',uniq.length?'entered by '+uniq.slice(0,2).join(', ')+(uniq.length>2?` +${uniq.length-2}`:''):'');
+    _sub('dupe-card-existing-sub',d.src||'');
+  } else { _sub('dupe-card-incoming-sub',''); _sub('dupe-card-existing-sub',''); }
 }
 function advanceDupePair(action){
   if(!importPlan) return;
@@ -6247,6 +6385,47 @@ function skipAllDupes(){
   _finaliseDupes(importPlan);
 }
 function _finaliseDupes(plan){
+  if(plan._stage==='connames'){
+    const map={};
+    plan.dupeCandidates.forEach(d=>{ if(d.action!=='separate') map[String(d.incoming.name||'').trim().toLowerCase()]=d.existing.label; });
+    const fixed=Object.keys(map).length;
+    if(fixed){
+      let links=0;
+      (plan.toAddEdges||[]).forEach(e=>{
+        const k=String(e.toName||'').trim().toLowerCase();
+        if(map[k]){ e._renamedFrom=e.toName; e.toName=map[k]; links++; }
+      });
+      const known=_knownImportNames(plan);
+      plan.unmatched=(plan.toAddEdges||[]).filter(e=>!known.has(String(e.toName||'').trim().toLowerCase()));
+      plan._connFixed=fixed; plan._connFixedLinks=links;
+    }
+    plan._stage='canvas'; plan.dupeCandidates=[];
+    _showImportSummaryScreen(plan);
+    return;
+  }
+  if(plan._stage==='withinfile'){
+    // Merging here happens before anything reaches the canvas: the duplicate row is folded into
+    // the row being kept, and its name is aliased so connections pointing at it still land.
+    const drop=new Set(), alias={};
+    plan.dupeCandidates.forEach(d=>{
+      if(d.action==='separate') return;
+      _mergeIncomingRow(d.canonical,d.incoming);
+      alias[String(d.incoming.name||'').trim().toLowerCase()]=d.canonical.name;
+      drop.add(d.incoming);
+    });
+    // A chain (A→B, B→C) must end up pointing at the row that actually survived.
+    Object.keys(alias).forEach(k=>{
+      let v=alias[k], guard=0;
+      while(alias[String(v).trim().toLowerCase()]&&guard++<20) v=alias[String(v).trim().toLowerCase()];
+      alias[k]=v;
+    });
+    const rows=plan._rows.filter(r=>!drop.has(r));
+    const skipped=plan._skipped||0;
+    plan.dupeCandidates=[];
+    importPlan=null;
+    _buildImportPlan(rows,skipped,Object.keys(alias).length?alias:null);
+    return;
+  }
   plan.dupeCandidates.forEach(d=>{
     if(d.action==='separate'){
       plan.toAdd.push(d.incoming);
@@ -6258,7 +6437,7 @@ function _finaliseDupes(plan){
     }
   });
   plan.dupeCandidates=[];
-  _showImportSummaryScreen(plan);
+  _showConnNameStage(plan);
 }
 // Legacy compat stubs
 function setDupeAction(){}
@@ -6305,6 +6484,17 @@ function _showImportSummaryScreen(plan){
   if(plan.toAdd.length)
     html+=row('✨',`${plan.toAdd.length} new node${plan.toAdd.length!==1?'s':''} will be added`,
       plan.toAdd.slice(0,5).map(r=>r.name).join(', ')+(plan.toAdd.length>5?`, +${plan.toAdd.length-5} more`:''));
+  const wfRows=plan.toAdd.filter(r=>r._mergedFrom&&r._mergedFrom.length);
+  if(wfRows.length){
+    const names=wfRows.slice(0,4).map(r=>`${escHtml(r.name)} (was also ${r._mergedFrom.slice(0,2).map(escHtml).join(', ')})`).join('; ');
+    const dropped=wfRows.reduce((a,r)=>a+r._mergedFrom.length,0);
+    html+=row('🧹',`${dropped} duplicate row${dropped!==1?'s':''} in the spreadsheet folded into ${wfRows.length} node${wfRows.length!==1?'s':''}`,
+      names+(wfRows.length>4?`, +${wfRows.length-4} more`:'')+'. Connections from every spelling are kept.');
+  }
+  if(plan._connFixed){
+    html+=row('🔗',`${plan._connFixedLinks} connection${plan._connFixedLinks!==1?'s':''} rescued from a misspelled name`,
+      `${plan._connFixed} name${plan._connFixed!==1?'s':''} typed in a connection cell matched to a node instead of being skipped.`);
+  }
   const mergeCount=plan.toUpdate.filter(u=>u.isMerge).length;
   const updateCount=plan.toUpdate.filter(u=>!u.isMerge).length;
   if(mergeCount)
@@ -6801,6 +6991,10 @@ function confirmImport(){
       lastUpdated:Date.now(),
       history:[{ts:Date.now(),text:'Imported from spreadsheet'}]
     };
+    if(r._mergedFrom&&r._mergedFrom.length){
+      node.merged=true;
+      node.history.push({ts:Date.now(),text:'Also entered in the spreadsheet as: '+r._mergedFrom.join(', ')});
+    }
     if(r.part){ node.argPart=r.part; if(!(r.colour&&/^#[0-9a-fA-F]{3,6}$/.test(r.colour))) node.colour=argPartOf(node).colour; node.shape='rectangle'; if(r.part==='claim') node.nodeSize='large'; }
     node.customFields={};
     Object.entries(r.fields||{}).forEach(([fname,v])=>{ const f=addFieldDef(fname); if(f) node.customFields[f.id]=v; });
