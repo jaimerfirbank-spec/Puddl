@@ -241,3 +241,20 @@ Right-click on node → shows:
 ## Claude and Codex coordination
 
 Before starting work, read and follow `AI_WORKFLOW.md`. Claude must use a `claude/<task>` branch and a separate worktree/folder from Codex. Check active branches and pull requests for overlapping work, and do not edit an area currently owned by another agent.
+
+---
+
+## How to report work to Jaime
+
+Jaime listens back to replies as audio. Technical detail is noise to him.
+
+When a job is done, say only what changed, in plain words: what the software did
+before, what it does now. A few lines. Then stop.
+
+Do not include: file paths, line numbers, function or variable names, branch or
+commit names, test output, byte or node counts, the sequence of steps taken, or
+what was tried and didn't work. None of it helps him.
+
+All of that belongs in the commit message, not the reply.
+
+If a decision is genuinely needed from him, ask it in one sentence at the end.
