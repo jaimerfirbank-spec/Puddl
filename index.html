@@ -6720,7 +6720,7 @@ function timelinePlay(){
 // Keeps a clear minimum gap between whole nodes (name included), not just the circles.
 // Clear space kept around every node and its name, in map units. Raising this spaces the whole
 // map out; the layout then fits at a smaller zoom, so it trades node size for breathing room.
-let NODE_BREATHING=56;
+let NODE_BREATHING=76;
 function _layoutR(n){
   if(n.type==='centre') return 120;
   const d=nodeDims(n), r=d.r||40;
@@ -6995,12 +6995,32 @@ function clearLinesOffNodes(rounds){
   return lastHits;
 }
 
+// The force layout settles rounder than it is aimed, so a finished map still wastes the sides of
+// a wide screen and has to zoom out to fit the height, shrinking everything. Stretching the
+// finished map toward the screen's shape lets it fit at a closer zoom: nodes and names come out
+// bigger and the gaps between them grow in the same move. Capped, so nothing looks pulled.
+const ASPECT_STRETCH_MAX=1.6;
+function stretchToScreen(){
+  if(nodes.length<ASPECT_THRESHOLD||!W||!H) return 1;
+  const xs=nodes.map(n=>n.x), ys=nodes.map(n=>n.y);
+  const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
+  if(w<1||h<1) return 1;
+  const want=Math.max(1.1,Math.min(3.4,W/H));
+  const k=Math.max(1,Math.min(ASPECT_STRETCH_MAX,want/(w/h)));
+  if(k<=1.01) return 1;
+  const cx=xs.reduce((a,v)=>a+v,0)/xs.length;
+  nodes.forEach(n=>{ n.x=n.fx=cx+(n.x-cx)*k; n.vx=0; n.vy=0; });
+  loops.forEach(lp=>{ if(lp.cx!==undefined) lp.cx=cx+(lp.cx-cx)*k; });
+  return k;
+}
+
 function rearrangeLayout(){
   if(nodes.length<2) return;
   layoutImportedNodes(nodes.slice());
   untangleLayout(350);
   fanSingleConnections();
   resolveOverlaps({silent:true,labelAware:true});
+  stretchToScreen();
   clearLinesOffNodes(26);
   resolveOverlaps({silent:true,labelAware:true});
   addLog('auto-arranged layout');
