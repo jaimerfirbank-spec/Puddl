@@ -2228,31 +2228,33 @@ function selectConnColour(col){
       <!-- Step 4: Near-duplicate review (one pair at a time) -->
       <div id="import-step-dupes" style="display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-          <div style="font-size:12px;font-weight:700;color:var(--ink-h);text-transform:uppercase;letter-spacing:0.06em;">Step 4 — Possible matches</div>
+          <div id="import-dupe-step-title" style="font-size:12px;font-weight:700;color:var(--ink-h);text-transform:uppercase;letter-spacing:0.06em;">Step 4 — Possible matches</div>
           <div id="import-dupe-progress" style="font-size:11px;color:var(--ink-h);font-weight:600;"></div>
         </div>
-        <div style="font-size:11px;color:var(--ink-h);margin-bottom:14px;">These look like the same organisation. Are they?</div>
+        <div id="import-dupe-intro" style="font-size:11px;color:var(--ink-h);margin-bottom:14px;">These look like the same organisation. Are they?</div>
         <!-- Single-pair card -->
         <div id="import-dupe-card" style="background:var(--surf-2);border:1.5px solid var(--bdr);border-radius:var(--radius-lg);padding:16px 18px;">
           <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center;margin-bottom:16px;">
             <div style="background:var(--surf);border:1px solid var(--bdr-m);border-radius:var(--radius);padding:10px 14px;text-align:center;">
-              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);margin-bottom:4px;">Incoming</div>
+              <div id="dupe-card-incoming-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);margin-bottom:4px;">Incoming</div>
               <div id="dupe-card-incoming" style="font-size:14px;font-weight:700;color:var(--ink);"></div>
+              <div id="dupe-card-incoming-sub" style="font-size:10.5px;color:var(--ink-h);margin-top:3px;"></div>
             </div>
             <div style="font-size:18px;color:var(--ink-h);font-weight:300;">≈</div>
             <div style="background:var(--surf);border:1px solid var(--bdr-m);border-radius:var(--radius);padding:10px 14px;text-align:center;">
-              <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);margin-bottom:4px;">On map</div>
+              <div id="dupe-card-existing-label" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-h);margin-bottom:4px;">On map</div>
               <div id="dupe-card-existing" style="font-size:14px;font-weight:700;color:var(--ink);"></div>
+              <div id="dupe-card-existing-sub" style="font-size:10.5px;color:var(--ink-h);margin-top:3px;"></div>
             </div>
           </div>
           <div id="dupe-card-score" style="text-align:center;font-size:11px;color:var(--ink-h);margin-bottom:14px;"></div>
-          <div style="font-size:13px;font-weight:600;color:var(--ink);text-align:center;margin-bottom:12px;">Are these the same organisation?</div>
+          <div id="dupe-card-question" style="font-size:13px;font-weight:600;color:var(--ink);text-align:center;margin-bottom:12px;">Are these the same organisation?</div>
           <div style="display:flex;gap:8px;">
-            <button onclick="advanceDupePair('merge')"
+            <button id="dupe-btn-yes" onclick="advanceDupePair('merge')"
               style="flex:1;height:40px;font-size:13px;font-weight:700;background:var(--acc);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;font-family:'DM Sans',sans-serif;">
               Yes, merge them
             </button>
-            <button onclick="advanceDupePair('separate')"
+            <button id="dupe-btn-no" onclick="advanceDupePair('separate')"
               style="flex:1;height:40px;font-size:13px;font-weight:600;border-radius:var(--radius);cursor:pointer;font-family:'DM Sans',sans-serif;">
               No, keep separate
             </button>
@@ -6138,6 +6140,95 @@ function runImportMapper(){
   const incoming=[...nodeMap.values()];
   if(!incoming.length){ status.textContent='No rows with a node name were found.'; return; }
 
+  // Pass 1: near-duplicate names inside the spreadsheet itself. A sheet several people have
+  // filled in carries "DMBC" and "Doncaster Council" as separate rows. Neither is on the canvas
+  // yet, so the canvas pass below has nothing to compare them against, and in replace mode that
+  // pass never runs at all. Exact repeats of a name were already folded together by nodeMap.
+  const _wf=_withinFileDupes(incoming);
+  if(_wf.length){
+    importPlan={dupeCandidates:_wf,_stage:'withinfile',_rows:incoming,_skipped:skipped};
+    _showImportDupesScreen(importPlan);
+    return;
+  }
+  _buildImportPlan(incoming,skipped,null);
+}
+
+// Words that carry no identity, dropped before two names are compared.
+const _NAME_NOISE=new Set(['the','and','of','a','at','for','ltd','limited','plc','cic','llp','inc','uk']);
+// Words that can be present on one side and absent on the other without making it a different
+// organisation. "Doncaster City Council" and "Doncaster Council" are one body; "St Aidan's Church"
+// and "St Aidan's Church Hall" are two things, because "hall" is not on this list.
+const _NAME_QUALIFIER=new Set(['city','borough','county','metropolitan','district','town','parish','greater','royal','the']);
+function _nameTokens(x){
+  return String(x||'').toLowerCase().replace(/['‘’`]/g,'').replace(/[^a-z0-9]+/g,' ')
+    .trim().split(/\s+/).filter(w=>w&&!_NAME_NOISE.has(w));
+}
+// Jaro-Winkler alone is no use on organisation names, because it rewards a shared opening and
+// almost every name here starts with the same place: it scored "Carrfield Pharmacy" against
+// "Carrfield Academy" at 0.93. So a pair only counts as the same thing when what separates them
+// is spelling rather than a whole extra word.
+function _looksLikeSameName(a,b){
+  if(typeof jaroWinkler!=='function') return false;
+  const la=String(a||'').trim().toLowerCase(), lb=String(b||'').trim().toLowerCase();
+  if(!la||!lb) return false;
+  if(jaroWinkler(la,lb)<_DUPE_THRESHOLD) return false;
+  const left=_nameTokens(a), right=_nameTokens(b);
+  if(!left.length||!right.length) return false;
+  for(let i=left.length-1;i>=0;i--){                       // identical words pair off
+    const j=right.indexOf(left[i]);
+    if(j>=0){ left.splice(i,1); right.splice(j,1); }
+  }
+  for(let i=left.length-1;i>=0;i--){                       // then words that differ only in spelling
+    const j=right.findIndex(w=>jaroWinkler(w,left[i])>=0.90);
+    if(j>=0){ left.splice(i,1); right.splice(j,1); }
+  }
+  const rest=left.concat(right);
+  return rest.length===0||rest.every(w=>_NAME_QUALIFIER.has(w));
+}
+
+// Near-duplicate names within one spreadsheet. Compares each row against the rows already
+// accepted as distinct, so the first spelling of a name becomes the one kept.
+function _withinFileDupes(rows){
+  if(typeof jaroWinkler!=='function') return [];
+  const out=[], kept=[];
+  rows.forEach(r=>{
+    const rn=String(r.name||'').trim().toLowerCase();
+    let best=null,bestScore=0;
+    kept.forEach(c=>{
+      const cn=String(c.name||'').trim().toLowerCase();
+      if(!_looksLikeSameName(cn,rn)) return;
+      const sc=jaroWinkler(cn,rn);
+      if(sc>bestScore){bestScore=sc;best=c;}
+    });
+    if(best) out.push({incoming:r,canonical:best,existing:{label:best.name},score:bestScore,action:'merge',withinFile:true});
+    else kept.push(r);
+  });
+  return out;
+}
+
+// Fold a confirmed duplicate row into the row being kept. Empty wins nothing: existing values
+// stay, blanks get filled, and connections from both rows are kept so no link is lost.
+function _mergeIncomingRow(t,s){
+  if(!t.notes) t.notes=s.notes||'';
+  else if(s.notes&&!t.notes.includes(s.notes)) t.notes+='\n'+s.notes;
+  if(!t.colour&&s.colour) t.colour=s.colour;
+  if(s.date&&(!t.date||s.date<t.date)) t.date=s.date;
+  if(!t.part&&s.part) t.part=s.part;
+  if(s.connToMain) t.connToMain=true;
+  if(!t.fields) t.fields={};
+  Object.entries(s.fields||{}).forEach(([k,v])=>{ if(!t.fields[k]) t.fields[k]=v; });
+  (s.connToRaw||[]).forEach(c=>t.connToRaw.push(c));
+  (s.grants||[]).forEach(g=>{ if(!t.grants.some(eg=>eg.source===g.source&&eg.rawAmount===g.rawAmount&&eg.date===g.date)) t.grants.push(g); });
+  (s.tags||[]).forEach(tg=>{ if(!t.tags.includes(tg)) t.tags.push(tg); });
+  t._mergedFrom=(t._mergedFrom||[]).concat([s.name]);
+}
+
+// Pass 2: compare the de-duplicated rows against what is already on the canvas, then build the
+// edge list and the import plan. Split out of runImportMapper so the within-file review above
+// can hand control back here once the user has resolved it.
+function _buildImportPlan(incoming,skipped,nameAlias){
+  // An edge endpoint can still name a row that was merged away, so put every name through the alias.
+  const _canonName=nm=>{ const k=String(nm||'').trim().toLowerCase(); return (nameAlias&&nameAlias[k])?nameAlias[k]:nm; };
   // In replace mode, skip dupe detection (canvas will be cleared on import)
   const toAdd=[], toUpdate=[], dupeCandidates=[];
   incoming.forEach(r=>{
@@ -6154,8 +6245,10 @@ function runImportMapper(){
     let nearMatch=null, nearScore=0;
     if(typeof jaroWinkler==='function'){
       nodes.forEach(n=>{
-        const score=jaroWinkler(n.label.trim().toLowerCase(),r.name.toLowerCase());
-        if(score>=_DUPE_THRESHOLD&&score>nearScore){nearScore=score;nearMatch=n;}
+        const nl=n.label.trim().toLowerCase(), rn=r.name.toLowerCase();
+        if(!_looksLikeSameName(nl,rn)) return;
+        const score=jaroWinkler(nl,rn);
+        if(score>nearScore){nearScore=score;nearMatch=n;}
       });
     }
     if(nearMatch){
@@ -6169,7 +6262,7 @@ function runImportMapper(){
   const toAddEdges=[];
   incoming.forEach(r=>{
     r.connToRaw.forEach(({to,type,date,arrow})=>{
-      toAddEdges.push({fromName:r.name,toName:to,type,date:date||'',arrow:arrow||'none'});
+      toAddEdges.push({fromName:_canonName(r.name),toName:_canonName(to),type,date:date||'',arrow:arrow||'none'});
     });
   });
 
@@ -6179,7 +6272,7 @@ function runImportMapper(){
   if(mainNodeName){
     incoming.forEach(r=>{
       if(r.connToMain&&r.name.toLowerCase()!==mainNodeName.toLowerCase()){
-        toAddEdges.push({fromName:r.name,toName:mainNodeName,type:'moderate',isMainConn:true,arrow:'none'});
+        toAddEdges.push({fromName:_canonName(r.name),toName:mainNodeName,type:'moderate',isMainConn:true,arrow:'none'});
         mainConnCount++;
       }
     });
@@ -6193,14 +6286,89 @@ function runImportMapper(){
   if(dupeCandidates.length>0){
     _showImportDupesScreen(importPlan);
   } else {
-    _showImportSummaryScreen(importPlan);
+    _showConnNameStage(importPlan);
   }
+}
+
+// Every name that will exist once this import is applied, lowercase -> how to spell it.
+function _knownImportNames(plan){
+  const k=new Map();
+  (plan.toAdd||[]).forEach(r=>{ const d=String(r.name||'').trim(); if(d) k.set(d.toLowerCase(),d); });
+  (plan.toUpdate||[]).forEach(u=>{
+    const i=String((u.incoming&&u.incoming.name)||'').trim(); if(i) k.set(i.toLowerCase(),i);
+    const e=String((u.existing&&u.existing.label)||'').trim(); if(e) k.set(e.toLowerCase(),e);
+  });
+  if(_importMode!=='replace') nodes.forEach(n=>{ const d=String(n.label||'').trim(); if(d) k.set(d.toLowerCase(),d); });
+  return k;
+}
+
+// Pass 3: a name typed in a "Connected to" cell with no row of its own. Matched exactly until
+// now, so one partner's "St Ledger Homes" against another's "St Leger Homes" row was simply
+// dropped. Offers the near match instead of silently skipping the link.
+function _connNameDupes(plan){
+  if(typeof jaroWinkler!=='function') return [];
+  const unm=plan.unmatched||[];
+  if(!unm.length) return [];
+  const known=_knownImportNames(plan);
+  const out=[], seen=new Set();
+  unm.forEach(e=>{
+    const raw=String(e.toName||'').trim(), key=raw.toLowerCase();
+    if(!raw||seen.has(key)) return;
+    seen.add(key);
+    let best=null,bestScore=0;
+    known.forEach((disp,kk)=>{
+      if(!_looksLikeSameName(kk,key)) return;
+      const sc=jaroWinkler(kk,key);
+      if(sc>bestScore){bestScore=sc;best=disp;}
+    });
+    if(best){
+      const bl=best.trim().toLowerCase();
+      const isRow=(plan.toAdd||[]).some(r=>String(r.name||'').trim().toLowerCase()===bl)
+        ||(plan.toUpdate||[]).some(u=>String((u.incoming&&u.incoming.name)||'').trim().toLowerCase()===bl);
+      out.push({incoming:{name:raw},existing:{label:best},score:bestScore,action:'merge',connName:true,
+        src:isRow?'has its own row':'already on the map',
+        from:unm.filter(x=>String(x.toName||'').trim().toLowerCase()===key).map(x=>x.fromName)});
+    }
+  });
+  return out;
+}
+function _showConnNameStage(plan){
+  const c=_connNameDupes(plan);
+  if(!c.length){ _showImportSummaryScreen(plan); return; }
+  plan._stage='connames';
+  plan.dupeCandidates=c;
+  _showImportDupesScreen(plan);
 }
 
 // ── Step 4: Near-duplicate review (one pair at a time) ────────────────────────
 function _showImportDupesScreen(plan){
   _importStep='dupes';
   _dupeReviewIdx=0;
+  // The same card serves both passes: duplicates inside the sheet, then duplicates against the map.
+  const _st=(plan&&plan._stage)||'canvas';
+  const _set=(id,txt)=>{ const e=document.getElementById(id); if(e) e.textContent=txt; };
+  if(_st==='withinfile'){
+    _set('import-dupe-step-title','Step 4 — Same thing, typed twice?');
+    _set('import-dupe-intro','Two rows in this spreadsheet look like the same thing. That happens when several people fill one sheet in.');
+    _set('dupe-card-incoming-label','In the sheet');
+    _set('dupe-card-existing-label','Also in sheet');
+    _set('dupe-card-question','Are these the same organisation?');
+    _set('dupe-btn-yes','Yes, merge them'); _set('dupe-btn-no','No, keep separate');
+  } else if(_st==='connames'){
+    _set('import-dupe-step-title','Step 4 — Connections with no match');
+    _set('import-dupe-intro','This name was typed into a connection, but nothing of that name exists. Without a match the connection is dropped.');
+    _set('dupe-card-incoming-label','Typed as');
+    _set('dupe-card-existing-label','Nearest name');
+    _set('dupe-card-question','Did they mean this one?');
+    _set('dupe-btn-yes','Yes, connect to it'); _set('dupe-btn-no','No, skip it');
+  } else {
+    _set('import-dupe-step-title','Step 4 — Possible matches');
+    _set('import-dupe-intro','These look like the same organisation. Are they?');
+    _set('dupe-card-incoming-label','Incoming');
+    _set('dupe-card-existing-label','On map');
+    _set('dupe-card-question','Are these the same organisation?');
+    _set('dupe-btn-yes','Yes, merge them'); _set('dupe-btn-no','No, keep separate');
+  }
   document.getElementById('import-step-mapper').style.display='none';
   document.getElementById('import-step-dupes').style.display='block';
   document.getElementById('import-step-summary').style.display='none';
@@ -6231,6 +6399,17 @@ function _renderDupePair(plan){
   if(inEl) inEl.textContent=d.incoming.name;
   if(exEl) exEl.textContent=d.existing.label;
   if(scEl) scEl.textContent=`${pct}% similarity`;
+  const _sub=(id,txt)=>{ const e=document.getElementById(id); if(e) e.textContent=txt||''; };
+  if(d.withinFile){
+    const _cn=r=>{ const k=((r&&r.connToRaw)||[]).length; return k?`${k} connection${k===1?'':'s'}`:'no connections'; };
+    _sub('dupe-card-incoming-sub',_cn(d.incoming));
+    _sub('dupe-card-existing-sub',_cn(d.canonical));
+  } else if(d.connName){
+    const f=(d.from||[]).filter(Boolean);
+    const uniq=[...new Set(f)];
+    _sub('dupe-card-incoming-sub',uniq.length?'entered by '+uniq.slice(0,2).join(', ')+(uniq.length>2?` +${uniq.length-2}`:''):'');
+    _sub('dupe-card-existing-sub',d.src||'');
+  } else { _sub('dupe-card-incoming-sub',''); _sub('dupe-card-existing-sub',''); }
 }
 function advanceDupePair(action){
   if(!importPlan) return;
@@ -6247,6 +6426,47 @@ function skipAllDupes(){
   _finaliseDupes(importPlan);
 }
 function _finaliseDupes(plan){
+  if(plan._stage==='connames'){
+    const map={};
+    plan.dupeCandidates.forEach(d=>{ if(d.action!=='separate') map[String(d.incoming.name||'').trim().toLowerCase()]=d.existing.label; });
+    const fixed=Object.keys(map).length;
+    if(fixed){
+      let links=0;
+      (plan.toAddEdges||[]).forEach(e=>{
+        const k=String(e.toName||'').trim().toLowerCase();
+        if(map[k]){ e._renamedFrom=e.toName; e.toName=map[k]; links++; }
+      });
+      const known=_knownImportNames(plan);
+      plan.unmatched=(plan.toAddEdges||[]).filter(e=>!known.has(String(e.toName||'').trim().toLowerCase()));
+      plan._connFixed=fixed; plan._connFixedLinks=links;
+    }
+    plan._stage='canvas'; plan.dupeCandidates=[];
+    _showImportSummaryScreen(plan);
+    return;
+  }
+  if(plan._stage==='withinfile'){
+    // Merging here happens before anything reaches the canvas: the duplicate row is folded into
+    // the row being kept, and its name is aliased so connections pointing at it still land.
+    const drop=new Set(), alias={};
+    plan.dupeCandidates.forEach(d=>{
+      if(d.action==='separate') return;
+      _mergeIncomingRow(d.canonical,d.incoming);
+      alias[String(d.incoming.name||'').trim().toLowerCase()]=d.canonical.name;
+      drop.add(d.incoming);
+    });
+    // A chain (A→B, B→C) must end up pointing at the row that actually survived.
+    Object.keys(alias).forEach(k=>{
+      let v=alias[k], guard=0;
+      while(alias[String(v).trim().toLowerCase()]&&guard++<20) v=alias[String(v).trim().toLowerCase()];
+      alias[k]=v;
+    });
+    const rows=plan._rows.filter(r=>!drop.has(r));
+    const skipped=plan._skipped||0;
+    plan.dupeCandidates=[];
+    importPlan=null;
+    _buildImportPlan(rows,skipped,Object.keys(alias).length?alias:null);
+    return;
+  }
   plan.dupeCandidates.forEach(d=>{
     if(d.action==='separate'){
       plan.toAdd.push(d.incoming);
@@ -6258,7 +6478,7 @@ function _finaliseDupes(plan){
     }
   });
   plan.dupeCandidates=[];
-  _showImportSummaryScreen(plan);
+  _showConnNameStage(plan);
 }
 // Legacy compat stubs
 function setDupeAction(){}
@@ -6305,6 +6525,17 @@ function _showImportSummaryScreen(plan){
   if(plan.toAdd.length)
     html+=row('✨',`${plan.toAdd.length} new node${plan.toAdd.length!==1?'s':''} will be added`,
       plan.toAdd.slice(0,5).map(r=>r.name).join(', ')+(plan.toAdd.length>5?`, +${plan.toAdd.length-5} more`:''));
+  const wfRows=plan.toAdd.filter(r=>r._mergedFrom&&r._mergedFrom.length);
+  if(wfRows.length){
+    const names=wfRows.slice(0,4).map(r=>`${escHtml(r.name)} (was also ${r._mergedFrom.slice(0,2).map(escHtml).join(', ')})`).join('; ');
+    const dropped=wfRows.reduce((a,r)=>a+r._mergedFrom.length,0);
+    html+=row('🧹',`${dropped} duplicate row${dropped!==1?'s':''} in the spreadsheet folded into ${wfRows.length} node${wfRows.length!==1?'s':''}`,
+      names+(wfRows.length>4?`, +${wfRows.length-4} more`:'')+'. Connections from every spelling are kept.');
+  }
+  if(plan._connFixed){
+    html+=row('🔗',`${plan._connFixedLinks} connection${plan._connFixedLinks!==1?'s':''} rescued from a misspelled name`,
+      `${plan._connFixed} name${plan._connFixed!==1?'s':''} typed in a connection cell matched to a node instead of being skipped.`);
+  }
   const mergeCount=plan.toUpdate.filter(u=>u.isMerge).length;
   const updateCount=plan.toUpdate.filter(u=>!u.isMerge).length;
   if(mergeCount)
@@ -6487,6 +6718,9 @@ function timelinePlay(){
 // ── Spacing tools ──────────────────────────────────────────────────────────
 // Radius that covers the node AND the name under it, for layout spacing.
 // Keeps a clear minimum gap between whole nodes (name included), not just the circles.
+// Clear space kept around every node and its name, in map units. Raising this spaces the whole
+// map out; the layout then fits at a smaller zoom, so it trades node size for breathing room.
+let NODE_BREATHING=76;
 function _layoutR(n){
   if(n.type==='centre') return 120;
   const d=nodeDims(n), r=d.r||40;
@@ -6560,7 +6794,7 @@ function resolveOverlaps(opts){
   _simpleNow=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&nodes.length>=SIMPLE_THRESHOLD);
   const gap=_simpleNow?3:10;
   const labelAware=opts&&opts.labelAware&&!_simpleNow;
-  const sn=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:labelAware?_layoutR(n)+15:_collR(n)+gap/2}));
+  const sn=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:labelAware?_layoutR(n)+NODE_BREATHING/2:_collR(n)+gap/2}));
   const overlapping=()=>{ const q=d3.quadtree(sn,d=>d.x,d=>d.y); let hit=0; const maxR=Math.max(...sn.map(d=>d.r));
     sn.forEach(a=>{ q.visit((nd,x0,y0,x1,y1)=>{ if(!nd.length){ let d=nd; do{ const b=d.data; if(b!==a&&b.id>a.id){ const dx=a.x-b.x,dy=a.y-b.y,rr=a.r+b.r; if(dx*dx+dy*dy<rr*rr*0.995) hit++; } }while(d=d.next); }
       return x0>a.x+a.r+maxR||x1<a.x-a.r-maxR||y0>a.y+a.r+maxR||y1<a.y-a.r-maxR; }); });
@@ -6665,11 +6899,130 @@ function tidyLayout(){
   if(typeof fitAll==='function') fitAll();
   showStatus('Tidied: spacing evened out, crossings reduced where possible. Undo puts it back.');
 }
+// Gather everything that connects to one thing only into a fan around whatever it connects to,
+// pointing away from that node's other links. A hub and its dependents then read as one group,
+// and the long lines that used to reach across the map disappear with them.
+function fanSingleConnections(){
+  if(nodes.length<3) return 0;
+  const byId=new Map(nodes.map(n=>[n.id,n]));
+  const deg=new Map(nodes.map(n=>[n.id,0])), nb=new Map(nodes.map(n=>[n.id,[]]));
+  edges.forEach(e=>{
+    const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target;
+    if(a===b||!byId.has(a)||!byId.has(b)) return;
+    deg.set(a,deg.get(a)+1); deg.set(b,deg.get(b)+1); nb.get(a).push(b); nb.get(b).push(a);
+  });
+  const groups=new Map();
+  nodes.forEach(n=>{
+    if(deg.get(n.id)!==1||n.type==='centre') return;
+    const pid=nb.get(n.id)[0];
+    if(pid===undefined||deg.get(pid)<2) return;        // a lone pair has no hub to fan around
+    if(!groups.has(pid)) groups.set(pid,[]);
+    groups.get(pid).push(n);
+  });
+  let placed=0;
+  groups.forEach((leaves,pid)=>{
+    const p=byId.get(pid); if(!p) return;
+    // aim the fan away from everything else the parent is joined to
+    let ax=0, ay=0;
+    nb.get(pid).forEach(id=>{
+      if(deg.get(id)<2) return;
+      const o=byId.get(id); if(!o) return;
+      const d=Math.hypot(o.x-p.x,o.y-p.y)||1; ax+=(o.x-p.x)/d; ay+=(o.y-p.y)/d;
+    });
+    const base=(ax||ay)?Math.atan2(-ay,-ax):-Math.PI/2;
+    leaves.sort((a,b)=>String(a.label||'').localeCompare(String(b.label||'')));
+    const k=leaves.length;
+    const pr=_layoutR(p), lr=Math.max(...leaves.map(l=>_layoutR(l)));
+    const spread=Math.min(Math.PI*1.45, 0.5*k+0.45);
+    const step=k>1?spread/(k-1):0;
+    // far enough out that neighbours on the arc still clear each other
+    const need=k>1?(2*lr+NODE_BREATHING)/(2*Math.sin(Math.max(step,0.1)/2)):0;
+    const R=Math.max(pr+lr+NODE_BREATHING, need);
+    leaves.forEach((l,i)=>{
+      const a=base+(k>1?(-spread/2+i*step):0);
+      l.x=l.fx=p.x+Math.cos(a)*R; l.y=l.fy=p.y+Math.sin(a)*R;
+      l.vx=0; l.vy=0; l.pinned=true; placed++;
+    });
+  });
+  return placed;
+}
+
+// Push nodes clear of any connection line that crosses them but has nothing to do with them.
+// Lines running under unrelated nodes are what makes a busy map look like a tangle.
+function clearLinesOffNodes(rounds){
+  if(nodes.length<3||!edges.length) return 0;
+  const byId=new Map(nodes.map(n=>[n.id,n]));
+  const pairs=edges.map(e=>{
+    const sId=typeof e.source==='object'?e.source.id:e.source, tId=typeof e.target==='object'?e.target.id:e.target;
+    const s=byId.get(sId), t=byId.get(tId);
+    return (s&&t&&s!==t)?[s,t]:null;
+  }).filter(Boolean);
+  const clear=new Map(nodes.map(n=>[n.id,(nodeDims(n).r||40)+NODE_BREATHING*0.45]));
+  let lastHits=0;
+  for(let r=0;r<(rounds||26);r++){
+    let hits=0;
+    const dx_=new Map(nodes.map(n=>[n.id,[0,0]]));
+    nodes.forEach(n=>{
+      const need=clear.get(n.id);
+      let px=0, py=0;
+      for(let i=0;i<pairs.length;i++){
+        const s=pairs[i][0], t=pairs[i][1];
+        if(s===n||t===n) continue;
+        const ex=t.x-s.x, ey=t.y-s.y, L=ex*ex+ey*ey;
+        if(!L) continue;
+        const u=((n.x-s.x)*ex+(n.y-s.y)*ey)/L;
+        if(u<=0.03||u>=0.97) continue;                 // the ends belong to their own nodes
+        const cx=s.x+u*ex, cy=s.y+u*ey;
+        let vx=n.x-cx, vy=n.y-cy;
+        let d=Math.hypot(vx,vy);
+        if(d>=need) continue;
+        if(d<0.01){ vx=-ey; vy=ex; d=Math.hypot(vx,vy)||1; }   // sat exactly on the line
+        const push=(need-d)*0.45;
+        px+=vx/d*push; py+=vy/d*push; hits++;
+      }
+      if(px||py){
+        const m=Math.hypot(px,py), cap=NODE_BREATHING*0.8;
+        if(m>cap){ px=px/m*cap; py=py/m*cap; }
+        dx_.set(n.id,[px,py]);
+      }
+    });
+    nodes.forEach(n=>{ const d=dx_.get(n.id); if(d[0]||d[1]){ n.x+=d[0]; n.y+=d[1]; } });
+    if(!hits) break;
+    if(r>6&&hits>=lastHits) break;                      // stopped improving, leave it alone
+    lastHits=hits;
+  }
+  nodes.forEach(n=>{ n.fx=n.x; n.fy=n.y; n.vx=0; n.vy=0; });
+  return lastHits;
+}
+
+// The force layout settles rounder than it is aimed, so a finished map still wastes the sides of
+// a wide screen and has to zoom out to fit the height, shrinking everything. Stretching the
+// finished map toward the screen's shape lets it fit at a closer zoom: nodes and names come out
+// bigger and the gaps between them grow in the same move. Capped, so nothing looks pulled.
+const ASPECT_STRETCH_MAX=1.6;
+function stretchToScreen(){
+  if(nodes.length<ASPECT_THRESHOLD||!W||!H) return 1;
+  const xs=nodes.map(n=>n.x), ys=nodes.map(n=>n.y);
+  const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
+  if(w<1||h<1) return 1;
+  const want=Math.max(1.1,Math.min(3.4,W/H));
+  const k=Math.max(1,Math.min(ASPECT_STRETCH_MAX,want/(w/h)));
+  if(k<=1.01) return 1;
+  const cx=xs.reduce((a,v)=>a+v,0)/xs.length;
+  nodes.forEach(n=>{ n.x=n.fx=cx+(n.x-cx)*k; n.vx=0; n.vy=0; });
+  loops.forEach(lp=>{ if(lp.cx!==undefined) lp.cx=cx+(lp.cx-cx)*k; });
+  return k;
+}
+
 function rearrangeLayout(){
   if(nodes.length<2) return;
   layoutImportedNodes(nodes.slice());
   untangleLayout(350);
-  resolveOverlaps({silent:true});
+  fanSingleConnections();
+  resolveOverlaps({silent:true,labelAware:true});
+  stretchToScreen();
+  clearLinesOffNodes(26);
+  resolveOverlaps({silent:true,labelAware:true});
   addLog('auto-arranged layout');
   saveState(); markUnsaved(); draw();
   if(typeof fitAll==='function') fitAll();
@@ -6682,8 +7035,12 @@ function rearrangeLayout(){
 const BIG_MAP_THRESHOLD=500;
 const BIG_MAP_WIDEN=1.45;   // push past the raw screen ratio: the layout settles
                             // narrower than the force target, so aim wider
+// A round map on a wide screen wastes the sides: it has to zoom out to fit the height, which
+// shrinks every node and name. Matching the screen's shape keeps the same gaps but fits at a
+// closer zoom, so everything reads bigger. Worth doing at any size past a handful of nodes.
+const ASPECT_THRESHOLD=24;
 function _mapAspect(){
-  if(nodes.length<BIG_MAP_THRESHOLD) return 1;
+  if(nodes.length<ASPECT_THRESHOLD) return 1;
   const a=(W&&H)?W/H:1.6;
   return Math.max(1.1,Math.min(3.4,a*BIG_MAP_WIDEN));
 }
@@ -6695,7 +7052,7 @@ function layoutImportedNodes(newNodes){
   const simpleAfter=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&total>=SIMPLE_THRESHOLD);
   const isNew=new Set(newNodes.map(n=>n.id));
   // Each node's layout radius covers its name too, plus half of the 30px minimum gap
-  const rad=n=>simpleAfter?_simpleR(n)+6:_layoutR(n)+15;
+  const rad=n=>simpleAfter?_simpleR(n)+6:_layoutR(n)+NODE_BREATHING/2;
   const simNodes=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:rad(n),fx:isNew.has(n.id)?null:n.x,fy:isNew.has(n.id)?null:n.y}));
   const byId=new Map(simNodes.map(d=>[d.id,d]));
   const links=[];
@@ -6801,6 +7158,10 @@ function confirmImport(){
       lastUpdated:Date.now(),
       history:[{ts:Date.now(),text:'Imported from spreadsheet'}]
     };
+    if(r._mergedFrom&&r._mergedFrom.length){
+      node.merged=true;
+      node.history.push({ts:Date.now(),text:'Also entered in the spreadsheet as: '+r._mergedFrom.join(', ')});
+    }
     if(r.part){ node.argPart=r.part; if(!(r.colour&&/^#[0-9a-fA-F]{3,6}$/.test(r.colour))) node.colour=argPartOf(node).colour; node.shape='rectangle'; if(r.part==='claim') node.nodeSize='large'; }
     node.customFields={};
     Object.entries(r.fields||{}).forEach(([fname,v])=>{ const f=addFieldDef(fname); if(f) node.customFields[f.id]=v; });
