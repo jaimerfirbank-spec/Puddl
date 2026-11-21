@@ -6153,6 +6153,39 @@ function runImportMapper(){
   _buildImportPlan(incoming,skipped,null);
 }
 
+// Words that carry no identity, dropped before two names are compared.
+const _NAME_NOISE=new Set(['the','and','of','a','at','for','ltd','limited','plc','cic','llp','inc','uk']);
+// Words that can be present on one side and absent on the other without making it a different
+// organisation. "Doncaster City Council" and "Doncaster Council" are one body; "St Aidan's Church"
+// and "St Aidan's Church Hall" are two things, because "hall" is not on this list.
+const _NAME_QUALIFIER=new Set(['city','borough','county','metropolitan','district','town','parish','greater','royal','the']);
+function _nameTokens(x){
+  return String(x||'').toLowerCase().replace(/['‘’`]/g,'').replace(/[^a-z0-9]+/g,' ')
+    .trim().split(/\s+/).filter(w=>w&&!_NAME_NOISE.has(w));
+}
+// Jaro-Winkler alone is no use on organisation names, because it rewards a shared opening and
+// almost every name here starts with the same place: it scored "Carrfield Pharmacy" against
+// "Carrfield Academy" at 0.93. So a pair only counts as the same thing when what separates them
+// is spelling rather than a whole extra word.
+function _looksLikeSameName(a,b){
+  if(typeof jaroWinkler!=='function') return false;
+  const la=String(a||'').trim().toLowerCase(), lb=String(b||'').trim().toLowerCase();
+  if(!la||!lb) return false;
+  if(jaroWinkler(la,lb)<_DUPE_THRESHOLD) return false;
+  const left=_nameTokens(a), right=_nameTokens(b);
+  if(!left.length||!right.length) return false;
+  for(let i=left.length-1;i>=0;i--){                       // identical words pair off
+    const j=right.indexOf(left[i]);
+    if(j>=0){ left.splice(i,1); right.splice(j,1); }
+  }
+  for(let i=left.length-1;i>=0;i--){                       // then words that differ only in spelling
+    const j=right.findIndex(w=>jaroWinkler(w,left[i])>=0.90);
+    if(j>=0){ left.splice(i,1); right.splice(j,1); }
+  }
+  const rest=left.concat(right);
+  return rest.length===0||rest.every(w=>_NAME_QUALIFIER.has(w));
+}
+
 // Near-duplicate names within one spreadsheet. Compares each row against the rows already
 // accepted as distinct, so the first spelling of a name becomes the one kept.
 function _withinFileDupes(rows){
@@ -6162,8 +6195,10 @@ function _withinFileDupes(rows){
     const rn=String(r.name||'').trim().toLowerCase();
     let best=null,bestScore=0;
     kept.forEach(c=>{
-      const sc=jaroWinkler(String(c.name||'').trim().toLowerCase(),rn);
-      if(sc>=_DUPE_THRESHOLD&&sc>bestScore){bestScore=sc;best=c;}
+      const cn=String(c.name||'').trim().toLowerCase();
+      if(!_looksLikeSameName(cn,rn)) return;
+      const sc=jaroWinkler(cn,rn);
+      if(sc>bestScore){bestScore=sc;best=c;}
     });
     if(best) out.push({incoming:r,canonical:best,existing:{label:best.name},score:bestScore,action:'merge',withinFile:true});
     else kept.push(r);
@@ -6210,8 +6245,10 @@ function _buildImportPlan(incoming,skipped,nameAlias){
     let nearMatch=null, nearScore=0;
     if(typeof jaroWinkler==='function'){
       nodes.forEach(n=>{
-        const score=jaroWinkler(n.label.trim().toLowerCase(),r.name.toLowerCase());
-        if(score>=_DUPE_THRESHOLD&&score>nearScore){nearScore=score;nearMatch=n;}
+        const nl=n.label.trim().toLowerCase(), rn=r.name.toLowerCase();
+        if(!_looksLikeSameName(nl,rn)) return;
+        const score=jaroWinkler(nl,rn);
+        if(score>nearScore){nearScore=score;nearMatch=n;}
       });
     }
     if(nearMatch){
@@ -6279,7 +6316,11 @@ function _connNameDupes(plan){
     if(!raw||seen.has(key)) return;
     seen.add(key);
     let best=null,bestScore=0;
-    known.forEach((disp,kk)=>{ const sc=jaroWinkler(kk,key); if(sc>=_DUPE_THRESHOLD&&sc>bestScore){bestScore=sc;best=disp;} });
+    known.forEach((disp,kk)=>{
+      if(!_looksLikeSameName(kk,key)) return;
+      const sc=jaroWinkler(kk,key);
+      if(sc>bestScore){bestScore=sc;best=disp;}
+    });
     if(best){
       const bl=best.trim().toLowerCase();
       const isRow=(plan.toAdd||[]).some(r=>String(r.name||'').trim().toLowerCase()===bl)
