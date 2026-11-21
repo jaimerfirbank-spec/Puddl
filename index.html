@@ -6718,6 +6718,9 @@ function timelinePlay(){
 // ── Spacing tools ──────────────────────────────────────────────────────────
 // Radius that covers the node AND the name under it, for layout spacing.
 // Keeps a clear minimum gap between whole nodes (name included), not just the circles.
+// Clear space kept around every node and its name, in map units. Raising this spaces the whole
+// map out; the layout then fits at a smaller zoom, so it trades node size for breathing room.
+let NODE_BREATHING=56;
 function _layoutR(n){
   if(n.type==='centre') return 120;
   const d=nodeDims(n), r=d.r||40;
@@ -6791,7 +6794,7 @@ function resolveOverlaps(opts){
   _simpleNow=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&nodes.length>=SIMPLE_THRESHOLD);
   const gap=_simpleNow?3:10;
   const labelAware=opts&&opts.labelAware&&!_simpleNow;
-  const sn=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:labelAware?_layoutR(n)+15:_collR(n)+gap/2}));
+  const sn=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:labelAware?_layoutR(n)+NODE_BREATHING/2:_collR(n)+gap/2}));
   const overlapping=()=>{ const q=d3.quadtree(sn,d=>d.x,d=>d.y); let hit=0; const maxR=Math.max(...sn.map(d=>d.r));
     sn.forEach(a=>{ q.visit((nd,x0,y0,x1,y1)=>{ if(!nd.length){ let d=nd; do{ const b=d.data; if(b!==a&&b.id>a.id){ const dx=a.x-b.x,dy=a.y-b.y,rr=a.r+b.r; if(dx*dx+dy*dy<rr*rr*0.995) hit++; } }while(d=d.next); }
       return x0>a.x+a.r+maxR||x1<a.x-a.r-maxR||y0>a.y+a.r+maxR||y1<a.y-a.r-maxR; }); });
@@ -6896,11 +6899,110 @@ function tidyLayout(){
   if(typeof fitAll==='function') fitAll();
   showStatus('Tidied: spacing evened out, crossings reduced where possible. Undo puts it back.');
 }
+// Gather everything that connects to one thing only into a fan around whatever it connects to,
+// pointing away from that node's other links. A hub and its dependents then read as one group,
+// and the long lines that used to reach across the map disappear with them.
+function fanSingleConnections(){
+  if(nodes.length<3) return 0;
+  const byId=new Map(nodes.map(n=>[n.id,n]));
+  const deg=new Map(nodes.map(n=>[n.id,0])), nb=new Map(nodes.map(n=>[n.id,[]]));
+  edges.forEach(e=>{
+    const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target;
+    if(a===b||!byId.has(a)||!byId.has(b)) return;
+    deg.set(a,deg.get(a)+1); deg.set(b,deg.get(b)+1); nb.get(a).push(b); nb.get(b).push(a);
+  });
+  const groups=new Map();
+  nodes.forEach(n=>{
+    if(deg.get(n.id)!==1||n.type==='centre') return;
+    const pid=nb.get(n.id)[0];
+    if(pid===undefined||deg.get(pid)<2) return;        // a lone pair has no hub to fan around
+    if(!groups.has(pid)) groups.set(pid,[]);
+    groups.get(pid).push(n);
+  });
+  let placed=0;
+  groups.forEach((leaves,pid)=>{
+    const p=byId.get(pid); if(!p) return;
+    // aim the fan away from everything else the parent is joined to
+    let ax=0, ay=0;
+    nb.get(pid).forEach(id=>{
+      if(deg.get(id)<2) return;
+      const o=byId.get(id); if(!o) return;
+      const d=Math.hypot(o.x-p.x,o.y-p.y)||1; ax+=(o.x-p.x)/d; ay+=(o.y-p.y)/d;
+    });
+    const base=(ax||ay)?Math.atan2(-ay,-ax):-Math.PI/2;
+    leaves.sort((a,b)=>String(a.label||'').localeCompare(String(b.label||'')));
+    const k=leaves.length;
+    const pr=_layoutR(p), lr=Math.max(...leaves.map(l=>_layoutR(l)));
+    const spread=Math.min(Math.PI*1.45, 0.5*k+0.45);
+    const step=k>1?spread/(k-1):0;
+    // far enough out that neighbours on the arc still clear each other
+    const need=k>1?(2*lr+NODE_BREATHING)/(2*Math.sin(Math.max(step,0.1)/2)):0;
+    const R=Math.max(pr+lr+NODE_BREATHING, need);
+    leaves.forEach((l,i)=>{
+      const a=base+(k>1?(-spread/2+i*step):0);
+      l.x=l.fx=p.x+Math.cos(a)*R; l.y=l.fy=p.y+Math.sin(a)*R;
+      l.vx=0; l.vy=0; l.pinned=true; placed++;
+    });
+  });
+  return placed;
+}
+
+// Push nodes clear of any connection line that crosses them but has nothing to do with them.
+// Lines running under unrelated nodes are what makes a busy map look like a tangle.
+function clearLinesOffNodes(rounds){
+  if(nodes.length<3||!edges.length) return 0;
+  const byId=new Map(nodes.map(n=>[n.id,n]));
+  const pairs=edges.map(e=>{
+    const sId=typeof e.source==='object'?e.source.id:e.source, tId=typeof e.target==='object'?e.target.id:e.target;
+    const s=byId.get(sId), t=byId.get(tId);
+    return (s&&t&&s!==t)?[s,t]:null;
+  }).filter(Boolean);
+  const clear=new Map(nodes.map(n=>[n.id,(nodeDims(n).r||40)+NODE_BREATHING*0.45]));
+  let lastHits=0;
+  for(let r=0;r<(rounds||26);r++){
+    let hits=0;
+    const dx_=new Map(nodes.map(n=>[n.id,[0,0]]));
+    nodes.forEach(n=>{
+      const need=clear.get(n.id);
+      let px=0, py=0;
+      for(let i=0;i<pairs.length;i++){
+        const s=pairs[i][0], t=pairs[i][1];
+        if(s===n||t===n) continue;
+        const ex=t.x-s.x, ey=t.y-s.y, L=ex*ex+ey*ey;
+        if(!L) continue;
+        const u=((n.x-s.x)*ex+(n.y-s.y)*ey)/L;
+        if(u<=0.03||u>=0.97) continue;                 // the ends belong to their own nodes
+        const cx=s.x+u*ex, cy=s.y+u*ey;
+        let vx=n.x-cx, vy=n.y-cy;
+        let d=Math.hypot(vx,vy);
+        if(d>=need) continue;
+        if(d<0.01){ vx=-ey; vy=ex; d=Math.hypot(vx,vy)||1; }   // sat exactly on the line
+        const push=(need-d)*0.45;
+        px+=vx/d*push; py+=vy/d*push; hits++;
+      }
+      if(px||py){
+        const m=Math.hypot(px,py), cap=NODE_BREATHING*0.8;
+        if(m>cap){ px=px/m*cap; py=py/m*cap; }
+        dx_.set(n.id,[px,py]);
+      }
+    });
+    nodes.forEach(n=>{ const d=dx_.get(n.id); if(d[0]||d[1]){ n.x+=d[0]; n.y+=d[1]; } });
+    if(!hits) break;
+    if(r>6&&hits>=lastHits) break;                      // stopped improving, leave it alone
+    lastHits=hits;
+  }
+  nodes.forEach(n=>{ n.fx=n.x; n.fy=n.y; n.vx=0; n.vy=0; });
+  return lastHits;
+}
+
 function rearrangeLayout(){
   if(nodes.length<2) return;
   layoutImportedNodes(nodes.slice());
   untangleLayout(350);
-  resolveOverlaps({silent:true});
+  fanSingleConnections();
+  resolveOverlaps({silent:true,labelAware:true});
+  clearLinesOffNodes(26);
+  resolveOverlaps({silent:true,labelAware:true});
   addLog('auto-arranged layout');
   saveState(); markUnsaved(); draw();
   if(typeof fitAll==='function') fitAll();
@@ -6913,8 +7015,12 @@ function rearrangeLayout(){
 const BIG_MAP_THRESHOLD=500;
 const BIG_MAP_WIDEN=1.45;   // push past the raw screen ratio: the layout settles
                             // narrower than the force target, so aim wider
+// A round map on a wide screen wastes the sides: it has to zoom out to fit the height, which
+// shrinks every node and name. Matching the screen's shape keeps the same gaps but fits at a
+// closer zoom, so everything reads bigger. Worth doing at any size past a handful of nodes.
+const ASPECT_THRESHOLD=24;
 function _mapAspect(){
-  if(nodes.length<BIG_MAP_THRESHOLD) return 1;
+  if(nodes.length<ASPECT_THRESHOLD) return 1;
   const a=(W&&H)?W/H:1.6;
   return Math.max(1.1,Math.min(3.4,a*BIG_MAP_WIDEN));
 }
@@ -6926,7 +7032,7 @@ function layoutImportedNodes(newNodes){
   const simpleAfter=SIMPLE_MODE==='on'||(SIMPLE_MODE==='auto'&&total>=SIMPLE_THRESHOLD);
   const isNew=new Set(newNodes.map(n=>n.id));
   // Each node's layout radius covers its name too, plus half of the 30px minimum gap
-  const rad=n=>simpleAfter?_simpleR(n)+6:_layoutR(n)+15;
+  const rad=n=>simpleAfter?_simpleR(n)+6:_layoutR(n)+NODE_BREATHING/2;
   const simNodes=nodes.map(n=>({id:n.id,x:n.x,y:n.y,r:rad(n),fx:isNew.has(n.id)?null:n.x,fy:isNew.has(n.id)?null:n.y}));
   const byId=new Map(simNodes.map(d=>[d.id,d]));
   const links=[];

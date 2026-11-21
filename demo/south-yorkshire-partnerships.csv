@@ -1,339 +1,195 @@
 ﻿Name,Connected to,Connection type,Arrow,Date added,Connection date,Colour,Notes,Place,Tier,Sector
-Combined Authority,Integrated Care Board,Strong,,2024-02-09,2024-03-05,#334155,,South Yorkshire,Regional,Strategic
-Combined Authority,VCSE Regional Alliance,Strong,,,2024-01-08,,,,,
-Combined Authority,Police and Crime Commissioner,Strong,,,2024-06-07,,,,,
-Combined Authority,Regional Active Partnership,Strong,,,2024-03-01,,,,,
-Combined Authority,Chamber of Commerce,Strong,,,2024-03-17,,,,,
-Combined Authority,Regional Skills Board,Strong,,,2024-06-14,,,,,
-Combined Authority,University Civic Partnership,Strong,,,2024-01-07,,,,,
-Combined Authority,Regional Housing Forum,Strong,,,2024-02-28,,,,,
-Combined Authority,Regional Youth Partnership,Strong,,,2024-05-06,,,,,
-Combined Authority,Regional Employment Programme,Strong,,,2024-02-09,,,,,
-Combined Authority,Regional Data and Insight Group,Strong,,,2024-05-23,,,,,
-Combined Authority,Doncaster Place Partnership,Strong,,,2024-07-01,,,,,
-Combined Authority,Sheffield Place Partnership,Strong,,,2024-05-12,,,,,
-Combined Authority,Rotherham Place Partnership,Strong,,,2024-08-23,,,,,
-Combined Authority,Barnsley Place Partnership,Strong,,,2024-08-16,,,,,
-Integrated Care Board,VCSE Regional Alliance,Moderate,,2024-03-26,2024-09-12,#334155,,South Yorkshire,Regional,Health
-Integrated Care Board,Doncaster Place Partnership,Moderate,,,2024-09-20,,,,,
-Integrated Care Board,Sheffield Place Partnership,Moderate,,,2024-09-07,,,,,
-Integrated Care Board,Rotherham Place Partnership,Moderate,,,2024-09-07,,,,,
-Integrated Care Board,Barnsley Place Partnership,Moderate,,,2024-10-13,,,,,
-VCSE Regional Alliance,Doncaster Place Partnership,Moderate,,2024-01-11,2024-12-15,#334155,,South Yorkshire,Regional,Voluntary sector
-VCSE Regional Alliance,Sheffield Place Partnership,Moderate,,,2024-10-24,,,,,
-VCSE Regional Alliance,Rotherham Place Partnership,Moderate,,,2024-09-05,,,,,
-VCSE Regional Alliance,Barnsley Place Partnership,Moderate,,,2024-10-12,,,,,
+Combined Authority,Integrated Care Board,Strong,,2024-02-09,2024-03-12,#334155,,South Yorkshire,Regional,Strategic
+Combined Authority,VCSE Regional Alliance,Strong,,,2024-05-04,,,,,
+Combined Authority,Police and Crime Commissioner,Strong,,,2024-02-14,,,,,
+Combined Authority,Regional Skills Board,Strong,,,2024-01-16,,,,,
+Combined Authority,University Civic Partnership,Strong,,,2024-01-11,,,,,
+Combined Authority,Regional Housing Forum,Strong,,,2024-02-03,,,,,
+Combined Authority,Regional Youth Partnership,Strong,,,2024-02-22,,,,,
+Combined Authority,Doncaster Place Partnership,Strong,,,2024-08-14,,,,,
+Combined Authority,Sheffield Place Partnership,Strong,,,2024-05-13,,,,,
+Combined Authority,Rotherham Place Partnership,Strong,,,2024-07-02,,,,,
+Combined Authority,Barnsley Place Partnership,Strong,,,2024-04-10,,,,,
+Integrated Care Board,VCSE Regional Alliance,Moderate,,2024-03-26,2024-06-12,#334155,,South Yorkshire,Regional,Health
+Integrated Care Board,Doncaster Place Partnership,Moderate,,,2024-06-07,,,,,
+Integrated Care Board,Sheffield Place Partnership,Moderate,,,2024-07-18,,,,,
+Integrated Care Board,Rotherham Place Partnership,Moderate,,,2024-11-10,,,,,
+Integrated Care Board,Barnsley Place Partnership,Moderate,,,2024-06-21,,,,,
+VCSE Regional Alliance,Doncaster Place Partnership,Moderate,,2024-01-11,2024-12-28,#334155,,South Yorkshire,Regional,Voluntary sector
+VCSE Regional Alliance,Sheffield Place Partnership,Moderate,,,2025-02-08,,,,,
+VCSE Regional Alliance,Rotherham Place Partnership,Moderate,,,2025-04-07,,,,,
+VCSE Regional Alliance,Barnsley Place Partnership,Moderate,,,2025-06-13,,,,,
 Police and Crime Commissioner,,,,2024-01-01,,#334155,,South Yorkshire,Regional,Safety
-Regional Active Partnership,,,,2024-02-06,,#334155,,South Yorkshire,Regional,Sport and activity
-Chamber of Commerce,,,,2024-03-12,,#334155,,South Yorkshire,Regional,Business
-Regional Skills Board,Chamber of Commerce,Strong,,2024-02-06,2024-05-13,#334155,,South Yorkshire,Regional,Skills
-University Civic Partnership,,,,2024-03-13,,#334155,,South Yorkshire,Regional,Education
-Regional Housing Forum,,,,2024-03-12,,#334155,,South Yorkshire,Regional,Housing
-Regional Youth Partnership,Regional Active Partnership,Moderate,,2024-01-08,2025-04-19,#334155,,South Yorkshire,Regional,Young people
-Regional Employment Programme,,,,2024-04-03,,#334155,,South Yorkshire,Regional,Employment
-Regional Data and Insight Group,University Civic Partnership,Moderate,,2024-04-03,2024-11-15,#334155,,South Yorkshire,Regional,Insight
-Doncaster Place Partnership,Doncaster Council,Strong,,2024-05-09,2025-06-16,#2563EB,,Doncaster,Place anchor,Strategic
-Doncaster Place Partnership,Doncaster NHS Place Team,Strong,,,2025-09-19,,,,,
-Doncaster Place Partnership,Doncaster Council for Voluntary Service,Strong,,,2024-08-13,,,,,
-Doncaster Place Partnership,Doncaster Housing Provider,Strong,,,2025-04-10,,,,,
-Doncaster Place Partnership,Doncaster College,Strong,,,2025-03-07,,,,,
-Doncaster Place Partnership,Doncaster Youth Service,Strong,,,2025-06-12,,,,,
-Doncaster Place Partnership,Doncaster Community Safety Partnership,Strong,,,2025-03-11,,,,,
-Doncaster Place Partnership,Doncaster Food Alliance,Strong,,,2024-10-14,,,,,
-Doncaster Place Partnership,Stainforth Food Project,Strong,,,2026-06-14,,,,,
-Doncaster Place Partnership,Intake Recovery Group,Strong,,,2026-08-11,,,,,
-Doncaster Place Partnership,Askern Carers Network,Moderate,,,2026-04-12,,,,,
-Doncaster Place Partnership,Edlington Repair Hub,Strong,,,2026-07-27,,,,,
-Doncaster Place Partnership,Askern Gardening Project,Weak,,,2025-08-11,,,,,
-Doncaster Place Partnership,Thorne Baby Bank,Weak,,,2026-03-18,,,,,
-Doncaster Place Partnership,Wheatley Litter Action Group,Moderate,,,2026-01-28,,,,,
-Doncaster Council,Mexborough Bike Library,Strong,,2025-08-16,2025-02-09,#2563EB,,Doncaster,Place body,Local government
-Doncaster Council,Wheatley Sports Foundation,Weak,,,2025-04-03,,,,,
-Doncaster Council,Edlington Boxing Academy,Strong,,,2025-06-04,,,,,
-Doncaster Council,Stainforth Tenants Federation,Weak,,,2025-09-26,,,,,
-Doncaster NHS Place Team,Conisbrough Youth Project,Moderate,,2025-06-04,2025-10-25,#2563EB,,Doncaster,Place body,Health
-Doncaster NHS Place Team,Conisbrough Warm Spaces Network,Moderate,,,2025-01-24,,,,,
-Doncaster NHS Place Team,Edlington Walking Group,Moderate,,,2026-03-07,,,,,
-Doncaster NHS Place Team,Bentley Peer Support Group,Moderate,,,2025-11-28,,,,,
-Doncaster Council for Voluntary Service,Doncaster College,Weak,,2025-03-26,2025-08-27,#2563EB,,Doncaster,Place body,Voluntary sector
-Doncaster Council for Voluntary Service,Bentley Timebank,Moderate,,,2025-10-26,,,,,
-Doncaster Council for Voluntary Service,Mexborough Dementia Support,Moderate,,,2025-11-17,,,,,
-Doncaster Council for Voluntary Service,Sheffield Council for Voluntary Service,Moderate,,,2026-03-28,,,,,
-Doncaster Housing Provider,Doncaster NHS Place Team,Weak,,2024-07-15,2025-04-16,#2563EB,,Doncaster,Place body,Housing
-Doncaster Housing Provider,Hexthorpe Faith Forum,Moderate,,,2025-02-20,,,,,
-Doncaster Housing Provider,Bentley Toy Library,Moderate,,,2026-09-17,,,,,
-Doncaster Housing Provider,Askern SEND Parents Forum,Moderate,,,2025-04-13,,,,,
-Doncaster College,Doncaster NHS Place Team,Weak,,2024-07-06,2025-01-02,#2563EB,,Doncaster,Place body,Education
-Doncaster College,Balby Digital Inclusion Project,Moderate,,,2025-05-27,,,,,
-Doncaster College,Mexborough Befriending Service,Strong,,,2026-04-08,,,,,
-Doncaster College,Wheatley Allotment Federation,Strong,,,2026-01-10,,,,,
-Doncaster College,Intake Community Transport,Weak,,,2025-09-23,,,,,
-Doncaster Youth Service,Rossington Uniform Bank,Moderate,,2024-12-01,2026-02-10,#2563EB,,Doncaster,Place body,Young people
-Doncaster Youth Service,Thorne Play Association,Strong,,,2025-11-04,,,,,
-Doncaster Youth Service,Balby Credit Union,Moderate,,,2025-01-15,,,,,
-Doncaster Community Safety Partnership,Hexthorpe Reading Volunteers,Moderate,,2025-07-26,2025-12-18,#2563EB,,Doncaster,Place body,Safety
-Doncaster Community Safety Partnership,Intake Young Carers Project,Weak,,,2025-07-20,,,,,
-Doncaster Community Safety Partnership,Balby Heritage Trust,Moderate,,,2025-12-15,,,,,
-Doncaster Community Safety Partnership,Barnsley Community Safety Partnership,Weak,,,2026-10-04,,,,,
-Doncaster Food Alliance,Doncaster Council,Weak,,2024-04-16,2025-03-13,#2563EB,,Doncaster,Place body,Food and poverty
-Doncaster Food Alliance,Rossington Enterprise Hub,Weak,,,2025-07-27,,,,,
-Doncaster Food Alliance,Hexthorpe Employment Support,Moderate,,,2025-05-04,,,,,
-Doncaster Food Alliance,Stainforth Disability Forum,Strong,,,2026-09-18,,,,,
-Doncaster Food Alliance,Sheffield Council for Voluntary Service,Moderate,,,2026-07-25,,,,,
-Doncaster Food Alliance,Rotherham Food Alliance,Weak,,,2026-03-03,,,,,
-Hexthorpe Faith Forum,,,,2025-02-20,,#2563EB,,Doncaster,Delivery,Community
-Stainforth Food Project,,,,2026-06-14,,#2563EB,,Doncaster,Delivery,Community
-Mexborough Bike Library,,,,2025-02-09,,#2563EB,,Doncaster,Delivery,Community
-Intake Recovery Group,,,,2026-08-11,,#2563EB,,Doncaster,Delivery,Community
-Wheatley Sports Foundation,,,,2025-04-03,,#2563EB,,Doncaster,Delivery,Community
-Edlington Boxing Academy,,,,2025-06-04,,#2563EB,,Doncaster,Delivery,Community
-Balby Digital Inclusion Project,,,,2025-05-27,,#2563EB,,Doncaster,Delivery,Community
-Askern Carers Network,,,,2026-04-12,,#2563EB,,Doncaster,Delivery,Community
-Bentley Toy Library,,,,2026-09-17,,#2563EB,,Doncaster,Delivery,Community
-Rossington Uniform Bank,,,,2026-02-10,,#2563EB,,Doncaster,Delivery,Community
-Thorne Play Association,,,,2025-11-04,,#2563EB,,Doncaster,Delivery,Community
-Conisbrough Youth Project,,,,2025-10-25,,#2563EB,,Doncaster,Delivery,Community
-Hexthorpe Reading Volunteers,,,,2025-12-18,,#2563EB,,Doncaster,Delivery,Community
-Stainforth Tenants Federation,,,,2025-09-26,,#2563EB,,Doncaster,Delivery,Community
-Mexborough Befriending Service,,,,2026-04-08,,#2563EB,,Doncaster,Delivery,Community
-Intake Young Carers Project,,,,2025-07-20,,#2563EB,,Doncaster,Delivery,Community
-Wheatley Allotment Federation,,,,2026-01-10,,#2563EB,,Doncaster,Delivery,Community
-Edlington Repair Hub,,,,2026-07-27,,#2563EB,,Doncaster,Delivery,Community
-Balby Heritage Trust,,,,2025-12-15,,#2563EB,,Doncaster,Delivery,Community
-Askern Gardening Project,,,,2025-08-11,,#2563EB,,Doncaster,Delivery,Community
-Bentley Timebank,,,,2025-10-26,,#2563EB,,Doncaster,Delivery,Community
-Rossington Enterprise Hub,,,,2025-07-27,,#2563EB,,Doncaster,Delivery,Community
-Thorne Baby Bank,,,,2026-03-18,,#2563EB,,Doncaster,Delivery,Community
-Conisbrough Warm Spaces Network,,,,2025-01-24,,#2563EB,,Doncaster,Delivery,Community
-Hexthorpe Employment Support,,,,2025-05-04,,#2563EB,,Doncaster,Delivery,Community
-Stainforth Disability Forum,,,,2026-09-18,,#2563EB,,Doncaster,Delivery,Community
-Mexborough Dementia Support,,,,2025-11-17,,#2563EB,,Doncaster,Delivery,Community
-Intake Community Transport,,,,2025-09-23,,#2563EB,,Doncaster,Delivery,Community
-Wheatley Litter Action Group,,,,2026-01-28,,#2563EB,,Doncaster,Delivery,Community
-Edlington Walking Group,,,,2026-03-07,,#2563EB,,Doncaster,Delivery,Community
-Balby Credit Union,,,,2025-01-15,,#2563EB,,Doncaster,Delivery,Community
-Askern SEND Parents Forum,,,,2025-04-13,,#2563EB,,Doncaster,Delivery,Community
-Bentley Peer Support Group,,,,2025-11-28,,#2563EB,,Doncaster,Delivery,Community
-Sheffield Place Partnership,Sheffield Council,Strong,,2024-05-18,2025-02-10,#059669,,Sheffield,Place anchor,Strategic
-Sheffield Place Partnership,Sheffield NHS Place Team,Strong,,,2024-06-14,,,,,
-Sheffield Place Partnership,Sheffield Council for Voluntary Service,Strong,,,2025-08-14,,,,,
-Sheffield Place Partnership,Sheffield Housing Provider,Strong,,,2024-11-16,,,,,
-Sheffield Place Partnership,Sheffield College,Strong,,,2024-06-21,,,,,
-Sheffield Place Partnership,Sheffield Youth Service,Strong,,,2024-11-11,,,,,
-Sheffield Place Partnership,Sheffield Community Safety Partnership,Strong,,,2024-09-09,,,,,
-Sheffield Place Partnership,Sheffield Food Alliance,Strong,,,2024-11-18,,,,,
-Sheffield Place Partnership,Parson Cross Tenants Federation,Moderate,,,2026-09-22,,,,,
-Sheffield Place Partnership,Darnall Dance Collective,Moderate,,,2025-10-21,,,,,
-Sheffield Place Partnership,Burngreave Carers Network,Strong,,,2026-10-26,,,,,
-Sheffield Place Partnership,Shiregreen Warm Spaces Network,Moderate,,,2025-08-10,,,,,
-Sheffield Place Partnership,Darnall Debt Advice Service,Moderate,,,2026-07-14,,,,,
-Sheffield Place Partnership,Manor Timebank,Moderate,,,2026-09-07,,,,,
-Sheffield Place Partnership,Gleadless Recovery Group,Moderate,,,2025-05-04,,,,,
-Sheffield Place Partnership,Crookes Befriending Service,Weak,,,2026-08-23,,,,,
-Sheffield Place Partnership,Woodhouse Heritage Trust,Strong,,,2025-09-12,,,,,
-Sheffield Council,Sheffield Council for Voluntary Service,Weak,,2025-05-09,2026-04-07,#059669,,Sheffield,Place body,Local government
-Sheffield Council,Woodhouse Employment Support,Moderate,,,2026-05-23,,,,,
-Sheffield Council,Page Hall Repair Hub,Weak,,,2025-08-13,,,,,
-Sheffield NHS Place Team,Sheffield Council,Weak,,2024-11-13,2026-03-14,#059669,,Sheffield,Place body,Health
-Sheffield NHS Place Team,Arbourthorne Women's Centre,Strong,,,2026-01-21,,,,,
-Sheffield NHS Place Team,Firth Park Family Centre,Moderate,,,2025-10-04,,,,,
-Sheffield NHS Place Team,Parson Cross Enterprise Hub,Moderate,,,2025-05-01,,,,,
-Sheffield NHS Place Team,Burngreave Gardening Project,Weak,,,2025-12-10,,,,,
-Sheffield Council for Voluntary Service,Shiregreen Homeless Outreach,Moderate,,2024-08-11,2025-03-04,#059669,,Sheffield,Place body,Voluntary sector
-Sheffield Council for Voluntary Service,Shiregreen Play Association,Moderate,,,2025-04-13,,,,,
-Sheffield Council for Voluntary Service,Page Hall Litter Action Group,Strong,,,2025-04-10,,,,,
-Sheffield Housing Provider,Crookes Disability Forum,Weak,,2025-08-19,2025-10-21,#059669,,Sheffield,Place body,Housing
-Sheffield Housing Provider,Arbourthorne Toy Library,Strong,,,2025-04-01,,,,,
-Sheffield Housing Provider,Stocksbridge Allotment Federation,Strong,,,2026-06-01,,,,,
-Sheffield Housing Provider,Firth Park Youth Project,Weak,,,2026-07-16,,,,,
-Sheffield College,Sheffield Food Alliance,Moderate,,2024-05-02,2025-05-01,#059669,,Sheffield,Place body,Education
-Sheffield College,Gleadless Boxing Academy,Strong,,,2025-01-07,,,,,
-Sheffield College,Crookes Bike Library,Weak,,,2026-01-27,,,,,
-Sheffield College,Stocksbridge SEND Parents Forum,Moderate,,,2026-07-10,,,,,
-Sheffield Youth Service,Page Hall Veterans Hub,Strong,,2025-04-09,2025-07-18,#059669,,Sheffield,Place body,Young people
-Sheffield Youth Service,Stocksbridge Uniform Bank,Moderate,,,2025-11-20,,,,,
-Sheffield Youth Service,Manor Community Transport,Moderate,,,2026-09-21,,,,,
-Sheffield Youth Service,Burngreave Peer Support Group,Weak,,,2025-12-21,,,,,
-Sheffield Community Safety Partnership,Manor Credit Union,Moderate,,2024-05-13,2025-02-13,#059669,,Sheffield,Place body,Safety
-Sheffield Community Safety Partnership,Woodhouse Music Project,Moderate,,,2025-06-26,,,,,
-Sheffield Community Safety Partnership,Parson Cross Young Carers Project,Weak,,,2025-04-28,,,,,
-Sheffield Community Safety Partnership,Arbourthorne Dementia Support,Weak,,,2025-02-17,,,,,
-Sheffield Food Alliance,Sheffield Council for Voluntary Service,Moderate,,2024-05-15,2026-02-21,#059669,,Sheffield,Place body,Food and poverty
-Sheffield Food Alliance,Gleadless Walking Group,Moderate,,,2026-04-12,,,,,
-Sheffield Food Alliance,Firth Park Reading Volunteers,Strong,,,2025-10-01,,,,,
-Sheffield Food Alliance,Darnall Baby Bank,Strong,,,2025-09-25,,,,,
-Parson Cross Tenants Federation,,,,2026-09-22,,#059669,,Sheffield,Delivery,Community
-Shiregreen Homeless Outreach,,,,2025-03-04,,#059669,,Sheffield,Delivery,Community
-Darnall Dance Collective,,,,2025-10-21,,#059669,,Sheffield,Delivery,Community
-Manor Credit Union,,,,2025-02-13,,#059669,,Sheffield,Delivery,Community
-Gleadless Boxing Academy,,,,2025-01-07,,#059669,,Sheffield,Delivery,Community
-Crookes Disability Forum,,,,2025-10-21,,#059669,,Sheffield,Delivery,Community
-Arbourthorne Women's Centre,,,,2026-01-21,,#059669,,Sheffield,Delivery,Community
-Burngreave Carers Network,,,,2026-10-26,,#059669,,Sheffield,Delivery,Community
-Woodhouse Music Project,,,,2025-06-26,,#059669,,Sheffield,Delivery,Community
-Firth Park Family Centre,,,,2025-10-04,,#059669,,Sheffield,Delivery,Community
-Page Hall Veterans Hub,,,,2025-07-18,,#059669,,Sheffield,Delivery,Community
-Stocksbridge Uniform Bank,,,,2025-11-20,,#059669,,Sheffield,Delivery,Community
-Parson Cross Enterprise Hub,,,,2025-05-01,,#059669,,Sheffield,Delivery,Community
-Shiregreen Warm Spaces Network,,,,2025-08-10,,#059669,,Sheffield,Delivery,Community
-Darnall Debt Advice Service,,,,2026-07-14,,#059669,,Sheffield,Delivery,Community
-Manor Timebank,,,,2026-09-07,,#059669,,Sheffield,Delivery,Community
-Gleadless Walking Group,,,,2026-04-12,,#059669,,Sheffield,Delivery,Community
-Crookes Bike Library,,,,2026-01-27,,#059669,,Sheffield,Delivery,Community
-Arbourthorne Toy Library,,,,2025-04-01,,#059669,,Sheffield,Delivery,Community
-Burngreave Gardening Project,,,,2025-12-10,,#059669,,Sheffield,Delivery,Community
-Woodhouse Employment Support,,,,2026-05-23,,#059669,,Sheffield,Delivery,Community
-Firth Park Reading Volunteers,,,,2025-10-01,,#059669,,Sheffield,Delivery,Community
-Page Hall Repair Hub,,,,2025-08-13,,#059669,,Sheffield,Delivery,Community
-Stocksbridge Allotment Federation,,,,2026-06-01,,#059669,,Sheffield,Delivery,Community
-Parson Cross Young Carers Project,,,,2025-04-28,,#059669,,Sheffield,Delivery,Community
-Shiregreen Play Association,,,,2025-04-13,,#059669,,Sheffield,Delivery,Community
-Darnall Baby Bank,,,,2025-09-25,,#059669,,Sheffield,Delivery,Community
-Manor Community Transport,,,,2026-09-21,,#059669,,Sheffield,Delivery,Community
-Gleadless Recovery Group,,,,2025-05-04,,#059669,,Sheffield,Delivery,Community
-Crookes Befriending Service,,,,2026-08-23,,#059669,,Sheffield,Delivery,Community
-Arbourthorne Dementia Support,,,,2025-02-17,,#059669,,Sheffield,Delivery,Community
-Burngreave Peer Support Group,,,,2025-12-21,,#059669,,Sheffield,Delivery,Community
-Woodhouse Heritage Trust,,,,2025-09-12,,#059669,,Sheffield,Delivery,Community
-Firth Park Youth Project,,,,2026-07-16,,#059669,,Sheffield,Delivery,Community
-Page Hall Litter Action Group,,,,2025-04-10,,#059669,,Sheffield,Delivery,Community
-Stocksbridge SEND Parents Forum,,,,2026-07-10,,#059669,,Sheffield,Delivery,Community
-Rotherham Place Partnership,Rotherham Council,Strong,,2024-02-15,2025-06-12,#EA580C,,Rotherham,Place anchor,Strategic
-Rotherham Place Partnership,Rotherham NHS Place Team,Strong,,,2025-07-24,,,,,
-Rotherham Place Partnership,Rotherham Council for Voluntary Service,Strong,,,2025-04-10,,,,,
-Rotherham Place Partnership,Rotherham Housing Provider,Strong,,,2025-04-02,,,,,
-Rotherham Place Partnership,Rotherham College,Strong,,,2024-11-21,,,,,
-Rotherham Place Partnership,Rotherham Youth Service,Strong,,,2025-08-26,,,,,
-Rotherham Place Partnership,Rotherham Community Safety Partnership,Strong,,,2025-07-09,,,,,
-Rotherham Place Partnership,Rotherham Food Alliance,Strong,,,2025-05-15,,,,,
-Rotherham Place Partnership,Kiveton Toy Library,Strong,,,2025-09-03,,,,,
-Rotherham Place Partnership,Thurcroft Debt Advice Service,Weak,,,2025-10-18,,,,,
-Rotherham Place Partnership,Brinsworth Bike Library,Weak,,,2025-09-13,,,,,
-Rotherham Place Partnership,Maltby Befriending Service,Moderate,,,2025-02-14,,,,,
-Rotherham Place Partnership,Masbrough Sports Foundation,Moderate,,,2025-11-14,,,,,
-Rotherham Place Partnership,Swinton Litter Action Group,Moderate,,,2026-02-10,,,,,
-Rotherham Place Partnership,Wath Dementia Support,Moderate,,,2025-04-07,,,,,
-Rotherham Place Partnership,Sheffield Housing Provider,Moderate,,,2026-08-26,,,,,
-Rotherham Council,Rotherham Youth Service,Weak,,2024-10-21,2026-01-20,#EA580C,,Rotherham,Place body,Local government
-Rotherham Council,Rawmarsh Homeless Outreach,Moderate,,,2025-04-13,,,,,
-Rotherham Council,Dinnington Employment Support,Strong,,,2026-01-11,,,,,
-Rotherham Council,Masbrough Youth Project,Strong,,,2025-11-17,,,,,
-Rotherham Council,Swinton Faith Forum,Weak,,,2025-04-19,,,,,
-Rotherham Council,Sheffield Food Alliance,Moderate,,,2026-08-26,,,,,
-Rotherham NHS Place Team,Rotherham Council for Voluntary Service,Weak,,2025-02-23,2025-12-13,#EA580C,,Rotherham,Place body,Health
-Rotherham NHS Place Team,Kiveton Dance Collective,Moderate,,,2025-05-26,,,,,
-Rotherham NHS Place Team,Thurcroft Credit Union,Weak,,,2025-10-17,,,,,
-Rotherham NHS Place Team,Maltby Disability Forum,Strong,,,2026-04-25,,,,,
-Rotherham Council for Voluntary Service,Rotherham NHS Place Team,Moderate,,2025-07-27,2026-01-17,#EA580C,,Rotherham,Place body,Voluntary sector
-Rotherham Council for Voluntary Service,Wath Warm Spaces Network,Moderate,,,2026-07-06,,,,,
-Rotherham Council for Voluntary Service,Thurcroft Repair Hub,Moderate,,,2025-05-16,,,,,
-Rotherham Housing Provider,Wath Timebank,Strong,,2025-05-14,2026-02-28,#EA580C,,Rotherham,Place body,Housing
-Rotherham Housing Provider,Kiveton Uniform Bank,Moderate,,,2025-11-25,,,,,
-Rotherham Housing Provider,Brinsworth SEND Parents Forum,Moderate,,,2026-02-11,,,,,
-Rotherham College,Eastwood Peer Support Group,Weak,,2024-10-02,2025-10-10,#EA580C,,Rotherham,Place body,Education
-Rotherham College,Rawmarsh Allotment Federation,Strong,,,2026-01-25,,,,,
-Rotherham College,Dinnington Young Carers Project,Strong,,,2025-05-01,,,,,
-Rotherham Youth Service,Rotherham Community Safety Partnership,Weak,,2024-05-04,2026-01-22,#EA580C,,Rotherham,Place body,Young people
-Rotherham Youth Service,Dinnington Gardening Project,Strong,,,2025-01-03,,,,,
-Rotherham Community Safety Partnership,Brinsworth Recovery Group,Weak,,2025-02-06,2025-12-11,#EA580C,,Rotherham,Place body,Safety
-Rotherham Community Safety Partnership,Rawmarsh Food Project,Strong,,,2026-05-11,,,,,
-Rotherham Food Alliance,Eastwood Baby Bank,Weak,,2024-11-20,2026-06-25,#EA580C,,Rotherham,Place body,Food and poverty
-Rotherham Food Alliance,Eastwood Digital Inclusion Project,Moderate,,,2026-02-08,,,,,
-Rotherham Food Alliance,Maltby Enterprise Hub,Moderate,,,2025-05-26,,,,,
-Kiveton Toy Library,,,,2025-09-03,,#EA580C,,Rotherham,Delivery,Community
-Thurcroft Debt Advice Service,,,,2025-10-18,,#EA580C,,Rotherham,Delivery,Community
-Eastwood Baby Bank,,,,2026-06-25,,#EA580C,,Rotherham,Delivery,Community
-Brinsworth Bike Library,,,,2025-09-13,,#EA580C,,Rotherham,Delivery,Community
-Maltby Befriending Service,,,,2025-02-14,,#EA580C,,Rotherham,Delivery,Community
-Rawmarsh Homeless Outreach,,,,2025-04-13,,#EA580C,,Rotherham,Delivery,Community
-Dinnington Employment Support,,,,2026-01-11,,#EA580C,,Rotherham,Delivery,Community
-Wath Timebank,,,,2026-02-28,,#EA580C,,Rotherham,Delivery,Community
-Masbrough Sports Foundation,,,,2025-11-14,,#EA580C,,Rotherham,Delivery,Community
-Swinton Litter Action Group,,,,2026-02-10,,#EA580C,,Rotherham,Delivery,Community
-Kiveton Dance Collective,,,,2025-05-26,,#EA580C,,Rotherham,Delivery,Community
-Thurcroft Credit Union,,,,2025-10-17,,#EA580C,,Rotherham,Delivery,Community
-Eastwood Peer Support Group,,,,2025-10-10,,#EA580C,,Rotherham,Delivery,Community
-Brinsworth Recovery Group,,,,2025-12-11,,#EA580C,,Rotherham,Delivery,Community
-Maltby Disability Forum,,,,2026-04-25,,#EA580C,,Rotherham,Delivery,Community
-Rawmarsh Food Project,,,,2026-05-11,,#EA580C,,Rotherham,Delivery,Community
-Dinnington Gardening Project,,,,2025-01-03,,#EA580C,,Rotherham,Delivery,Community
-Wath Warm Spaces Network,,,,2026-07-06,,#EA580C,,Rotherham,Delivery,Community
-Masbrough Youth Project,,,,2025-11-17,,#EA580C,,Rotherham,Delivery,Community
-Swinton Faith Forum,,,,2025-04-19,,#EA580C,,Rotherham,Delivery,Community
-Kiveton Uniform Bank,,,,2025-11-25,,#EA580C,,Rotherham,Delivery,Community
-Thurcroft Repair Hub,,,,2025-05-16,,#EA580C,,Rotherham,Delivery,Community
-Eastwood Digital Inclusion Project,,,,2026-02-08,,#EA580C,,Rotherham,Delivery,Community
-Brinsworth SEND Parents Forum,,,,2026-02-11,,#EA580C,,Rotherham,Delivery,Community
-Maltby Enterprise Hub,,,,2025-05-26,,#EA580C,,Rotherham,Delivery,Community
-Rawmarsh Allotment Federation,,,,2026-01-25,,#EA580C,,Rotherham,Delivery,Community
-Dinnington Young Carers Project,,,,2025-05-01,,#EA580C,,Rotherham,Delivery,Community
-Wath Dementia Support,,,,2025-04-07,,#EA580C,,Rotherham,Delivery,Community
-Barnsley Place Partnership,Barnsley Council,Strong,,2024-02-02,2025-08-16,#7C3AED,,Barnsley,Place anchor,Strategic
-Barnsley Place Partnership,Barnsley NHS Place Team,Strong,,,2024-06-20,,,,,
-Barnsley Place Partnership,Barnsley Council for Voluntary Service,Strong,,,2024-10-27,,,,,
-Barnsley Place Partnership,Barnsley Housing Provider,Strong,,,2024-09-20,,,,,
-Barnsley Place Partnership,Barnsley College,Strong,,,2025-10-15,,,,,
-Barnsley Place Partnership,Barnsley Youth Service,Strong,,,2024-06-03,,,,,
-Barnsley Place Partnership,Barnsley Community Safety Partnership,Strong,,,2025-09-18,,,,,
-Barnsley Place Partnership,Barnsley Food Alliance,Strong,,,2025-09-25,,,,,
-Barnsley Place Partnership,Goldthorpe Community Transport,Moderate,,,2025-04-05,,,,,
-Barnsley Place Partnership,Grimethorpe Debt Advice Service,Weak,,,2025-09-24,,,,,
-Barnsley Place Partnership,Goldthorpe Boxing Academy,Moderate,,,2026-08-22,,,,,
-Barnsley Place Partnership,Athersley Heritage Trust,Moderate,,,2025-01-11,,,,,
-Barnsley Place Partnership,Athersley Food Project,Moderate,,,2026-07-17,,,,,
-Barnsley Council,Darton Music Project,Strong,,2025-05-24,2026-06-23,#7C3AED,,Barnsley,Place body,Local government
-Barnsley Council,Hoyland Walking Group,Strong,,,2026-10-24,,,,,
-Barnsley Council,Sheffield Community Safety Partnership,Moderate,,,2026-08-17,,,,,
-Barnsley NHS Place Team,Barnsley Council for Voluntary Service,Weak,,2025-03-05,2025-02-04,#7C3AED,,Barnsley,Place body,Health
-Barnsley NHS Place Team,Barnsley Council for Voluntary Service,Moderate,,,2026-02-11,,,,,
-Barnsley NHS Place Team,Athersley Recovery Group,Strong,,,2026-05-08,,,,,
-Barnsley NHS Place Team,Wombwell Peer Support Group,Strong,,,2026-02-15,,,,,
-Barnsley NHS Place Team,Wombwell Befriending Service,Moderate,,,2025-02-01,,,,,
-Barnsley Council for Voluntary Service,Barnsley Community Safety Partnership,Weak,,2025-04-03,2025-06-03,#7C3AED,,Barnsley,Place body,Voluntary sector
-Barnsley Council for Voluntary Service,Penistone Young Carers Project,Weak,,,2025-05-13,,,,,
-Barnsley Council for Voluntary Service,Kendray Sports Foundation,Moderate,,,2026-04-07,,,,,
-Barnsley Housing Provider,Wombwell Litter Action Group,Moderate,,2025-01-11,2026-08-10,#7C3AED,,Barnsley,Place body,Housing
-Barnsley Housing Provider,Cudworth Credit Union,Moderate,,,2025-08-17,,,,,
-Barnsley Housing Provider,Darton Baby Bank,Moderate,,,2025-01-09,,,,,
-Barnsley College,Cudworth Reading Volunteers,Moderate,,2025-06-16,2025-03-28,#7C3AED,,Barnsley,Place body,Education
-Barnsley College,Royston Tenants Federation,Moderate,,,2025-07-18,,,,,
-Barnsley College,Penistone Play Association,Moderate,,,2026-01-07,,,,,
-Barnsley Youth Service,Barnsley College,Moderate,,2024-10-25,2026-04-04,#7C3AED,,Barnsley,Place body,Young people
-Barnsley Youth Service,Hoyland Carers Network,Weak,,,2025-06-18,,,,,
-Barnsley Youth Service,Royston Homeless Outreach,Weak,,,2025-06-14,,,,,
-Barnsley Youth Service,Grimethorpe Allotment Federation,Moderate,,,2025-11-18,,,,,
-Barnsley Youth Service,Rotherham College,Moderate,,,2026-04-26,,,,,
-Barnsley Community Safety Partnership,Darton Faith Forum,Weak,,2024-04-03,2025-11-14,#7C3AED,,Barnsley,Place body,Safety
-Barnsley Community Safety Partnership,Kendray Employment Support,Strong,,,2025-10-07,,,,,
-Barnsley Community Safety Partnership,Kendray Bike Library,Moderate,,,2025-01-28,,,,,
-Barnsley Food Alliance,Penistone Uniform Bank,Weak,,2025-02-12,2025-01-17,#7C3AED,,Barnsley,Place body,Food and poverty
-Barnsley Food Alliance,Goldthorpe Gardening Project,Moderate,,,2026-06-05,,,,,
-Barnsley Food Alliance,Grimethorpe Youth Project,Moderate,,,2025-09-20,,,,,
-Barnsley Food Alliance,Sheffield Council,Moderate,,,2026-06-14,,,,,
-Goldthorpe Community Transport,,,,2025-04-05,,#7C3AED,,Barnsley,Delivery,Community
-Penistone Young Carers Project,,,,2025-05-13,,#7C3AED,,Barnsley,Delivery,Community
-Darton Faith Forum,,,,2025-11-14,,#7C3AED,,Barnsley,Delivery,Community
-Wombwell Litter Action Group,,,,2026-08-10,,#7C3AED,,Barnsley,Delivery,Community
-Grimethorpe Debt Advice Service,,,,2025-09-24,,#7C3AED,,Barnsley,Delivery,Community
-Kendray Sports Foundation,,,,2026-04-07,,#7C3AED,,Barnsley,Delivery,Community
-Athersley Recovery Group,,,,2026-05-08,,#7C3AED,,Barnsley,Delivery,Community
-Cudworth Credit Union,,,,2025-08-17,,#7C3AED,,Barnsley,Delivery,Community
-Hoyland Carers Network,,,,2025-06-18,,#7C3AED,,Barnsley,Delivery,Community
-Royston Homeless Outreach,,,,2025-06-14,,#7C3AED,,Barnsley,Delivery,Community
-Goldthorpe Boxing Academy,,,,2026-08-22,,#7C3AED,,Barnsley,Delivery,Community
-Penistone Uniform Bank,,,,2025-01-17,,#7C3AED,,Barnsley,Delivery,Community
-Darton Music Project,,,,2026-06-23,,#7C3AED,,Barnsley,Delivery,Community
-Wombwell Peer Support Group,,,,2026-02-15,,#7C3AED,,Barnsley,Delivery,Community
-Grimethorpe Allotment Federation,,,,2025-11-18,,#7C3AED,,Barnsley,Delivery,Community
-Kendray Employment Support,,,,2025-10-07,,#7C3AED,,Barnsley,Delivery,Community
-Athersley Heritage Trust,,,,2025-01-11,,#7C3AED,,Barnsley,Delivery,Community
-Cudworth Reading Volunteers,,,,2025-03-28,,#7C3AED,,Barnsley,Delivery,Community
-Hoyland Walking Group,,,,2026-10-24,,#7C3AED,,Barnsley,Delivery,Community
-Royston Tenants Federation,,,,2025-07-18,,#7C3AED,,Barnsley,Delivery,Community
-Goldthorpe Gardening Project,,,,2026-06-05,,#7C3AED,,Barnsley,Delivery,Community
-Penistone Play Association,,,,2026-01-07,,#7C3AED,,Barnsley,Delivery,Community
-Darton Baby Bank,,,,2025-01-09,,#7C3AED,,Barnsley,Delivery,Community
-Wombwell Befriending Service,,,,2025-02-01,,#7C3AED,,Barnsley,Delivery,Community
-Grimethorpe Youth Project,,,,2025-09-20,,#7C3AED,,Barnsley,Delivery,Community
-Kendray Bike Library,,,,2025-01-28,,#7C3AED,,Barnsley,Delivery,Community
-Athersley Food Project,,,,2026-07-17,,#7C3AED,,Barnsley,Delivery,Community
+Regional Skills Board,University Civic Partnership,Strong,,2024-02-06,2024-03-12,#334155,,South Yorkshire,Regional,Skills
+University Civic Partnership,,,,2024-03-12,,#334155,,South Yorkshire,Regional,Education
+Regional Housing Forum,,,,2024-02-06,,#334155,,South Yorkshire,Regional,Housing
+Regional Youth Partnership,,,,2024-03-13,,#334155,,South Yorkshire,Regional,Young people
+Doncaster Place Partnership,Doncaster Council,Strong,,2024-06-25,2025-02-20,#2563EB,,Doncaster,Place anchor,Strategic
+Doncaster Place Partnership,Doncaster NHS Place Team,Strong,,,2025-06-14,,,,,
+Doncaster Place Partnership,Doncaster Council for Voluntary Service,Strong,,,2025-02-17,,,,,
+Doncaster Place Partnership,Doncaster Housing Provider,Strong,,,2025-01-15,,,,,
+Doncaster Place Partnership,Doncaster College,Strong,,,2025-06-16,,,,,
+Doncaster Place Partnership,Edlington Baby Bank,Moderate,,,2025-06-21,,,,,
+Doncaster Place Partnership,Stainforth Credit Union,Moderate,,,2025-06-23,,,,,
+Doncaster Place Partnership,Hexthorpe Timebank,Moderate,,,2025-01-19,,,,,
+Doncaster Place Partnership,Bentley Litter Action Group,Weak,,,2025-08-26,,,,,
+Doncaster Place Partnership,Sheffield Council,Weak,,,2026-07-06,,,,,
+Doncaster Place Partnership,Rotherham College,Weak,,,2026-04-06,,,,,
+Doncaster Council,Doncaster Housing Provider,Moderate,,2024-09-05,2026-03-11,#2563EB,,Doncaster,Place body,Local government
+Doncaster Council,Askern Carers Network,Strong,,,2026-06-19,,,,,
+Doncaster Council,Balby Toy Library,Moderate,,,2025-09-11,,,,,
+Doncaster Council,Stainforth Faith Forum,Moderate,,,2025-12-02,,,,,
+Doncaster NHS Place Team,Mexborough Heritage Trust,Weak,,2025-03-12,2025-10-10,#2563EB,,Doncaster,Place body,Health
+Doncaster NHS Place Team,Thorne Reading Volunteers,Moderate,,,2026-05-25,,,,,
+Doncaster NHS Place Team,Intake Music Project,Weak,,,2025-07-26,,,,,
+Doncaster Council for Voluntary Service,Rossington Disability Forum,Moderate,,2025-06-14,2026-06-15,#2563EB,,Doncaster,Place body,Voluntary sector
+Doncaster Council for Voluntary Service,Conisbrough Warm Spaces Network,Moderate,,,2026-02-28,,,,,
+Doncaster Housing Provider,Doncaster Council,Weak,,2024-04-08,2025-12-26,#2563EB,,Doncaster,Place body,Housing
+Doncaster Housing Provider,Wheatley Tenants Federation,Moderate,,,2026-09-20,,,,,
+Doncaster Housing Provider,Mexborough Sports Foundation,Strong,,,2025-07-20,,,,,
+Doncaster Housing Provider,Thorne Play Association,Moderate,,,2025-05-17,,,,,
+Doncaster Housing Provider,Barnsley Housing Provider,Weak,,,2026-01-09,,,,,
+Doncaster College,Edlington Enterprise Hub,Weak,,2025-08-16,2025-08-11,#2563EB,,Doncaster,Place body,Education
+Doncaster College,Askern Family Centre,Weak,,,2026-02-17,,,,,
+Doncaster College,Sheffield College,Moderate,,,2026-04-01,,,,,
+Edlington Baby Bank,,,,2025-06-21,,#2563EB,,Doncaster,Delivery,Community
+Mexborough Heritage Trust,,,,2025-10-10,,#2563EB,,Doncaster,Delivery,Community
+Stainforth Credit Union,,,,2025-06-23,,#2563EB,,Doncaster,Delivery,Community
+Thorne Reading Volunteers,,,,2026-05-25,,#2563EB,,Doncaster,Delivery,Community
+Askern Carers Network,,,,2026-06-19,,#2563EB,,Doncaster,Delivery,Community
+Balby Toy Library,,,,2025-09-11,,#2563EB,,Doncaster,Delivery,Community
+Rossington Disability Forum,,,,2026-06-15,,#2563EB,,Doncaster,Delivery,Community
+Intake Music Project,,,,2025-07-26,,#2563EB,,Doncaster,Delivery,Community
+Conisbrough Warm Spaces Network,,,,2026-02-28,,#2563EB,,Doncaster,Delivery,Community
+Wheatley Tenants Federation,,,,2026-09-20,,#2563EB,,Doncaster,Delivery,Community
+Hexthorpe Timebank,,,,2025-01-19,,#2563EB,,Doncaster,Delivery,Community
+Bentley Litter Action Group,,,,2025-08-26,,#2563EB,,Doncaster,Delivery,Community
+Edlington Enterprise Hub,,,,2025-08-11,,#2563EB,,Doncaster,Delivery,Community
+Mexborough Sports Foundation,,,,2025-07-20,,#2563EB,,Doncaster,Delivery,Community
+Stainforth Faith Forum,,,,2025-12-02,,#2563EB,,Doncaster,Delivery,Community
+Thorne Play Association,,,,2025-05-17,,#2563EB,,Doncaster,Delivery,Community
+Askern Family Centre,,,,2026-02-17,,#2563EB,,Doncaster,Delivery,Community
+Sheffield Place Partnership,Sheffield Council,Strong,,2024-06-21,2025-03-02,#059669,,Sheffield,Place anchor,Strategic
+Sheffield Place Partnership,Sheffield NHS Place Team,Strong,,,2025-07-22,,,,,
+Sheffield Place Partnership,Sheffield Council for Voluntary Service,Strong,,,2025-02-15,,,,,
+Sheffield Place Partnership,Sheffield Housing Provider,Strong,,,2024-09-03,,,,,
+Sheffield Place Partnership,Sheffield College,Strong,,,2024-09-17,,,,,
+Sheffield Place Partnership,Page Hall Faith Forum,Strong,,,2025-03-24,,,,,
+Sheffield Place Partnership,Manor Heritage Trust,Weak,,,2025-09-09,,,,,
+Sheffield Place Partnership,Shiregreen Youth Project,Strong,,,2026-09-28,,,,,
+Sheffield Place Partnership,Darnall Food Project,Strong,,,2025-09-02,,,,,
+Sheffield Place Partnership,Manor Enterprise Hub,Strong,,,2026-10-19,,,,,
+Sheffield Place Partnership,Firth Park Baby Bank,Moderate,,,2026-08-17,,,,,
+Sheffield Council,Parson Cross Befriending Service,Moderate,,2025-02-09,2026-09-20,#059669,,Sheffield,Place body,Local government
+Sheffield Council,Woodhouse SEND Parents Forum,Moderate,,,2025-06-18,,,,,
+Sheffield Council,Page Hall Repair Hub,Weak,,,2025-03-25,,,,,
+Sheffield NHS Place Team,Gleadless Women's Centre,Moderate,,2024-06-18,2025-02-13,#059669,,Sheffield,Place body,Health
+Sheffield Council for Voluntary Service,Sheffield NHS Place Team,Moderate,,2025-06-02,2026-02-10,#059669,,Sheffield,Place body,Voluntary sector
+Sheffield Council for Voluntary Service,Stocksbridge Carers Network,Moderate,,,2026-03-14,,,,,
+Sheffield Council for Voluntary Service,Crookes Peer Support Group,Weak,,,2025-09-06,,,,,
+Sheffield Housing Provider,Arbourthorne Veterans Hub,Moderate,,2025-02-14,2026-04-02,#059669,,Sheffield,Place body,Housing
+Sheffield Housing Provider,Burngreave Toy Library,Weak,,,2026-02-23,,,,,
+Sheffield College,Sheffield Housing Provider,Moderate,,2025-03-06,2025-01-16,#059669,,Sheffield,Place body,Education
+Sheffield College,Woodhouse Music Project,Moderate,,,2025-12-08,,,,,
+Sheffield College,Burngreave Family Centre,Moderate,,,2025-08-13,,,,,
+Sheffield College,Firth Park Employment Support,Weak,,,2026-02-05,,,,,
+Woodhouse Music Project,,,,2025-12-08,,#059669,,Sheffield,Delivery,Community
+Page Hall Faith Forum,,,,2025-03-24,,#059669,,Sheffield,Delivery,Community
+Manor Heritage Trust,,,,2025-09-09,,#059669,,Sheffield,Delivery,Community
+Burngreave Family Centre,,,,2025-08-13,,#059669,,Sheffield,Delivery,Community
+Firth Park Employment Support,,,,2026-02-05,,#059669,,Sheffield,Delivery,Community
+Stocksbridge Carers Network,,,,2026-03-14,,#059669,,Sheffield,Delivery,Community
+Arbourthorne Veterans Hub,,,,2026-04-02,,#059669,,Sheffield,Delivery,Community
+Parson Cross Befriending Service,,,,2026-09-20,,#059669,,Sheffield,Delivery,Community
+Shiregreen Youth Project,,,,2026-09-28,,#059669,,Sheffield,Delivery,Community
+Crookes Peer Support Group,,,,2025-09-06,,#059669,,Sheffield,Delivery,Community
+Gleadless Women's Centre,,,,2025-02-13,,#059669,,Sheffield,Delivery,Community
+Darnall Food Project,,,,2025-09-02,,#059669,,Sheffield,Delivery,Community
+Woodhouse SEND Parents Forum,,,,2025-06-18,,#059669,,Sheffield,Delivery,Community
+Page Hall Repair Hub,,,,2025-03-25,,#059669,,Sheffield,Delivery,Community
+Manor Enterprise Hub,,,,2026-10-19,,#059669,,Sheffield,Delivery,Community
+Burngreave Toy Library,,,,2026-02-23,,#059669,,Sheffield,Delivery,Community
+Firth Park Baby Bank,,,,2026-08-17,,#059669,,Sheffield,Delivery,Community
+Rotherham Place Partnership,Rotherham Council,Strong,,2024-03-01,2024-10-14,#EA580C,,Rotherham,Place anchor,Strategic
+Rotherham Place Partnership,Rotherham NHS Place Team,Strong,,,2024-06-06,,,,,
+Rotherham Place Partnership,Rotherham Council for Voluntary Service,Strong,,,2025-04-13,,,,,
+Rotherham Place Partnership,Rotherham Housing Provider,Strong,,,2025-01-01,,,,,
+Rotherham Place Partnership,Rotherham College,Strong,,,2025-10-13,,,,,
+Rotherham Place Partnership,Maltby Credit Union,Strong,,,2026-01-21,,,,,
+Rotherham Place Partnership,Rawmarsh Dance Collective,Moderate,,,2025-05-01,,,,,
+Rotherham Place Partnership,Masbrough Gardening Project,Moderate,,,2026-07-14,,,,,
+Rotherham Place Partnership,Thurcroft Befriending Service,Moderate,,,2026-09-07,,,,,
+Rotherham Place Partnership,Brinsworth Youth Project,Weak,,,2026-01-27,,,,,
+Rotherham Place Partnership,Eastwood Allotment Federation,Strong,,,2025-04-01,,,,,
+Rotherham Council,Rotherham NHS Place Team,Moderate,,2025-06-11,2026-04-08,#EA580C,,Rotherham,Place body,Local government
+Rotherham Council,Masbrough Peer Support Group,Strong,,,2025-01-07,,,,,
+Rotherham Council,Brinsworth Dementia Support,Strong,,,2026-10-26,,,,,
+Rotherham Council,Kiveton Bike Library,Moderate,,,2025-08-10,,,,,
+Rotherham NHS Place Team,Thurcroft Disability Forum,Weak,,2025-06-01,2025-10-21,#EA580C,,Rotherham,Place body,Health
+Rotherham NHS Place Team,Maltby Women's Centre,Moderate,,,2026-04-12,,,,,
+Rotherham NHS Place Team,Swinton Homeless Outreach,Weak,,,2025-12-10,,,,,
+Rotherham NHS Place Team,Sheffield NHS Place Team,Weak,,,2026-06-24,,,,,
+Rotherham Council for Voluntary Service,Dinnington Recovery Group,Moderate,,2024-05-12,2025-11-20,#EA580C,,Rotherham,Place body,Voluntary sector
+Rotherham Council for Voluntary Service,Sheffield Place Partnership,Moderate,,,2026-09-26,,,,,
+Rotherham Housing Provider,Wath Debt Advice Service,Strong,,2025-05-08,2025-07-18,#EA580C,,Rotherham,Place body,Housing
+Rotherham College,Rotherham Council,Moderate,,2024-09-12,2025-03-09,#EA580C,,Rotherham,Place body,Education
+Rotherham College,Eastwood Warm Spaces Network,Moderate,,,2025-06-26,,,,,
+Rotherham College,Swinton Digital Inclusion Project,Moderate,,,2025-10-04,,,,,
+Masbrough Peer Support Group,,,,2025-01-07,,#EA580C,,Rotherham,Delivery,Community
+Thurcroft Disability Forum,,,,2025-10-21,,#EA580C,,Rotherham,Delivery,Community
+Maltby Credit Union,,,,2026-01-21,,#EA580C,,Rotherham,Delivery,Community
+Brinsworth Dementia Support,,,,2026-10-26,,#EA580C,,Rotherham,Delivery,Community
+Eastwood Warm Spaces Network,,,,2025-06-26,,#EA580C,,Rotherham,Delivery,Community
+Swinton Digital Inclusion Project,,,,2025-10-04,,#EA580C,,Rotherham,Delivery,Community
+Wath Debt Advice Service,,,,2025-07-18,,#EA580C,,Rotherham,Delivery,Community
+Dinnington Recovery Group,,,,2025-11-20,,#EA580C,,Rotherham,Delivery,Community
+Rawmarsh Dance Collective,,,,2025-05-01,,#EA580C,,Rotherham,Delivery,Community
+Kiveton Bike Library,,,,2025-08-10,,#EA580C,,Rotherham,Delivery,Community
+Masbrough Gardening Project,,,,2026-07-14,,#EA580C,,Rotherham,Delivery,Community
+Thurcroft Befriending Service,,,,2026-09-07,,#EA580C,,Rotherham,Delivery,Community
+Maltby Women's Centre,,,,2026-04-12,,#EA580C,,Rotherham,Delivery,Community
+Brinsworth Youth Project,,,,2026-01-27,,#EA580C,,Rotherham,Delivery,Community
+Eastwood Allotment Federation,,,,2025-04-01,,#EA580C,,Rotherham,Delivery,Community
+Swinton Homeless Outreach,,,,2025-12-10,,#EA580C,,Rotherham,Delivery,Community
+Barnsley Place Partnership,Barnsley Council,Strong,,2024-06-23,2025-05-18,#7C3AED,,Barnsley,Place anchor,Strategic
+Barnsley Place Partnership,Barnsley NHS Place Team,Strong,,,2024-09-28,,,,,
+Barnsley Place Partnership,Barnsley Council for Voluntary Service,Strong,,,2025-06-24,,,,,
+Barnsley Place Partnership,Barnsley Housing Provider,Strong,,,2025-09-21,,,,,
+Barnsley Place Partnership,Barnsley College,Strong,,,2024-09-05,,,,,
+Barnsley Place Partnership,Wombwell Carers Network,Moderate,,,2025-03-19,,,,,
+Barnsley Place Partnership,Goldthorpe Walking Group,Moderate,,,2026-08-27,,,,,
+Barnsley Place Partnership,Darton SEND Parents Forum,Strong,,,2026-10-12,,,,,
+Barnsley Place Partnership,Penistone Food Project,Moderate,,,2025-05-13,,,,,
+Barnsley Place Partnership,Goldthorpe Heritage Trust,Strong,,,2025-08-16,,,,,
+Barnsley Place Partnership,Sheffield College,Moderate,,,2026-05-28,,,,,
+Barnsley Council,Hoyland Baby Bank,Moderate,,2024-11-13,2025-08-23,#7C3AED,,Barnsley,Place body,Local government
+Barnsley Council,Grimethorpe Repair Hub,Weak,,,2026-09-02,,,,,
+Barnsley NHS Place Team,Royston Warm Spaces Network,Strong,,2024-04-13,2025-01-11,#7C3AED,,Barnsley,Place body,Health
+Barnsley Council for Voluntary Service,Barnsley College,Weak,,2025-02-04,2025-12-15,#7C3AED,,Barnsley,Place body,Voluntary sector
+Barnsley Council for Voluntary Service,Penistone Reading Volunteers,Moderate,,,2026-07-19,,,,,
+Barnsley Council for Voluntary Service,Cudworth Peer Support Group,Strong,,,2026-02-23,,,,,
+Barnsley Housing Provider,Grimethorpe Employment Support,Weak,,2024-08-09,2026-01-19,#7C3AED,,Barnsley,Place body,Housing
+Barnsley Housing Provider,Athersley Boxing Academy,Moderate,,,2025-07-25,,,,,
+Barnsley Housing Provider,Kendray Community Transport,Weak,,,2025-09-19,,,,,
+Barnsley Housing Provider,Sheffield Place Partnership,Moderate,,,2026-09-20,,,,,
+Barnsley College,Barnsley Council for Voluntary Service,Moderate,,2024-09-05,2026-05-10,#7C3AED,,Barnsley,Place body,Education
+Barnsley College,Kendray Women's Centre,Weak,,,2026-05-04,,,,,
+Barnsley College,Royston Toy Library,Weak,,,2025-07-06,,,,,
+Barnsley College,Wombwell Debt Advice Service,Strong,,,2026-05-05,,,,,
+Barnsley College,Rotherham NHS Place Team,Moderate,,,2026-04-06,,,,,
+Kendray Women's Centre,,,,2026-05-04,,#7C3AED,,Barnsley,Delivery,Community
+Grimethorpe Employment Support,,,,2026-01-19,,#7C3AED,,Barnsley,Delivery,Community
+Royston Toy Library,,,,2025-07-06,,#7C3AED,,Barnsley,Delivery,Community
+Penistone Reading Volunteers,,,,2026-07-19,,#7C3AED,,Barnsley,Delivery,Community
+Wombwell Carers Network,,,,2025-03-19,,#7C3AED,,Barnsley,Delivery,Community
+Goldthorpe Walking Group,,,,2026-08-27,,#7C3AED,,Barnsley,Delivery,Community
+Athersley Boxing Academy,,,,2025-07-25,,#7C3AED,,Barnsley,Delivery,Community
+Hoyland Baby Bank,,,,2025-08-23,,#7C3AED,,Barnsley,Delivery,Community
+Cudworth Peer Support Group,,,,2026-02-23,,#7C3AED,,Barnsley,Delivery,Community
+Darton SEND Parents Forum,,,,2026-10-12,,#7C3AED,,Barnsley,Delivery,Community
+Kendray Community Transport,,,,2025-09-19,,#7C3AED,,Barnsley,Delivery,Community
+Grimethorpe Repair Hub,,,,2026-09-02,,#7C3AED,,Barnsley,Delivery,Community
+Royston Warm Spaces Network,,,,2025-01-11,,#7C3AED,,Barnsley,Delivery,Community
+Penistone Food Project,,,,2025-05-13,,#7C3AED,,Barnsley,Delivery,Community
+Wombwell Debt Advice Service,,,,2026-05-05,,#7C3AED,,Barnsley,Delivery,Community
+Goldthorpe Heritage Trust,,,,2025-08-16,,#7C3AED,,Barnsley,Delivery,Community
