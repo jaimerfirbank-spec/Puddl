@@ -5933,9 +5933,9 @@ function _withDate(d,fn){
   try{ DATE_ASAT=d||null; recomputeDateHidden(); return fn(); }
   finally{ DATE_ASAT=keep; _dateHidden.clear(); hid.forEach(x=>_dateHidden.add(x)); }
 }
-function _snapAt(d){
+function _snapAt(d,only){
   return _withDate(d,()=>{
-    const ppl=nodes.filter(n=>n.type!=='centre'&&!(d&&_dateHidden.has(n.id)));
+    const ppl=nodes.filter(n=>n.type!=='centre'&&!(d&&_dateHidden.has(n.id))&&(!only||only.has(n.id)));
     const ids=new Set(ppl.map(n=>n.id)), nById=new Map(nodes.map(n=>[n.id,n]));
     const adj=new Map(ppl.map(n=>[n.id,new Set()])), links=[], seen=new Set();
     edges.forEach(e=>{
@@ -5967,12 +5967,12 @@ function _metrics(S,grp){
   return {n:S.ppl.length,links:S.links.length,iso,isoIds,pieces,cross,measured,pairs};
 }
 // The map month by month, from the first date on it to the last
-function _timeSeries(grp){
+function _timeSeries(grp,only){
   const range=mapDateRange();
   if(!range||range.lo.slice(0,7)===range.hi.slice(0,7)) return null;
   let pts=_monthEnds(range.lo,range.hi);
   if(pts.length>36){ const step=Math.ceil(pts.length/36); pts=pts.filter((p,i)=>i%step===0||i===pts.length-1); }
-  return pts.map(d=>Object.assign({d},_metrics(_snapAt(d),grp)));
+  return pts.map(d=>Object.assign({d},_metrics(_snapAt(d,only),grp)));
 }
 
 function computeFindings(I){
@@ -5993,7 +5993,8 @@ function computeFindings(I){
   const add=(id,tag,text,evidence,focusFn,note)=>list.push({id,tag,text,evidence,note,focus:()=>Object.assign({},focusFn(),{key:'finding:'+id})});
   const grp=MAP_TYPE==='argument'?null:_findingsGrouping(pool,linkList);
   const gw=grp?_groupWord(grp.name):'', gp=grp?_groupPlural(grp.name):'';
-  const series=_timeSeries(grp);
+  const only=_selectionActive()?new Set(nodes.filter(n=>highlightIds.has(n.id)).map(n=>n.id)):null;   // the selection, if there is one
+  const series=_timeSeries(grp,only);
   const thenRow=series?series.find(r=>r.links>=15):null;
   const nowRow=series?series[series.length-1]:null;
   const gOf=id=>grp?grp.of(G.nById.get(id)):'';
@@ -6016,7 +6017,7 @@ function computeFindings(I){
   }
   // 2. Two groups that started to connect, preferring the pair that began by going through one item
   if(grp&&series&&thenRow&&thenRow!==nowRow){
-    const S0=_snapAt(thenRow.d), per=new Map();
+    const S0=_snapAt(thenRow.d,only), per=new Map();
     S0.links.forEach(([x,y])=>{
       const gx=grp.of(S0.nById.get(x)), gy=grp.of(S0.nById.get(y)); if(!gx||!gy||gx===gy) return;
       const k=_pairKey(gx,gy); if(!per.has(k)) per.set(k,{m0:0,occ:new Map()});
@@ -6142,7 +6143,7 @@ function computeFindings(I){
   }
   // 10. Whether new connections are speeding up or slowing down
   if(series){
-    const ds=[]; edges.forEach(e=>{ const d=edgeDateOf(e,G.nById.get(_eEnd(e,'source')),G.nById.get(_eEnd(e,'target'))); if(d) ds.push(d); });
+    const ds=[]; edges.forEach(e=>{ const ea=_eEnd(e,'source'), eb=_eEnd(e,'target'); if(only&&!(only.has(ea)&&only.has(eb))) return; const d=edgeDateOf(e,G.nById.get(ea),G.nById.get(eb)); if(d) ds.push(d); });
     if(ds.length>=20){
       const hi=ds.reduce((a,b)=>a>b?a:b), t1=_addDays(hi,-90), t2=_addDays(hi,-180);
       const w1=ds.filter(d=>d>t1).length, w2=ds.filter(d=>d>t2&&d<=t1).length;
@@ -10093,28 +10094,50 @@ function updateFilterCount(count, active){
 
 // Also show report button whenever a search/filter is active even with 0 results
 
+// A filter or search is a selection. A loop or finding that is only lit up on the map is not: it is
+// pinned, and pinned items are not what the person asked to look at.
+function _selectionActive(){
+  const pins=highlightIds.pins;
+  return pins?[...highlightIds].some(id=>!pins.has(id)):highlightIds.size>0;
+}
 function getVisibleNodes(){
-  // Returns nodes currently "visible" (highlighted or all if no filter)
-  const hasHL = highlightIds.size > 0;
-  if(!hasHL) return nodes.filter(n=>n.type!=='centre');
-  // Exclude the sentinel -1 (no-match marker)
-  return nodes.filter(n=>n.type!=='centre' && highlightIds.has(n.id) && n.id !== -1);
+  // The items the report covers: the selection, or everything, as the timeline date has it
+  const sel=_selectionActive();
+  return nodes.filter(n=>n.type!=='centre'&&n.id!==-1&&(!sel||highlightIds.has(n.id))&&!(DATE_ASAT&&_dateHidden.has(n.id)));
 }
 
 function getVisibleEdges(){
-  const visIds = new Set(getVisibleNodes().map(n=>n.id));
+  const vis=getVisibleNodes(), visIds=new Set(vis.map(n=>n.id)), nById=new Map(nodes.map(n=>[n.id,n]));
   return edges.filter(e=>{
     const s=typeof e.source==='object'?e.source.id:e.source;
     const t=typeof e.target==='object'?e.target.id:e.target;
-    return visIds.has(s)&&visIds.has(t);
+    if(!visIds.has(s)||!visIds.has(t)) return false;
+    return !(DATE_ASAT&&edgeHiddenByDate(e,nById.get(s),nById.get(t)));
   });
+}
+// What is narrowing the report, in words
+function _selectionParts(){
+  const parts=[], q=((document.getElementById('search-input')||{}).value||'').trim();
+  if(q) parts.push('search \u201c'+q+'\u201d');
+  const lab={'cat-filter':'category','area-filter':'area','conn-type-filter':'connection type','member-filter':'member','tag-filter':'tag'};
+  Object.keys(lab).forEach(id=>{ const st=msSelected[id]; if(st&&st.size) parts.push(lab[id]+': '+[...st].join(', ')); });
+  if(CONN_MIN!==null||CONN_MAX!==null) parts.push(CONN_MIN!==null&&CONN_MAX!==null?CONN_MIN+' to '+CONN_MAX+' connections':(CONN_MIN!==null?CONN_MIN+' or more connections':'up to '+CONN_MAX+' connections'));
+  if(DATE_FROM||DATE_TO) parts.push('added '+(DATE_FROM||'the start')+' to '+(DATE_TO||'now'));
+  if(DATE_ASAT) parts.push('the map as it stood on '+DATE_ASAT);
+  return parts;
+}
+function _selectionBannerHTML(){
+  const parts=_selectionParts(); if(!parts.length&&!_selectionActive()) return '';
+  const np=mapNounPack()[1], shown=getVisibleNodes().length, all=nodes.filter(n=>n.type!=='centre').length;
+  const box=h=>`<div class="report-section"><div style="padding:10px 12px;border-radius:8px;background:var(--surf-2);border-left:3px solid #2563EB;font-size:12px;line-height:1.5;">${h}</div></div>`;
+  if(DATE_ASAT&&parts.length===1) return box(`<strong>This report shows the map as it stood on ${escHtml(DATE_ASAT)}:</strong> ${shown} ${escHtml(np)} by then. Clear the timeline date to see it as it is now.`);
+  return box(`<strong>This report covers part of the map:</strong> ${shown} of ${all} ${escHtml(np)}.${parts.length?' Narrowed by '+escHtml(parts.join('; '))+'.':''} Clear the search and filters to see everything.`);
 }
 
 function openReport(){
   const visible=getVisibleNodes();
-  const q=document.getElementById('search-input').value.trim();
-  const cat=document.getElementById('cat-filter').value;
-  const subtitle=q||cat?`Filtered: ${q||''}${q&&cat?' · ':''}${cat||''}`:'Full map';
+  const _parts=_selectionParts();
+  const subtitle=_parts.length?'Covers part of the map: '+_parts.join(' · '):(_selectionActive()?`Covers ${visible.length} selected`:'Full map');
   document.getElementById('report-modal-subtitle').textContent=subtitle;
   currentReportTab='summary';
   // Reset tab highlight
@@ -10185,7 +10208,7 @@ function buildSummaryReport(){
 
   {
     const _I=computeInsights(), _F=computeFindings(_I);
-    html+=_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
+    html+=_selectionBannerHTML()+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
   }
 
   if(vis.some(n=>n.colourLabel)&&Object.keys(catCounts).length){
