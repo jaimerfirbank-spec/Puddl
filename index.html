@@ -2401,6 +2401,14 @@ function selectConnColour(col){
           </div>
         </div>
         <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Merge marks</h4>
+          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">The small badge on a node whose spellings were merged on import. Hide it for presentations. The record of what was merged stays in Insights.</p>
+          <div style="display:flex;gap:8px;">
+            <button id="btn-mergemarks-show" onclick="setShowMergeMarks(true)" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Show</button>
+            <button id="btn-mergemarks-hide" onclick="setShowMergeMarks(false)" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Hide</button>
+          </div>
+        </div>
+        <div style="margin-bottom:24px;">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Size nodes by</h4>
           <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Nodes start at the size you picked and grow with the value, so the biggest stand out. Fields only appear here if they hold numbers.</p>
           <select id="settings-size-by" onchange="setSizeBy(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);"></select>
@@ -2634,6 +2642,7 @@ let dragGroupInit=null;   // Shift-drag: {id:{x,y}} for the node and its direct 
 let panDragging=false,panSX=0,panSY=0,panPX=0,panPY=0;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
+let SHOW_MERGE_MARKS=true;        // the small two-circle badge on nodes that were merged on import
 let FIELD_DEFS=[];
 // Dates: nodes/connections may carry n.date / e.date as 'YYYY-MM-DD'. Undated items always show.
 let DATE_ASAT=null;              // show the map as it was on this date (hides anything later)
@@ -3065,7 +3074,7 @@ function snap(){
     };
   }
   return JSON.stringify({
-    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
+    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,mergedFrom:n.mergedFrom||[],outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
     edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false})),
     colourLegendMap,
     categories:CATEGORIES,
@@ -3084,6 +3093,7 @@ function snap(){
     dateAsAt:DATE_ASAT,
     areas:AREAS,
     nodeLabelPosition:NODE_LABEL_POSITION,
+    showMergeMarks:SHOW_MERGE_MARKS,
     sizeByConnections:SIZE_BY==='connections',
     sizeBy:SIZE_BY,
     simpleMode:SIMPLE_MODE,
@@ -3147,6 +3157,7 @@ function restoreSnap(s){
   DATE_ASAT=d.dateAsAt||null; if(typeof recomputeDateHidden==='function') recomputeDateHidden();
   if(d.areas&&Array.isArray(d.areas)&&d.areas.length) AREAS=d.areas;
   if(d.nodeLabelPosition) NODE_LABEL_POSITION=d.nodeLabelPosition;
+  SHOW_MERGE_MARKS=d.showMergeMarks!==false;   // maps saved before this setting existed show them
   SIZE_BY=typeof d.sizeBy==='string'?d.sizeBy:(d.sizeByConnections?'connections':'');
   COLOUR_BY=typeof d.colourBy==='string'?d.colourBy:'';
   SIMPLE_MODE=['auto','on','off'].includes(d.simpleMode)?d.simpleMode:'auto';
@@ -4099,7 +4110,7 @@ function draw(){
     }
 
     // Merged node indicator: two overlapping small circles at bottom-right
-    if(n.merged){
+    if(n.merged&&SHOW_MERGE_MARKS){
       ctx.save();
       const bx=n.x+r*0.65, by=n.y+r*0.65;
       const br=6/zoom;
@@ -5583,6 +5594,18 @@ function renderInsights(){
   h += grp('groups','Groups',I.linked.length,
     pair(plural(I.linked.length,'linked group'), plural(I.alone,'person')+' on their own') + I.linked.slice(0,5).map(g=>row(g.best,`group of ${g.size}`,'group')).join(''));
 
+  {
+    const mergedNodes=I.pool.filter(n=>n.merged);
+    if(mergedNodes.length){
+      let mh=`<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;line-height:1.4;">Names the importer treated as the same thing and joined into one. If any of these are really different, they need splitting back out by hand. Click a name to light it up.</div>`;
+      mh+=mergedNodes.map(n=>{
+        const k=(n.mergedFrom||[]).length;
+        return row(n,k?`${k} merged in`:'')+`<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 6px 12px;line-height:1.45;">${mergeRecordLines(n).map(esc).join('<br>')}</div>`;
+      }).join('');
+      h += grp('merges','Merged on import',mergedNodes.length,mh);
+    }
+  }
+
   const cEntries=Object.entries(I.cats).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const cMax=cEntries.length?cEntries[0][1]:1;
   h += grp('cats','By category',null,
@@ -5774,6 +5797,28 @@ function clearInsightFocus(){
 function toggleInsightNext(){
   _insightShowNext=!_insightShowNext;
   _afterPinChange();
+}
+
+// What the importer joined into a node, in plain words. Used by Insights and by the report.
+function mergeRecordLines(n){
+  const when=ts=>{ try{ return new Date(ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }catch(e){ return ''; } };
+  const from=n.mergedFrom||[];
+  if(!from.length) return ['Merged on an earlier import. No record was kept of the other spelling.'];
+  return from.map(f=>{
+    const ln=(f.links||[]).map(String);
+    const linked=ln.length?` (it was linked to ${ln.slice(0,3).join(', ')}${ln.length>3?', and '+(ln.length-3)+' more':''})`:'';
+    return `Also entered as "${f.name}"${linked}. ${f.via==='map'?'Matched to a node already on the map':'Two rows in one spreadsheet'}${f.ts?', '+when(f.ts):''}.`;
+  });
+}
+function setShowMergeMarks(v){
+  SHOW_MERGE_MARKS=!!v;
+  syncMergeMarksUI();
+  saveState(); markUnsaved(); draw();
+}
+function syncMergeMarksUI(){
+  const a=document.getElementById('btn-mergemarks-show'), b=document.getElementById('btn-mergemarks-hide');
+  if(a){ a.style.background=SHOW_MERGE_MARKS?'var(--ink)':''; a.style.color=SHOW_MERGE_MARKS?'var(--surf)':''; }
+  if(b){ b.style.background=!SHOW_MERGE_MARKS?'var(--ink)':''; b.style.color=!SHOW_MERGE_MARKS?'var(--surf)':''; }
 }
 
 function pinLoop(i,on){
@@ -6830,6 +6875,7 @@ function _mergeIncomingRow(t,s){
   (s.grants||[]).forEach(g=>{ if(!t.grants.some(eg=>eg.source===g.source&&eg.rawAmount===g.rawAmount&&eg.date===g.date)) t.grants.push(g); });
   (s.tags||[]).forEach(tg=>{ if(!t.tags.includes(tg)) t.tags.push(tg); });
   t._mergedFrom=(t._mergedFrom||[]).concat([s.name]);
+  (t._mergedLinks=t._mergedLinks||{})[s.name]=(s.connToRaw||[]).map(c=>c.to);   // what the other spelling was joined to
 }
 
 // Pass 2: compare the de-duplicated rows against what is already on the canvas, then build the
@@ -7791,6 +7837,7 @@ function confirmImport(){
     if(r._mergedFrom&&r._mergedFrom.length){
       node.merged=true;
       node.history.push({ts:Date.now(),text:'Also entered in the spreadsheet as: '+r._mergedFrom.join(', ')});
+      node.mergedFrom=r._mergedFrom.map(nm=>({name:nm,via:'sheet',ts:Date.now(),links:(r._mergedLinks&&r._mergedLinks[nm])||[]}));
     }
     if(r.part){ node.argPart=r.part; if(!(r.colour&&/^#[0-9a-fA-F]{3,6}$/.test(r.colour))) node.colour=argPartOf(node).colour; node.shape='rectangle'; if(r.part==='claim') node.nodeSize='large'; }
     node.customFields={};
@@ -7817,7 +7864,18 @@ function confirmImport(){
       r.tags.forEach(t=>{if(!n.tags.includes(t)) n.tags.push(t);});
     }
     // Mark as merged from multiple sources
-    if(isMerge) n.merged=true;
+    if(isMerge){
+      n.merged=true;
+      // Keep a record of what was joined, so it can be checked, and undone by hand if it was wrong
+      const _same=(a,b)=>String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();
+      if(!n.mergedFrom) n.mergedFrom=[];
+      if(!_same(r.name,n.label)){
+        n.mergedFrom.push({name:r.name,via:'map',ts:Date.now(),links:(r.connToRaw||[]).map(c=>c.to)});
+        if(!n.history) n.history=[];
+        n.history.push({ts:Date.now(),text:'Merged on import: also entered as '+r.name});
+      }
+      (r._mergedFrom||[]).forEach(nm=>n.mergedFrom.push({name:nm,via:'sheet',ts:Date.now(),links:(r._mergedLinks&&r._mergedLinks[nm])||[]}));
+    }
   });
 
   // --- Add edges (second pass so all nodes exist) ---
@@ -9726,6 +9784,13 @@ function buildSummaryReport(){
     html+=`</div>`;
   }
 
+  {
+    const mergedNodes=nodes.filter(n=>n.merged&&n.type!=='centre');
+    if(mergedNodes.length){
+      html+=`<div class="report-section"><h4>Merged on import</h4><div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Names the importer treated as the same thing and joined into one. Worth checking with the people who know them.</div>`+
+        mergedNodes.map(n=>`<div class="report-row">${escHtml(n.label)}<div style="font-size:11px;color:var(--txt-m);margin-top:2px;">${mergeRecordLines(n).map(escHtml).join('<br>')}</div></div>`).join('')+`</div>`;
+    }
+  }
   if(MAP_TYPE==='general'||MAP_TYPE==='network'){
     const NI=computeInsights();
     html+=`<div class="report-section"><h4>Network structure</h4>
@@ -13535,6 +13600,7 @@ function nodeFill(n){
 function renderCustomizePanel(){
   switchCustomizeTab('nodes');
   setNodeLabelPosition(NODE_LABEL_POSITION);
+  syncMergeMarksUI();
   syncNodeStyleButtons();
   syncSizeByConnButtons();
 }
