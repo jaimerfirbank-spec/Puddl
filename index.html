@@ -6612,11 +6612,11 @@ function runImportMapper(){
   // pass never runs at all. Exact repeats of a name were already folded together by nodeMap.
   const _wf=_withinFileDupes(incoming);
   if(_wf.length){
-    importPlan={dupeCandidates:_wf,_stage:'withinfile',_rows:incoming,_skipped:skipped};
+    importPlan={dupeCandidates:_wf,_stage:'withinfile',_rows:incoming,_skipped:skipped,_polInfo:{unreadable:polarityUnreadable,samples:polarityUnreadableSamples}};
     _showImportDupesScreen(importPlan);
     return;
   }
-  _buildImportPlan(incoming,skipped,null);
+  _buildImportPlan(incoming,skipped,null,{unreadable:polarityUnreadable,samples:polarityUnreadableSamples});
 }
 
 // Words that carry no identity, dropped before two names are compared.
@@ -6692,7 +6692,9 @@ function _mergeIncomingRow(t,s){
 // Pass 2: compare the de-duplicated rows against what is already on the canvas, then build the
 // edge list and the import plan. Split out of runImportMapper so the within-file review above
 // can hand control back here once the user has resolved it.
-function _buildImportPlan(incoming,skipped,nameAlias){
+function _buildImportPlan(incoming,skipped,nameAlias,polInfo){
+  // Polarity cells that could not be read were counted while the rows were read, in the caller
+  const polarityUnreadable=(polInfo&&polInfo.unreadable)||0, polarityUnreadableSamples=(polInfo&&polInfo.samples)||[];
   // An edge endpoint can still name a row that was merged away, so put every name through the alias.
   const _canonName=nm=>{ const k=String(nm||'').trim().toLowerCase(); return (nameAlias&&nameAlias[k])?nameAlias[k]:nm; };
   // In replace mode, skip dupe detection (canvas will be cleared on import)
@@ -6937,7 +6939,7 @@ function _finaliseDupes(plan){
     const skipped=plan._skipped||0;
     plan.dupeCandidates=[];
     importPlan=null;
-    _buildImportPlan(rows,skipped,Object.keys(alias).length?alias:null);
+    _buildImportPlan(rows,skipped,Object.keys(alias).length?alias:null,plan._polInfo);
     return;
   }
   plan.dupeCandidates.forEach(d=>{
