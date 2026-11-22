@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Review photo · Puddle Lens</title>
+  <link rel="stylesheet" href="/lens/lens.css">
+  <style>
+    :root{font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif;color:#17233a;background:#eef3f8}
+    *{box-sizing:border-box}body{margin:0}.page{max-width:1500px;margin:auto;padding:28px}.top{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:20px}.top h1{margin:0;font-size:clamp(26px,4vw,42px)}.top p{margin:6px 0 0;color:#5b6980}.badge{background:#dff4ea;color:#17714c;padding:9px 13px;border-radius:999px;font-weight:800;white-space:nowrap}
+    .card{background:white;border:1px solid #d7dfeb;border-radius:20px;padding:24px;box-shadow:0 10px 30px #26365012}.upload{display:block;border:3px dashed #2f75e8;border-radius:16px;padding:30px;text-align:center;background:#f7faff;cursor:pointer}.upload strong{display:block;font-size:23px}.upload span{color:#5b6980}.controls{display:flex;gap:12px;align-items:center;margin-top:16px;flex-wrap:wrap}button{border:0;border-radius:12px;padding:14px 22px;font:inherit;font-weight:800;cursor:pointer;background:#286de0;color:white}button:disabled{opacity:.45;cursor:not-allowed}.clear{background:#e8eef7;color:#263650}.status{font-weight:700;color:#516078}.error{color:#b42318;background:#fff0ee;border:1px solid #ffc9c2;padding:12px 15px;border-radius:10px;margin-top:14px}.hidden{display:none}
+    .result{margin-top:22px}.grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(360px,.7fr);gap:22px}.picture{position:relative;background:#f2f5f8;border-radius:15px;overflow:hidden;align-self:start}.picture img{display:block;width:100%;height:auto}.overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.side{min-width:0}.pills{display:flex;gap:8px;flex-wrap:wrap}.pill{background:#edf2f8;border-radius:999px;padding:7px 11px;font-weight:800}.warning{margin-top:12px;color:#9b5c00;background:#fff5dc;padding:11px 13px;border-radius:10px}h2{margin:3px 0 15px}h3{margin:25px 0 8px}table{width:100%;border-collapse:collapse;font-size:15px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #dce3ec;vertical-align:top}th{color:#637089}.low{color:#ad5f00;font-weight:800}.good{color:#168353;font-weight:800}.note{font-size:13px;color:#68758a;margin-top:14px}
+    .writing-tip{font-size:14px;line-height:1.6;margin-top:16px;padding:14px 16px;border:1px solid #dce5f0;border-radius:12px;background:#f7faff}.writing-tip a{display:block;color:#245cba;font-weight:700;margin-top:4px}
+    @media(max-width:900px){.page{padding:16px}.grid{grid-template-columns:1fr}.top{align-items:flex-start}.card{padding:16px}}
+    :root{font-family:'DM Sans',system-ui,-apple-system,sans-serif;color:#18181b;background:#f0f0ee}
+    .top h1{font-size:30px;letter-spacing:-.04em}.top p{color:#71717a}.card{border-color:rgba(0,0,0,.1);border-radius:12px;box-shadow:none}.upload{border:1px dashed #a1a1aa;border-radius:9px;background:#fafafa}.upload strong{font-size:19px}.upload span{display:block;margin-top:8px;line-height:1.6}.writing-tip{background:#fafafa;border-color:#e4e4e7;border-radius:9px}.writing-tip a{color:#52525b}button{background:#18181b;border-radius:9px;font-weight:600}.clear{background:#f4f4f5;color:#18181b}.grid{grid-template-columns:minmax(0,1fr) minmax(420px,1fr)}.picture{position:sticky;top:20px;width:100%;max-height:calc(100svh - 40px);aspect-ratio:var(--photo-aspect);background:#f4f4f5}.picture img{width:100%;height:100%;object-fit:fill}.side{max-height:calc(100svh - 40px);overflow:auto;padding-right:4px}.side table{min-width:430px}.pills .pill{background:#f4f4f5}.note{line-height:1.6}
+    @media(max-width:900px){.grid{grid-template-columns:1fr}.picture{position:relative;top:0;max-height:none}.side{max-height:none;overflow:auto}.top{flex-wrap:wrap}}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top"><div><h1>Puddle Lens</h1><p>Review the photo reading, correct it, then approve it or create one editable map.</p></div><a class="button secondary" href="/lens/inbox.html">Photo inbox</a></div>
+    <p><a href="/lens/">Sign in to Lens</a> · <a href="/">Back to Puddle</a></p>
+    <section class="card">
+      <label class="upload" for="file"><strong>Choose one hand-drawn map photo</strong><span>JPG, PNG or WebP — black marker on white paper works best. Sign in to Lens first.</span></label>
+      <aside class="writing-tip" aria-label="Handwriting tips"><strong>Write names in separate CAPITAL letters.</strong> Give L a square corner and leave space between letters. <a href="hand-drawn-map-guide.html" target="_blank" rel="noopener">See the handwriting guide and drawn letter examples ↗</a></aside>
+      <input id="file" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+      <div class="controls"><button id="read" disabled>Read map with AI</button><button id="clear" class="clear" type="button">Clear</button><span id="status" class="status">Choose a photo.</span></div>
+      <div id="error" class="error hidden"></div>
+    </section>
+    <section id="selected-photo" class="card" hidden><h2>Selected photo</h2><img id="selected-preview" alt="Photo ready to read" style="display:block;width:100%;max-height:55svh;object-fit:contain"></section>
+    <section id="result" class="card result hidden"></section>
+  </main>
+<script src="/api/client-config"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/lens/shared.js"></script>
+<script src="/lens/reviews.js"></script>
+<script>
+const $=id=>document.getElementById(id),lensPhotoName=new URLSearchParams(location.search).get('lensPhoto');let chosen=null,previewUrl='',requestNumber=0,readController=null,photoAuthClient=null;
+function cancelReading(){ requestNumber++; if(readController) readController.abort(); readController=null; }
+function setStatus(text){$('status').textContent=text}
+function showError(text){$('error').textContent=text;$('error').classList.remove('hidden')}
+let selectedPreviewUrl='';
+function showSelectedPhoto(file){if(selectedPreviewUrl)URL.revokeObjectURL(selectedPreviewUrl);selectedPreviewUrl=file?URL.createObjectURL(file):'';$('selected-preview').src=selectedPreviewUrl;$('selected-photo').hidden=!file;}
+function clearError(){$('error').classList.add('hidden');$('error').textContent=''}
+$('file').addEventListener('change',()=>{cancelReading();chosen=$('file').files&&$('file').files[0]||null;$('read').disabled=!chosen;clearError();$('result').classList.add('hidden');showSelectedPhoto(chosen);setStatus(chosen?chosen.name:'Choose a photo.')});
+$('clear').addEventListener('click',()=>{cancelReading();chosen=null;$('file').value='';$('read').disabled=true;$('result').classList.add('hidden');clearError();showSelectedPhoto(null);setStatus('Choose a photo.')});
+function loadImage(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),image=new Image();image.onload=()=>{URL.revokeObjectURL(url);resolve(image)};image.onerror=()=>{URL.revokeObjectURL(url);reject(Error('This photo could not be opened. Use JPG, PNG or WebP.'))};image.src=url})}
+async function prepareImage(file){if(file.size>25*1024*1024)throw Error('Choose a photo smaller than 25 MB.');const image=await loadImage(file),maxSide=2000,scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));const canvas=document.createElement('canvas');canvas.width=Math.round(image.naturalWidth*scale);canvas.height=Math.round(image.naturalHeight*scale);const context=canvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(image,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/jpeg',.86)}
+function confidenceClass(value){return value>=70?'good':'low'}
+function encodeShare(value){const bytes=new TextEncoder().encode(JSON.stringify(value));let binary='';for(const byte of bytes)binary+=String.fromCharCode(byte);return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+async function copyText(value){if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(value);const input=document.createElement('textarea');input.value=value;input.style.position='fixed';input.style.opacity='0';document.body.appendChild(input);input.select();document.execCommand('copy');input.remove()}
+async function shareReview(data,title,button){const session=await PuddleLens.session(photoAuthClient),path=session.user.id+'/'+lensPhotoName;const response=await photoAuthClient.storage.from(PuddleLens.BUCKET).createSignedUrl(path,7*24*60*60);if(response.error||!response.data?.signedUrl)throw response.error||Error('Could not create a share link.');const payload={version:1,title,imageUrl:response.data.signedUrl,expiresAt:Date.now()+7*24*60*60*1000,nodes:data.nodes,edges:data.edges,warnings:data.warnings||[]},link=location.origin+'/lens/shared-review.html#review='+encodeShare(payload);button.dataset.shareLink=link;const visible=document.createElement('a');visible.href=link;visible.textContent='Open shared review';visible.target='_blank';visible.rel='noopener';button.after(visible);try{await copyText(link);button.textContent='Share link copied ✓';setStatus('Share link copied. It works without login for seven days.')}catch(_){button.textContent='Share link ready ✓';setStatus('Share link ready. Open it below or copy its address.')};}
+function addCell(row,text,className){const cell=document.createElement('td');cell.textContent=String(text);if(className)cell.className=className;row.appendChild(cell)}
+function addInputCell(row,value,onchange,options){const cell=document.createElement('td');let input;if(options){input=document.createElement('select');options.forEach(option=>{const item=document.createElement('option'),optionValue=typeof option==='object'?option.value:option,optionLabel=typeof option==='object'?option.label:option;item.value=optionValue;item.textContent=optionLabel;item.selected=optionValue===value;input.appendChild(item)})}else{input=document.createElement('input');input.type='text';input.value=value}input.style.cssText='width:100%;min-width:90px;padding:7px;border:1px solid #cbd5e1;border-radius:7px;font:inherit';input.addEventListener('change',()=>onchange(input.value));cell.appendChild(input);row.appendChild(cell)}
+function addNodeNameCell(row,nodeId,onchange,data){const cell=document.createElement('td'),input=document.createElement('input'),list=document.createElement('datalist'),listId='node_names_'+Math.random().toString(36).slice(2);const current=data.nodes.find(node=>node.id===nodeId);input.type='text';input.value=current?current.label:'';input.setAttribute('list',listId);input.placeholder='Choose or type a name';input.style.cssText='width:100%;min-width:120px;padding:7px;border:1px solid #cbd5e1;border-radius:7px;font:inherit';list.id=listId;data.nodes.forEach(node=>{const option=document.createElement('option');option.value=node.label;list.appendChild(option)});input.addEventListener('change',()=>{const label=input.value.trim();if(!label)return;let node=data.nodes.find(item=>item.label.toLowerCase()===label.toLowerCase());if(!node){node={id:'n'+Date.now()+Math.random().toString(36).slice(2),label,shape:'circle',x:450,y:450,width:100,height:100,confidence:100,notes:'Added while creating a missing connection'};data.nodes.push(node)}onchange(node.id)});cell.append(input,list);row.appendChild(cell)}
+function addDeleteCell(row,onclick){const cell=document.createElement('td'),button=document.createElement('button');button.type='button';button.textContent='Remove';button.className='clear';button.style.cssText='padding:7px 10px;font-size:12px';button.addEventListener('click',onclick);cell.appendChild(button);row.appendChild(cell)}
+function nodeName(nodes,id){const node=nodes.find(n=>n.id===id);return node?node.label:id}
+function connectionText(edge,nodes){const a=nodeName(nodes,edge.source),b=nodeName(nodes,edge.target);if(edge.direction==='both')return a+' ↔ '+b;if(edge.direction==='target_to_source')return b+' → '+a;if(edge.direction==='unclear')return a+' — '+b;return a+' → '+b}
+function drawOverlay(svg,nodes,edges){const ns='http://www.w3.org/2000/svg';edges.forEach(edge=>{const a=nodes.find(n=>n.id===edge.source),b=nodes.find(n=>n.id===edge.target);if(!a||!b)return;const line=document.createElementNS(ns,'line');line.setAttribute('x1',a.x+a.width/2);line.setAttribute('y1',a.y+a.height/2);line.setAttribute('x2',b.x+b.width/2);line.setAttribute('y2',b.y+b.height/2);line.setAttribute('stroke','#e39a15');line.setAttribute('stroke-width','4');line.setAttribute('opacity','.8');svg.appendChild(line)});nodes.forEach((node,index)=>{const rect=document.createElementNS(ns,'rect');rect.setAttribute('x',node.x);rect.setAttribute('y',node.y);rect.setAttribute('width',node.width);rect.setAttribute('height',node.height);rect.setAttribute('fill','none');rect.setAttribute('stroke',node.confidence>=70?'#14a36f':'#e05252');rect.setAttribute('stroke-width','4');svg.appendChild(rect);const text=document.createElementNS(ns,'text');text.setAttribute('x',node.x);text.setAttribute('y',Math.max(22,node.y-7));text.setAttribute('fill',node.confidence>=70?'#087a50':'#c23d3d');text.setAttribute('font-size','22');text.setAttribute('font-weight','800');text.textContent=(index+1)+' '+node.label;svg.appendChild(text)})}
+function heading(text,level=3){const h=document.createElement('h'+level);h.textContent=text;return h}
+function render(imageUrl,data){
+  const result=$('result');result.replaceChildren();const grid=document.createElement('div');grid.className='grid';
+  const picture=document.createElement('div');picture.className='picture';const img=document.createElement('img');img.src=imageUrl;img.alt='Uploaded hand-drawn map';img.onload=()=>{picture.style.setProperty('--photo-aspect',img.naturalWidth+'/'+img.naturalHeight);const available=Math.max(240,window.innerHeight-40);picture.style.maxWidth=(available*img.naturalWidth/img.naturalHeight)+'px'};picture.appendChild(img);const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.classList.add('overlay');svg.setAttribute('viewBox','0 0 1000 1000');svg.setAttribute('preserveAspectRatio','none');picture.appendChild(svg);drawOverlay(svg,data.nodes,data.edges);
+  const side=document.createElement('div');side.className='side';side.appendChild(heading('AI reading',2));const pills=document.createElement('div');pills.className='pills';for(const text of [data.nodes.length+' nodes',data.edges.length+' connections']){const p=document.createElement('span');p.className='pill';p.textContent=text;pills.appendChild(p)}side.appendChild(pills);
+  if(data.warnings.length){const warning=document.createElement('div');warning.className='warning';warning.textContent=data.warnings.join(' • ');side.appendChild(warning)}
+  side.appendChild(heading('Check and correct nodes'));const nt=document.createElement('table');const nh=document.createElement('tr');for(const t of ['#','Name','Shape','Reading','']){const th=document.createElement('th');th.textContent=t;nh.appendChild(th)}nt.appendChild(nh);data.nodes.forEach((node,index)=>{const row=document.createElement('tr');addCell(row,index+1);addInputCell(row,node.label,value=>{node.label=value;render(imageUrl,data)});addInputCell(row,node.shape,value=>{node.shape=value;render(imageUrl,data)},['circle','oval','rectangle','unknown']);addCell(row,node.confidence+'%',confidenceClass(node.confidence));addDeleteCell(row,()=>{data.nodes.splice(index,1);data.edges=data.edges.filter(edge=>edge.source!==node.id&&edge.target!==node.id);render(imageUrl,data)});nt.appendChild(row)});side.appendChild(nt);
+  const addNode=document.createElement('button');addNode.type='button';addNode.className='clear';addNode.style.marginTop='10px';addNode.textContent='+ Add missing node';addNode.addEventListener('click',()=>{const id='n'+Date.now();data.nodes.push({id,label:'NEW NODE',shape:'circle',x:450,y:450,width:100,height:100,confidence:100,notes:'Added by user'});render(imageUrl,data)});side.appendChild(addNode);
+  side.appendChild(heading('Check and correct connections'));const et=document.createElement('table');const eh=document.createElement('tr');for(const t of ['From','Direction','To','Reading','']){const th=document.createElement('th');th.textContent=t;eh.appendChild(th)}et.appendChild(eh);data.edges.forEach((edge,index)=>{const row=document.createElement('tr');addNodeNameCell(row,edge.source,value=>{edge.source=value;render(imageUrl,data)},data);addInputCell(row,edge.direction,value=>{edge.direction=value;render(imageUrl,data)},['source_to_target','both','target_to_source','unclear']);addNodeNameCell(row,edge.target,value=>{edge.target=value;render(imageUrl,data)},data);addCell(row,edge.confidence+'%',confidenceClass(edge.confidence));addDeleteCell(row,()=>{data.edges.splice(index,1);render(imageUrl,data)});et.appendChild(row)});side.appendChild(et);
+  const addEdge=document.createElement('button');addEdge.type='button';addEdge.className='clear';addEdge.style.marginTop='10px';addEdge.textContent='+ Add missing connection';addEdge.disabled=data.nodes.length<2;addEdge.addEventListener('click',()=>{data.edges.push({source:data.nodes[0].id,target:data.nodes[1].id,direction:'source_to_target',confidence:100,notes:'Added by user'});render(imageUrl,data)});side.appendChild(addEdge);
+  const actions=document.createElement('div');actions.className='controls';actions.style.cssText='margin-top:24px;padding-top:18px;border-top:1px solid #dce3ec';const title=(chosen&&chosen.name?chosen.name.replace(/\.[^.]+$/,''):'Photo map');
+  if(lensPhotoName){const approve=document.createElement('button');approve.type='button';approve.textContent='Approve for combined map';approve.disabled=!data.nodes.length;approve.addEventListener('click',async()=>{try{await img.decode();const session=await PuddleLens.session(photoAuthClient);PuddleLensReviews.save(session.user.id,lensPhotoName,title,data,img.naturalWidth,img.naturalHeight);approve.textContent='Approved ✓';setStatus('Approved. Return to the Photo inbox to select it for a combined map.')}catch(error){showError(error.message||'Could not approve this map.')}});actions.appendChild(approve);PuddleLens.session(photoAuthClient).then(session=>{if(PuddleLensReviews.get(session.user.id,lensPhotoName))approve.textContent='Update approval ✓'}).catch(()=>{});const share=document.createElement('button');share.type='button';share.className='clear';share.textContent='Copy review link · 7 days';share.disabled=!data.nodes.length;share.addEventListener('click',async()=>{try{await shareReview(data,title,share)}catch(error){showError(error.message||'Could not create the share link.')}});actions.appendChild(share);}
+  const create=document.createElement('button');create.type='button';create.className=lensPhotoName?'clear':'';create.textContent='Create one Puddle map now';create.disabled=!data.nodes.length;create.addEventListener('click',async()=>{try{await img.decode();const payload={version:1,title,nodes:data.nodes.map(node=>({...node,notes:String(node.notes||'')})),edges:data.edges.map(edge=>({...edge,notes:''})),imageWidth:img.naturalWidth,imageHeight:img.naturalHeight};sessionStorage.setItem('puddl_image_import',JSON.stringify(payload));window.location.href='/?imageImport=1'}catch(_){showError('Could not prepare the map. Browser storage may be full.')}});actions.appendChild(create);side.appendChild(actions);
+  const note=document.createElement('p');note.className='note';note.textContent=lensPhotoName?'Correct anything that is wrong, then approve it. In the Photo inbox, select approved maps and add them to one Puddl map.':'Correct anything that is wrong, then create one Puddle map. Node shapes and sizes are simplified, and connection strengths can be set afterwards.';side.appendChild(note);grid.append(picture,side);result.appendChild(grid);result.classList.remove('hidden');
+}
+$('read').addEventListener('click',async()=>{
+  if(!chosen)return;
+  cancelReading();
+  const request=requestNumber,file=chosen;
+  readController=new AbortController();
+  const signal=readController.signal;
+  $('read').disabled=true;clearError();$('result').classList.add('hidden');
+  try{
+    if(!window.supabase)throw Error('The sign-in service could not load. Please reload the page.');
+    if(!window.PUDDLE_CONFIG?.supabaseUrl||!window.PUDDLE_CONFIG?.supabaseKey)throw Error('The preview database is not configured yet.');
+    if(!photoAuthClient)photoAuthClient=window.supabase.createClient(window.PUDDLE_CONFIG.supabaseUrl,window.PUDDLE_CONFIG.supabaseKey);
+    const {data:{session}}=await photoAuthClient.auth.getSession();
+    if(!session)throw Error('Sign in to Puddle in another tab, then return here and try again.');
+    if(request!==requestNumber)return;
+    setStatus('Preparing photo…');
+    const image=await prepareImage(file);
+    if(request!==requestNumber)return;
+    previewUrl=image;
+    setStatus('AI is reading the map… This may take a minute.');
+    const response=await fetch('/api/image-to-map',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({image}),signal});
+    const body=await response.json();
+    if(request!==requestNumber)return;
+    if(!response.ok)throw Error(body.error||'The photo reader failed.');
+    $('selected-photo').hidden=true;render(image,body.result);setStatus('Finished. Check names, connections and arrow directions.');
+  }catch(error){
+    if(request!==requestNumber||error.name==='AbortError')return;
+    showError(error.message||'The photo reader failed.');setStatus('Could not finish.');
+  }finally{if(request===requestNumber){$('read').disabled=!chosen;readController=null;}}
+});
+
+// Phone uploads enter the same review flow; opening one never starts a paid read.
+(async()=>{
+ const name=lensPhotoName;if(!name)return;const request=requestNumber;
+ try{
+  setStatus('Loading photo from Lens…');photoAuthClient=PuddleLens.createClient();
+  const photo=await PuddleLens.download(photoAuthClient,name);if(request!==requestNumber)return;
+  chosen=new File([photo],PuddleLens.titleFromFilename(name)+'.jpg',{type:'image/jpeg'});
+  showSelectedPhoto(chosen);$('read').disabled=false;setStatus('Photo ready. Choose Read map with AI when you are ready.');
+ }catch(error){if(request!==requestNumber)return;showError(PuddleLens.friendly(error));setStatus('Could not load photo.');}
+})();
+</script>
+</body>
+</html>
