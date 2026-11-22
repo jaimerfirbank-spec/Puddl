@@ -2517,6 +2517,12 @@ function selectConnColour(col){
           <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">On: every connection draws in its strength's colour, the same colours as the key on big maps. Off: connections keep their own colours.</p>
           <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);cursor:pointer;"><input type="checkbox" id="settings-edge-colour-strength" onchange="setEdgeColourByStrength(this.checked)"> Colour connections by strength</label>
         </div>
+        <div style="margin-bottom:28px;">
+          <h4 style="margin:0 0 6px 0;font-size:14px;font-weight:600;color:var(--ink);">Strength colours</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Click a colour to change it. Choosing one switches on "Colour connections by strength", so every connection follows it.</p>
+          <div id="connection-styles-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+          <button onclick="resetStrengthColours()" style="margin-top:10px;padding:6px 12px;font-size:11px;">Reset to the original colours</button>
+        </div>
       </div>
     </div>
     
@@ -2549,14 +2555,20 @@ let catIdCtr = 10;
 let LOOP_CONNECTION_STYLE = {id:'loop',label:'Loop',colour:'#3B82F6',lineWidth:2.2,dashPattern:[],arrowScale:1,isDouble:false};
 
 // Connection styles configuration
-let CONNECTION_STYLES = [
+// Strong, moderate and weak say everything a connection needs to. Bold, dashed and double
+// were only looks, so they are gone; a map saved with them is moved onto these three on load.
+const _defaultConnStyles=()=>[
   {id:'strong', label:'Strong', colour:'#1E40AF', lineWidth:3.2, dashPattern:[], arrowScale:1.3},
   {id:'moderate', label:'Moderate', colour:'#0EA5E9', lineWidth:1.8, dashPattern:[], arrowScale:1},
-  {id:'weak', label:'Weak', colour:'#888888', lineWidth:1.0, dashPattern:[], arrowScale:0.75},
-  {id:'bold', label:'Bold', colour:'#7C3AED', lineWidth:5, dashPattern:[], arrowScale:1.8},
-  {id:'dashed', label:'Dashed', colour:'#EA580C', lineWidth:1.8, dashPattern:[8,4], arrowScale:1},
-  {id:'double', label:'Double', colour:'#059669', lineWidth:1.8, dashPattern:[], arrowScale:1, isDouble:true}
+  {id:'weak', label:'Weak', colour:'#888888', lineWidth:1.0, dashPattern:[], arrowScale:0.75}
 ];
+let CONNECTION_STYLES = _defaultConnStyles();
+const RETIRED_CONN_STYLES={bold:'strong',dashed:'weak',double:'moderate'};
+function _retireConnStyles(){
+  CONNECTION_STYLES=CONNECTION_STYLES.filter(st=>!RETIRED_CONN_STYLES[st.id]);
+  _defaultConnStyles().forEach((d,i)=>{ if(!CONNECTION_STYLES.find(x=>x.id===d.id)) CONNECTION_STYLES.splice(i,0,d); });
+  (edges||[]).forEach(e=>{ const m=RETIRED_CONN_STYLES[e.strength]; if(m) e.strength=m; });
+}
 
 
 // Central event label (editable by user)
@@ -3163,6 +3175,7 @@ function restoreSnap(s){
   if(d.loops) loops=d.loops; else loops=[];
   if(d.loopConnectionStyle) LOOP_CONNECTION_STYLE={...LOOP_CONNECTION_STYLE,...d.loopConnectionStyle};
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
+  _retireConnStyles();
   presentationStops=d.presentationStops||[];
   savedPresentations=Array.isArray(d.savedPresentations)?d.savedPresentations:[];
   presMapOnly=!!d.presMapOnly;
@@ -8628,17 +8641,7 @@ function updateEdgePopupStyle() {
   }
 }
 
-// Bold, dashed and double are visual variants that carry no meaning of their
-// own - strong, moderate and weak already say everything a network map needs.
-// They stay in CONNECTION_STYLES so maps already using them still draw
-// correctly, and are still editable in Settings; they are just not offered on
-// a network map unless that map already uses one.
-const EXTRA_CONN_STYLES=['bold','dashed','double'];
-function offeredConnectionStyles(){
-  if(typeof MAP_TYPE==='undefined'||MAP_TYPE!=='network') return CONNECTION_STYLES;
-  const inUse=new Set((edges||[]).map(e=>e.strength).filter(Boolean));
-  return CONNECTION_STYLES.filter(st=>!EXTRA_CONN_STYLES.includes(st.id)||inUse.has(st.id));
-}
+function offeredConnectionStyles(){ return CONNECTION_STYLES; }
 function populateEdgePopupStyles() {
   const select = document.getElementById('edge-popup-strength');
   if(!select) return;
@@ -13144,24 +13147,24 @@ function loadDemo(){
     [3,17,'moderate','rgba(0,0,0,0.25)'],
     [4,6,'strong','#FFB347'],   // Dr Osei → Balby Road Surgery
     [4,16,'strong','#FFB347'],  // Dr Osei → Doncaster Mind
-    [5,8,'dashed','#B09FFF'],   // Marcus → Housing (planned)
+    [5,8,'weak','#B09FFF'],   // Marcus → Housing (planned)
     [5,3,'moderate','rgba(0,0,0,0.25)'],
-    [6,1,'bold','#FFB347'],     // Surgery → map centre (bold = major link)
+    [6,1,'strong','#FFB347'],     // Surgery → map centre (bold = major link)
     [6,16,'moderate','#FFB347'],
     [7,17,'moderate','rgba(0,0,0,0.25)'],
     [8,9,'strong','#C5E86C'],
     [9,10,'weak','rgba(0,0,0,0.25)'],
-    [10,6,'double','#D4A5E0'],  // Church → Surgery (double = two-way formal)
+    [10,6,'moderate','#D4A5E0'],  // Church → Surgery (double = two-way formal)
     [11,1,'moderate','rgba(0,0,0,0.25)'],
     [12,14,'strong','rgba(0,0,0,0.25)'],
-    [13,16,'dashed','#FF9ED2'],
+    [13,16,'weak','#FF9ED2'],
     [14,7,'weak','rgba(0,0,0,0.25)'],
     [15,3,'strong','rgba(0,0,0,0.25)'],
     [16,8,'moderate','rgba(0,0,0,0.25)'],
     [18,2,'strong','#C5E86C'],
-    [19,1,'bold','#C5E86C'],    // Be Reyt → centre (bold)
+    [19,1,'strong','#C5E86C'],    // Be Reyt → centre (bold)
     [20,7,'weak','rgba(0,0,0,0.25)'],
-    [15,4,'dashed','#B09FFF'],  // Akeela → Dr Osei (dashed = informal)
+    [15,4,'weak','#B09FFF'],  // Akeela → Dr Osei (dashed = informal)
     [19,16,'moderate','#FFB347'], // Be Reyt → Mind
   ];
   // arrow:'none' is explicit: these demo links were never given a direction, and
@@ -14111,46 +14114,29 @@ function renderFieldsConfig(){
 
 function renderConnectionStylesList(){
   const container = document.getElementById('connection-styles-list');
-  const styles = _connStylesDraft || CONNECTION_STYLES;
-  container.innerHTML = styles.map((style, index) => `
-    <div style="padding:16px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf);">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-        <input type="text" value="${style.label.replace(/"/g,'&quot;')}"
-          oninput="draftUpdateLabel('${style.id}',this.value)"
-          style="flex:1;padding:6px 8px;border:1px solid var(--bdr);border-radius:4px;font-size:12px;background:var(--surf);color:var(--ink);">
-        <button onclick="draftDeleteStyle(${index})"
-          style="padding:6px 10px;background:#D9534F;color:#fff;border:none;border-radius:4px;font-size:11px;cursor:pointer;"${styles.length<=1?' disabled':''}>Delete</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <div id="conn-colour-trigger-${style.id}" onclick="openSwatchPicker(this,'${hexFromColour(style.colour)}','conn','${style.id}')" style="width:28px;height:28px;background:${hexFromColour(style.colour)};border-radius:4px;cursor:pointer;border:1px solid var(--bdr);flex-shrink:0;"></div>
-        <span style="font-size:11px;color:var(--ink-2);">Colour</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
-        <div>
-          <label style="font-size:11px;color:var(--txt-m);display:block;margin-bottom:4px;">Line Width</label>
-          <input type="number" value="${style.lineWidth}" min="0.5" max="10" step="0.5"
-            oninput="draftUpdateProp('${style.id}','lineWidth',this.value)"
-            style="width:100%;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;background:var(--surf);color:var(--ink);">
-        </div>
-        <div>
-          <label style="font-size:11px;color:var(--txt-m);display:block;margin-bottom:4px;">Dash Pattern</label>
-          <input type="text" value="${style.dashPattern.join(',')}"
-            oninput="draftUpdateDash('${style.id}',this.value)"
-            placeholder="e.g. 8,4 for dashed"
-            style="width:100%;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;background:var(--surf);color:var(--ink);">
-        </div>
-        <div>
-          <label style="font-size:11px;color:var(--txt-m);display:block;margin-bottom:4px;">Arrow Scale</label>
-          <input type="number" value="${style.arrowScale}" min="0.5" max="3" step="0.1"
-            oninput="draftUpdateProp('${style.id}','arrowScale',this.value)"
-            style="width:100%;padding:4px 6px;border:1px solid var(--bdr);border-radius:4px;font-size:11px;background:var(--surf);color:var(--ink);">
-        </div>
-      </div>
-      <canvas id="conn-preview-${style.id}" width="600" height="52"
-        style="width:100%;height:52px;border-radius:6px;display:block;"></canvas>
-    </div>
-  `).join('');
-  styles.forEach(s => drawConnPreview(s.id));
+  if(!container) return;
+  container.innerHTML = ['strong','moderate','weak'].map(id=>{
+    const style=CONNECTION_STYLES.find(x=>x.id===id); if(!style) return '';
+    const hex=hexFromColour(style.colour);
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf);">
+      <div id="conn-colour-trigger-${id}" onclick="openSwatchPicker(this,'${hex}','conn','${id}')" title="Change the colour" style="width:28px;height:28px;background:${hex};border-radius:6px;border:1px solid var(--bdr-m);cursor:pointer;flex-shrink:0;"></div>
+      <span style="font-size:12px;font-weight:600;color:var(--ink);width:78px;">${escHtml(style.label)}</span>
+      <canvas id="conn-preview-${id}" width="400" height="34" style="flex:1;min-width:0;height:34px;display:block;"></canvas>
+    </div>`;
+  }).join('');
+  ['strong','moderate','weak'].forEach(id=>drawConnPreview(id));
+}
+// Change one strength's colour, and make every connection follow the strength colours
+function setStrengthColour(id,hex){
+  [CONNECTION_STYLES,_connStylesDraft].forEach(list=>{ const st=list&&list.find(x=>x.id===id); if(st) st.colour=hex; });
+  if(!EDGE_COLOUR_BY_STRENGTH) setEdgeColourByStrength(true);
+  if(typeof updateColourLegend==='function') updateColourLegend();
+  renderConnectionStylesList(); draw(); saveState(); markUnsaved();
+}
+function resetStrengthColours(){
+  _defaultConnStyles().forEach(d=>{ [CONNECTION_STYLES,_connStylesDraft].forEach(list=>{ const st=list&&list.find(x=>x.id===d.id); if(st) st.colour=d.colour; }); });
+  if(typeof updateColourLegend==='function') updateColourLegend();
+  renderConnectionStylesList(); draw(); saveState(); markUnsaved();
 }
 
 function setNodeLabelPosition(pos){
@@ -14767,14 +14753,7 @@ function resetCustomizations(){
     SIZE_BY_CONNECTIONS = false; SIZE_BY=''; COLOUR_BY='';
 
     // Reset connection styles
-    CONNECTION_STYLES = [
-      {id:'strong', label:'Strong', colour:'rgba(0,0,0,0.8)', lineWidth:4.5, dashPattern:[], arrowScale:1.3},
-      {id:'moderate', label:'Moderate', colour:'rgba(0,0,0,0.5)', lineWidth:2.2, dashPattern:[], arrowScale:1},
-      {id:'weak', label:'Weak', colour:'rgba(0,0,0,0.3)', lineWidth:1.2, dashPattern:[], arrowScale:0.75},
-      {id:'bold', label:'Bold', colour:'rgba(0,0,0,0.9)', lineWidth:7, dashPattern:[], arrowScale:1.8},
-      {id:'dashed', label:'Dashed', colour:'rgba(0,0,0,0.5)', lineWidth:2.2, dashPattern:[8,4], arrowScale:1},
-      {id:'double', label:'Double', colour:'rgba(0,0,0,0.6)', lineWidth:2, dashPattern:[], arrowScale:1, isDouble:true}
-    ];
+    CONNECTION_STYLES = _defaultConnStyles();
     _connStylesDraft = null;
     
     renderCustomizePanel();
@@ -15347,9 +15326,7 @@ function _swatchPick(hex){
     var t=document.getElementById('cat-colour-trigger-'+_swatchId);
     if(t)t.style.background=hex;
   }else if(_swatchType==='conn'){
-    draftUpdateColour(_swatchId,hex);
-    var t2=document.getElementById('conn-colour-trigger-'+_swatchId);
-    if(t2)t2.style.background=hex;
+    setStrengthColour(_swatchId,hex);
   }else if(_swatchType==='loop'){
     loopDraftUpdateColour(hex);
     var t3=document.getElementById('loop-colour-trigger');
