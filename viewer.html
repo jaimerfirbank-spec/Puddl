@@ -4011,7 +4011,7 @@ function renderInsights(){
       h += skipped('bottleneck','Bottleneck score',structureWhy);
     } else {
       h += grp('bottleneck','Bottleneck score',null,
-        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'Sits on the most paths between the other factors - influence has to pass through it.':MAP_TYPE==='stakeholder'?'Sits on the most routes between the other stakeholders - a gatekeeper even without being the most connected.':'Sits on the most paths between everyone else - a pinch point even without being the most connected.'}</div>`+
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'Sits on the most paths between the other factors - influence has to pass through it.':MAP_TYPE==='stakeholder'?'Sits on the most routes between the other stakeholders - a gatekeeper even without being the most connected.':'Sits on the most paths between everyone else - a pinch point even without being the most connected.'}</div>`+_bottleneckExplainHTML(mapNounPack()[1])+
         (I.topBetweenness.length ? I.topBetweenness.map(n=>row(n,Math.round(I.betweenness.get(n.id)))).join('') : none('No node sits between others on a path.')));
     }
 
@@ -4583,6 +4583,28 @@ function _groupColours(grp,pool){
   });
   return out;
 }
+function _tipA(lines){ return ` data-tip="${escHtml((Array.isArray(lines)?lines:[lines]).join('\n'))}"`; }
+function _nameList(ids,nById,max){
+  const ns=ids.map(id=>(nById.get?nById.get(id):nById[id])).filter(Boolean).map(n=>n.label).sort((a,b)=>String(a).localeCompare(String(b)));
+  max=max||8; return ns.slice(0,max).join(', ')+(ns.length>max?`, and ${ns.length-max} more`:'');
+}
+function _bottleneckExplainHTML(n){
+  const e=escHtml;
+  return `<details style="font-size:10.5px;color:var(--ink-h);padding:0 6px 6px;"><summary style="cursor:pointer;font-weight:700;">How is this score worked out?</summary>
+    <div style="margin-top:4px;line-height:1.55;">Take every pair of the other ${e(n)} on the map and find the shortest chain of links between them. The score counts how many of those chains pass through this one.
+    If a pair has two equally short chains and only one runs through it, that pair counts as a half. So a score of 40 means it sits on the shortest routes of about 40 pairs.<br>
+    It is not the same as being the most connected. A quiet one that joins two busy groups can score higher than a busy one in the middle of a crowd.
+    It is also not the same as "what the map leans on", which only counts when there is no other way round.<br>
+    Every link counts, whichever way its arrow points.</div></details>`;
+}
+function _cutOffIds(adj,pool,id){
+  const start=[...(adj.get(id)||[])]; if(!start.length) return [];
+  const seen=new Set([id]), comps=[];
+  start.forEach(s0=>{ if(seen.has(s0)) return; const comp=[], st=[s0]; seen.add(s0);
+    while(st.length){ const u=st.pop(); comp.push(u); (adj.get(u)||[]).forEach(v=>{ if(!seen.has(v)){ seen.add(v); st.push(v); } }); }
+    comps.push(comp); });
+  comps.sort((a,b)=>b.length-a.length); return comps.slice(1).flat();
+}
 function _svgDonut(items,size){
   const live=items.filter(it=>it.value>0), total=live.reduce((a,b)=>a+b.value,0);
   if(!total) return '';
@@ -4590,11 +4612,11 @@ function _svgDonut(items,size){
   const P=(rad,a)=>[(cx+rad*Math.cos(a)).toFixed(2),(cy+rad*Math.sin(a)).toFixed(2)];
   let a0=-Math.PI/2, out='';
   live.forEach(it=>{
-    const frac=it.value/total, a1=a0+frac*2*Math.PI, tip=`<title>${escHtml(it.label)}: ${it.value}</title>`;
-    if(frac>0.9999) out+=`<circle cx="${cx}" cy="${cy}" r="${(r+ri)/2}" fill="none" stroke="${it.colour}" stroke-width="${r-ri}">${tip}</circle>`;
+    const frac=it.value/total, a1=a0+frac*2*Math.PI, tip=''; const _tp=_tipA(it.tip||[it.label,`${it.value} of ${total} (${Math.round(100*frac)}%)`]);
+    if(frac>0.9999) out+=`<circle cx="${cx}" cy="${cy}" r="${(r+ri)/2}" fill="none" stroke="${it.colour}" stroke-width="${r-ri}"${_tp}>${tip}</circle>`;
     else{
       const large=frac>0.5?1:0, [x0,y0]=P(r,a0), [x1,y1]=P(r,a1), [x2,y2]=P(ri,a1), [x3,y3]=P(ri,a0);
-      out+=`<path d="M${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1} L${x2},${y2} A${ri},${ri} 0 ${large} 0 ${x3},${y3} Z" fill="${it.colour}">${tip}</path>`;
+      out+=`<path d="M${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1} L${x2},${y2} A${ri},${ri} 0 ${large} 0 ${x3},${y3} Z" fill="${it.colour}"${_tp}>${tip}</path>`;
     }
     a0=a1;
   });
@@ -4602,20 +4624,22 @@ function _svgDonut(items,size){
 }
 function _donutLegend(items,size){
   const e=escHtml;
-  return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">${_svgDonut(items,size)}<div style="flex:1;min-width:110px;font-size:11px;">${items.filter(it=>it.value>0).map(it=>`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;"><span style="width:9px;height:9px;border-radius:50%;background:${it.colour};flex-shrink:0;"></span><span style="flex:1;color:var(--txt-m);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e(it.label)}">${e(it.label)}</span><span style="font-weight:600;color:var(--navy);">${it.value}</span></div>`).join('')}</div></div>`;
+  return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">${_svgDonut(items,size)}<div style="flex:1;min-width:110px;font-size:11px;">${items.filter(it=>it.value>0).map(it=>`<div${_tipA(it.tip||[it.label,`${it.value}`])} style="display:flex;align-items:center;gap:6px;margin:2px 0;"><span style="width:9px;height:9px;border-radius:50%;background:${it.colour};flex-shrink:0;"></span><span style="flex:1;color:var(--txt-m);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e(it.label)}">${e(it.label)}</span><span style="font-weight:600;color:var(--navy);">${it.value}</span></div>`).join('')}</div></div>`;
 }
 function _barRows(items){
   const e=escHtml, mx=Math.max(1,...items.map(i=>i.value));
-  return items.map(it=>`<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px;"><div style="width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt-m);" title="${e(it.label)}">${e(it.label)}</div><div style="flex:1;background:var(--surf-2);border-radius:4px;height:9px;"><div style="width:${Math.max(3,Math.round(100*it.value/mx))}%;height:9px;border-radius:4px;background:${it.colour};"></div></div><div style="width:26px;text-align:right;font-weight:600;color:var(--navy);">${it.value}</div></div>`).join('');
+  return items.map(it=>`<div${_tipA(it.tip||[it.label,String(it.value)])} style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px;"><div style="width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt-m);" title="${e(it.label)}">${e(it.label)}</div><div style="flex:1;background:var(--surf-2);border-radius:4px;height:9px;"><div style="width:${Math.max(3,Math.round(100*it.value/mx))}%;height:9px;border-radius:4px;background:${it.colour};"></div></div><div style="width:26px;text-align:right;font-weight:600;color:var(--navy);">${it.value}</div></div>`).join('');
 }
-function _svgColumns(vals,dates,colour,pct){
+function _svgColumns(vals,dates,colour,pct,tips){
   const W=250, H=92, padL=4, padR=4, top=16, base=H-18, n=vals.length;
   const mx=pct?100:Math.max(1,...vals), slot=(W-padL-padR)/n, bw=Math.max(3,slot-3);
   const short=d=>{ try{ return new Date(d+'T12:00:00').toLocaleDateString('en-GB',{month:'short',year:'2-digit'}); }catch(e){ return d; } };
   let bars='';
   vals.forEach((v,i)=>{
     const h=Math.round((base-top)*(v/mx)), x=(padL+i*slot+(slot-bw)/2).toFixed(1), y=base-h;
-    bars+=`<rect x="${x}" y="${y}" width="${bw.toFixed(1)}" height="${Math.max(h,v>0?1:0)}" rx="2" fill="${colour}" opacity="${i===n-1?1:0.78}"><title>${escHtml(short(dates[i]))}: ${v}${pct?'%':''}</title></rect>`;
+    bars+=`<rect x="${x}" y="${y}" width="${bw.toFixed(1)}" height="${Math.max(h,v>0?1:0)}" rx="2" fill="${colour}" opacity="${i===n-1?1:0.78}"/>`;
+    // A full-height hit area per month, so thin and empty bars can still be hovered
+    bars+=`<rect class="rep-hit" x="${(padL+i*slot).toFixed(1)}" y="0" width="${slot.toFixed(1)}" height="${base}"${_tipA((tips&&tips[i])||[_monthLabel(dates[i]),`${v}${pct?'%':''}`])}/>`;
   });
   const last=vals[n-1];
   return `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:300px;"><line x1="${padL}" y1="${base}" x2="${W-padR}" y2="${base}" stroke="var(--bdr)"/>${bars}<text x="${padL}" y="${H-5}" style="font-size:9.5px;fill:var(--txt-m);">${escHtml(short(dates[0]))}</text><text x="${W-padR}" y="${H-5}" text-anchor="end" style="font-size:9.5px;fill:var(--txt-m);">${escHtml(short(dates[n-1]))}</text><text x="${W-padR}" y="10" text-anchor="end" style="font-size:11px;font-weight:700;fill:${colour};">${last}${pct?'%':''}</text></svg>`;
@@ -4671,7 +4695,7 @@ function _systemsReportHTML(I){
   // Plain findings
   const F=[];
   if(loops.length){
-    F.push(['LOOPS',_R_COL,`${loops.length} feedback loop${loops.length===1?'':'s'} found${I.loopsComplete?'':' (search not finished: there may be more)'}. ${rC?`${rC} reinforcing, which will amplify whatever is happening.`:'None reinforcing.'} ${bC?`${bC} balancing, which resist change.`:'None balancing.'}`]);
+    F.push(['LOOPS',_R_COL,`${loops.length} feedback loop${loops.length===1?'':'s'} found${I.loopsComplete?'':' (search not finished: there may be more)'}. ${rC?`${rC} reinforcing, which ${rC===1?'amplifies':'amplify'} whatever is happening.`:'None reinforcing.'} ${bC?`${bC} balancing, which ${bC===1?'resists':'resist'} change.`:'None balancing.'}`]);
     if(rC&&!bC) F.push(['WATCH',_NEG_COL,'Reinforcing loops with nothing balancing them can run away. Nothing on this map pushes back.']);
     if(bC&&!rC) F.push(['NOTE',_B_COL,'Only balancing loops: this system tends to settle where it is, and is hard to shift.']);
   } else F.push(['LOOPS',_U_COL,'No feedback loops found: influence on this map flows one way and never comes back round.']);
@@ -4682,11 +4706,11 @@ function _systemsReportHTML(I){
   h+=F.map(([t,c,x])=>`<div class="report-row" style="flex-direction:column;align-items:flex-start;gap:2px;border-left:3px solid ${c};padding-left:10px;margin:6px 0;"><div style="font-size:10px;font-weight:700;letter-spacing:0.05em;color:${c};">${t}</div><div style="font-size:12px;line-height:1.5;">${x}</div></div>`).join('');
   // Signs chart
   if(pl.pos+pl.neg+pl.none>0){
-    h+=`<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;background:var(--surf);margin:12px 0;"><div style="font-size:11.5px;font-weight:700;color:var(--navy);">The signs on the links</div><div style="font-size:10.5px;color:var(--txt-m);margin:1px 0 8px;">Every link that has an arrow</div>${_donutLegend([{label:'+ move together',value:pl.pos,colour:_POS_COL},{label:'− move apart',value:pl.neg,colour:_NEG_COL},{label:'No sign yet',value:pl.none,colour:'#94A3B8'}],110)}</div>`;
+    h+=`<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;background:var(--surf);margin:12px 0;"><div style="font-size:11.5px;font-weight:700;color:var(--navy);">The signs on the links</div><div style="font-size:10.5px;color:var(--txt-m);margin:1px 0 8px;">Every link that has an arrow</div>${_donutLegend([{label:'+ move together',value:pl.pos,colour:_POS_COL,tip:['+ : they move together',`${pl.pos} link${pl.pos===1?'':'s'}`,'More of the first gives more of the next, less gives less.']},{label:'− move apart',value:pl.neg,colour:_NEG_COL,tip:['− : they move apart',`${pl.neg} link${pl.neg===1?'':'s'}`,'More of the first gives less of the next.']},{label:'No sign yet',value:pl.none,colour:'#94A3B8',tip:['No sign yet',`${pl.none} link${pl.none===1?'':'s'}`,pl.unsigned.slice(0,6).map(([a,b])=>a.label+' → '+b.label).join('\n')||'']}],110)}</div>`;
   }
   // Where the loops pass through
   if(top.length>1){
-    h+=`<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;background:var(--surf);margin-bottom:12px;"><div style="font-size:11.5px;font-weight:700;color:var(--navy);">In the most loops</div><div style="font-size:10.5px;color:var(--txt-m);margin:1px 0 8px;">Change one of these and the most loops feel it</div>${_barRows(top.map(([n,c])=>({label:n.label,value:c,colour:'#7C3AED'})))}</div>`;
+    h+=`<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;background:var(--surf);margin-bottom:12px;"><div style="font-size:11.5px;font-weight:700;color:var(--navy);">In the most loops</div><div style="font-size:10.5px;color:var(--txt-m);margin:1px 0 8px;">Change one of these and the most loops feel it</div>${_barRows(top.map(([n,c])=>({label:n.label,value:c,colour:'#7C3AED',tip:[n.label,`In ${c} of the ${I.loopsFoundTotal} loops found`,'Change this and every one of those loops feels it.']})))}</div>`;
   }
   // Each loop
   if(loops.length){
@@ -4730,20 +4754,33 @@ function _reportChartsHTML(I,F){
   const e=escHtml, np=mapNounPack()[1], cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
   const adj=F.G.adj, gcol=F.grp?_groupColours(F.grp,pool):null, gw=F.grp?_groupWord(F.grp.name):'';
   const card=(title,sub,inner)=>`<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;background:var(--surf);min-width:0;"><div style="font-size:11.5px;font-weight:700;color:var(--navy);">${e(title)}</div><div style="font-size:10.5px;color:var(--txt-m);margin:1px 0 8px;">${e(sub||'')}</div>${inner}</div>`;
-  const cards=[];
-  if(F.grp) cards.push(card(`${cap(np)} by ${gw}`,`${pool.length} on the map`,_donutLegend(Object.entries(F.grp.counts).sort((a,b)=>b[1]-a[1]).map(([v,c])=>({label:v,value:c,colour:gcol[v]})),128)));
+  const cards=[], nById=new Map(pool.map(n=>[n.id,n])), ns=mapNounPack()[0];
+  const noun=k=>`${k} ${k===1?ns:np}`;
+  if(F.grp) cards.push(card(`${cap(np)} by ${gw}`,`${pool.length} on the map`,_donutLegend(Object.entries(F.grp.counts).sort((a,b)=>b[1]-a[1]).map(([v,c])=>({label:v,value:c,colour:gcol[v],tip:[`${v}: ${noun(c)}`,`${Math.round(100*c/pool.length)}% of the map`,_nameList(pool.filter(n=>F.grp.of(n)===v).map(n=>n.id),nById,10)]})),128)));
   if(F.series&&F.series.length>=2){
-    const dts=F.series.map(r=>r.d);
-    cards.push(card('Connections over time','Total on the map at the end of each month',_svgColumns(F.series.map(r=>r.links),dts,'#2563EB')));
-    if(Math.max(...F.series.map(r=>r.iso))>0) cards.push(card(`${cap(np)} with no connection`,'At the end of each month',_svgColumns(F.series.map(r=>r.iso),dts,'#DC2626')));
-    if(F.grp&&F.series.some(r=>r.measured>=10)) cards.push(card(`Connections that cross ${gw} lines`,'Share of all connections, by month',_svgColumns(F.series.map(r=>r.measured>=10?Math.round(100*r.cross/r.measured):0),dts,'#7C3AED',true)));
+    const dts=F.series.map(r=>r.d), S=F.series;
+    const linkTips=S.map((r,i)=>{ const dl=i?r.links-S[i-1].links:null; return [`End of ${_monthLabel(r.d)}`,`${r.links} connection${r.links===1?'':'s'} between ${noun(r.n)}`,dl===null?'The first month on the map':(dl>0?`${dl} added since ${_monthLabel(S[i-1].d)}`:dl<0?`${-dl} fewer than ${_monthLabel(S[i-1].d)}`:`No change since ${_monthLabel(S[i-1].d)}`)]; });
+    cards.push(card('Connections over time','Total on the map at the end of each month',_svgColumns(S.map(r=>r.links),dts,'#2563EB',false,linkTips)));
+    if(Math.max(...S.map(r=>r.iso))>0){
+      const isoTips=S.map(r=>[`End of ${_monthLabel(r.d)}`,r.iso?`${r.iso} of ${noun(r.n)} ${r.iso===1?'has':'have'} no connection yet`:`Every ${ns} has at least one connection`,r.iso?_nameList(r.isoIds||[],new Map(nodes.map(n=>[n.id,n])),8):'']);
+      cards.push(card(`${cap(np)} with no connection`,'At the end of each month',_svgColumns(S.map(r=>r.iso),dts,'#DC2626',false,isoTips)));
+    }
+    if(F.grp&&S.some(r=>r.measured>=10)){
+      const lab=k=>String(k).split('\u0001').join(' ↔ ');
+      const crossTips=S.map(r=>{
+        if(r.measured<10) return [`End of ${_monthLabel(r.d)}`,r.measured?`Only ${r.measured} connection${r.measured===1?'':'s'} between ${gw}s so far, too few for a fair percentage`:'No connections to measure yet'];
+        const top=[...(r.pairs||new Map()).entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,c])=>`${lab(k)} (${c})`).join(', ');
+        return [`End of ${_monthLabel(r.d)}`,`${Math.round(100*r.cross/r.measured)}% = ${r.cross} of ${r.measured} connections join two different ${gw}s`,top?`Most often: ${top}`:''];
+      });
+      cards.push(card(`Connections that cross ${gw} lines`,'Share of all connections, by month',_svgColumns(S.map(r=>r.measured>=10?Math.round(100*r.cross/r.measured):0),dts,'#7C3AED',true,crossTips)));
+    }
   }
   const byDeg=[...pool].sort((a,b)=>adj.get(b.id).size-adj.get(a.id).size||String(a.label).localeCompare(String(b.label))).slice(0,8);
-  cards.push(card('Best connected','Connections each',_barRows(byDeg.map(n=>({label:n.label,value:adj.get(n.id).size,colour:(gcol&&gcol[F.grp.of(n)])||n.colour||'#64748B'})))));
+  cards.push(card('Best connected','Connections each',_barRows(byDeg.map(n=>({label:n.label,value:adj.get(n.id).size,colour:(gcol&&gcol[F.grp.of(n)])||n.colour||'#64748B',tip:[n.label,`${adj.get(n.id).size} connection${adj.get(n.id).size===1?'':'s'}`,'Linked to: '+_nameList([...adj.get(n.id)],nById,10)]})))));
   const br=(I.bridges||[]).slice().sort((a,b)=>b.cutOff-a.cutOff).slice(0,6);
-  if(br.length) cards.push(card('What the map leans on','Take one out and this many are cut off',_barRows(br.map(b=>({label:b.node.label,value:b.cutOff,colour:'#EA580C'})))));
+  if(br.length) cards.push(card('What the map leans on','Take one out and this many are cut off',_barRows(br.map(b=>({label:b.node.label,value:b.cutOff,colour:'#EA580C',tip:[b.node.label,`Take it out and ${noun(b.cutOff)} lose${b.cutOff===1?'s':''} their only route to the rest`,_nameList(_cutOffIds(adj,pool,b.node.id),nById,10)]})))));
   const bk=[['1',1,1,'#D97706'],['2',2,2,'#64748B'],['3',3,3,'#64748B'],['4–5',4,5,'#2563EB'],['6–9',6,9,'#2563EB'],['10+',10,1e9,'#2563EB']];
-  const hist=bk.map(([l,lo,hi,c])=>({label:l,value:pool.filter(n=>{ const d=adj.get(n.id).size; return d>=lo&&d<=hi; }).length,colour:c}));
+  const hist=bk.map(([l,lo,hi,c])=>{ const mem=pool.filter(n=>{ const d=adj.get(n.id).size; return d>=lo&&d<=hi; }); return {label:l,value:mem.length,colour:c,tip:[`${noun(mem.length)} with ${l} connection${l==='1'?'':'s'}`,mem.length?_nameList(mem.map(n=>n.id),nById,10):'None']}; });
   cards.push(card('How many connections each has',`${cap(np)} with this many (amber: hanging by one)`,_barRows(hist)));
   return `<div class="report-section"><h4>At a glance</h4><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">${cards.join('')}</div></div>`;
 }
@@ -5313,8 +5350,10 @@ function buildSummaryReport(){
       html+=`<div class="report-section"><h4>Bottleneck score</h4><div class="report-row" style="color:var(--txt-m);">Skipped: map has more than 200 nodes.</div></div>`;
     } else if(NI.topBetweenness.length){
       html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Bottleneck score: the top ${NI.topBetweenness.length}, in full</summary>
-        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Sits on the most paths between everyone else.</div>`+
-        NI.topBetweenness.map(n=>`<div class="report-row">${escHtml(n.label)} <span class="report-stat">${Math.round(NI.betweenness.get(n.id))}</span></div>`).join('')+`</details>`;
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Sits on the most paths between everyone else. The score is roughly how many pairs of the others have their shortest route through it.</div>`+
+        NI.topBetweenness.map(n=>{ const sc=Math.round(NI.betweenness.get(n.id)), m=NI.pool.length-1, pairs=m*(m-1)/2;
+          return `<div class="report-row"${_tipA([n.label,`Score ${sc}: about ${sc} pairs of the others have their shortest route through it`,pairs?`That is ${Math.round(100*sc/pairs)}% of the ${pairs} possible pairs`:''])}>${escHtml(n.label)} <span class="report-stat">${sc}</span></div>`; }).join('')+
+        `<div style="font-size:11px;color:var(--txt-m);margin-top:8px;line-height:1.55;"><strong>How it is worked out.</strong> Take every pair of the other ${mapNounPack()[1]} and find the shortest chain of links between them. The score counts how many of those chains pass through this one. If a pair has two equally short chains and only one runs through it, it counts as a half. It is not the same as being the most connected: a quiet one that joins two busy groups can score higher than a busy one in the middle of a crowd. Every link counts, whichever way its arrow points.</div></details>`;
     }
     if(NI.overloadedHubs.length){
       html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Overloaded hubs: ${NI.overloadedHubs.length}, in full</summary>
