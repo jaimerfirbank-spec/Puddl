@@ -4809,7 +4809,7 @@ function computeInsights(){
   // R/B classification and Limits-to-Growth, systems maps only. edgeByPair
   // resolves each loop's consecutive node pairs back to the real edge, the
   // same a|b / b|a lookup pattern refreshLoopPins() already uses for pins.
-  let loopClass=[], limitsToGrowth=[], unassignedPolarityCount=0, nodeLoopCount=new Map();
+  let loopClass=[], loopSteps=[], limitsToGrowth=[], unassignedPolarityCount=0, nodeLoopCount=new Map(), polLinks={pos:0,neg:0,none:0,unsigned:[]};
   if(MAP_TYPE==='systems'){
     const edgeByPair=new Map();
     edgesIn.forEach(e=>{
@@ -4822,6 +4822,20 @@ function computeInsights(){
       edgeByPair.set(a+'|'+b,e); edgeByPair.set(b+'|'+a,e);
     });
     loopClass=loops.map(L=>classifySystemsLoop(L,edgeByPair));
+    // The sign on each step of each loop, in loop order, for the report to spell out
+    loopSteps=loops.map(L=>L.map((n,i)=>{
+      const m=L[(i+1)%L.length], e=edgeByPair.get(n.id+'|'+m.id);
+      return (e&&e.polarity)||null;
+    }));
+    edgesIn.forEach(e=>{
+      if(e.isLoop&&arrowOf(e)==='none') return;
+      if(arrowOf(e)==='none') return;
+      const a=(e.source&&typeof e.source==='object')?e.source:nodes.find(n=>n.id===e.source);
+      const b=(e.target&&typeof e.target==='object')?e.target:nodes.find(n=>n.id===e.target);
+      if(!a||!b) return;
+      if(e.polarity==='positive') polLinks.pos++; else if(e.polarity==='negative') polLinks.neg++;
+      else { polLinks.none++; polLinks.unsigned.push(arrowOf(e)==='backward'?[b,a]:[a,b]); }
+    });
     limitsToGrowth=findLimitsToGrowth(loops,loopClass,total,5);
     edgesIn.forEach(e=>{ if(arrowOf(e)!=='none'&&!e.polarity) unassignedPolarityCount++; });
     // Counted over every loop found, not just the representatives left after
@@ -4968,7 +4982,7 @@ function computeInsights(){
           outDeg,inDeg,drivers,sinks,rootCauses,finalOutcomes,causeRule,outcomeRule,
           directedEdges,loops,loopVariants,loopsComplete,loopSearchDepth,
           loopsFoundTotal,loopsTruncated,compCount,compBig,focus,focusGuessed,fD,fCounts,
-          loopClass,limitsToGrowth,unassignedPolarityCount,nodeLoopCount,
+          loopClass,loopSteps,polLinks,limitsToGrowth,unassignedPolarityCount,nodeLoopCount,
           silentGiants,gridlockRisks,influenceBridges,alignmentHealth,
           stakeGrid,powerNotOnSide,highInterestLowPower,notEngaged,
           criticalLinks,density,betweenness,betweennessCapped,topBetweenness,overloadedHubs,
@@ -6255,6 +6269,113 @@ function _svgColumns(vals,dates,colour,pct){
   });
   const last=vals[n-1];
   return `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:300px;"><line x1="${padL}" y1="${base}" x2="${W-padR}" y2="${base}" stroke="var(--bdr)"/>${bars}<text x="${padL}" y="${H-5}" style="font-size:9.5px;fill:var(--txt-m);">${escHtml(short(dates[0]))}</text><text x="${W-padR}" y="${H-5}" text-anchor="end" style="font-size:9.5px;fill:var(--txt-m);">${escHtml(short(dates[n-1]))}</text><text x="${W-padR}" y="10" text-anchor="end" style="font-size:11px;font-weight:700;fill:${colour};">${last}${pct?'%':''}</text></svg>`;
+}
+// Systems maps: what the + and - mean, and what each loop is doing, in plain English.
+// Every sentence is built from the signs on the links, so it only says what the map says.
+const _POS_COL='#16A34A', _NEG_COL='#DC2626', _R_COL='#D97706', _B_COL='#2563EB', _U_COL='#64748B';
+function _loopTrailHTML(L,steps,type){
+  const e=escHtml;
+  // Follow the change round the loop: a + keeps the direction, a - flips it.
+  // Once a link has no sign the direction is unknown, so the trail stops showing arrows there.
+  let up=true, known=true;
+  const chips=[];
+  for(let i=0;i<=L.length;i++){
+    const n=L[i%L.length];
+    const arrow=known?(up?`<span style="color:${_POS_COL};font-weight:700;">&#9650;</span>`:`<span style="color:${_NEG_COL};font-weight:700;">&#9660;</span>`):'';
+    chips.push(`<span style="display:inline-block;padding:1px 7px;border-radius:999px;background:var(--surf-3);border:1px solid var(--bdr);white-space:nowrap;">${e(n.label)} ${arrow}</span>`);
+    if(i<L.length){
+      const st=steps[i];
+      if(!st) known=false; else if(st==='negative') up=!up;
+      const sg=st==='positive'?`<span style="color:${_POS_COL};font-weight:700;">+</span>`:st==='negative'?`<span style="color:${_NEG_COL};font-weight:700;">&minus;</span>`:`<span style="color:${_U_COL};font-weight:700;" title="No + or - set on this link">?</span>`;
+      chips.push(`<span style="color:var(--txt-m);">&rarr;${sg}&rarr;</span>`);
+    }
+  }
+  return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 5px;font-size:11px;margin:5px 0 4px;">${chips.join('')}</div>`;
+}
+function _loopSentence(L,steps,type){
+  const e=escHtml, first=e(L[0].label);
+  if(type==='R') return `A change in ${first} comes back round as the same kind of change, only bigger. Left alone it snowballs, upwards or downwards, until something outside the loop stops it.`;
+  if(type==='B') return `A change in ${first} comes back round as the opposite change. It pulls the system back towards a level, so it resists change, for better or worse.`;
+  const k=steps.map((x,i)=>x?null:i).filter(x=>x!==null);
+  const names=k.slice(0,3).map(i=>`${e(L[i].label)} &rarr; ${e(L[(i+1)%L.length].label)}`).join(', ');
+  return `${k.length} link${k.length===1?' has':'s have'} no + or &minus; yet (${names}), so this can't be called reinforcing or balancing. Set the sign on the link and it will be.`;
+}
+function _systemsReportHTML(I){
+  const e=escHtml, pool=I.pool||[];
+  let h=`<div class="report-section"><h4>How this system behaves</h4>`;
+  // How to read the signs
+  h+=`<div style="border:1px solid var(--bdr);border-radius:10px;padding:10px 14px;background:var(--surf);margin-bottom:12px;font-size:11.5px;line-height:1.55;">
+    <div style="font-weight:700;color:var(--navy);margin-bottom:4px;">How to read the + and &minus;</div>
+    <div><span style="color:${_POS_COL};font-weight:700;">+</span> means they move together: more of the first gives more of the next, less gives less.</div>
+    <div><span style="color:${_NEG_COL};font-weight:700;">&minus;</span> means they move apart: more of the first gives less of the next.</div>
+    <div style="color:var(--txt-m);margin-top:4px;">Follow the signs round a circle. An even number of &minus; (including none) makes a <span style="color:${_R_COL};font-weight:700;">reinforcing</span> loop that feeds itself. An odd number makes a <span style="color:${_B_COL};font-weight:700;">balancing</span> loop that corrects itself.</div>
+  </div>`;
+  if(!I.directedEdges){
+    return h+`<div style="font-size:12px;color:var(--txt-m);">No arrows are set, so there is no way to tell what drives what. Give the connections arrows, and a + or &minus;, to see the loops.</div></div>`;
+  }
+  const loops=I.loops||[], cls=I.loopClass||[], steps=I.loopSteps||[], pl=I.polLinks||{pos:0,neg:0,none:0,unsigned:[]};
+  const rC=cls.filter(c=>c.type==='R').length, bC=cls.filter(c=>c.type==='B').length, uC=cls.filter(c=>c.type==='unassigned').length;
+  const tile=(n,label,col,sub)=>`<div style="flex:1;min-width:120px;border:1px solid var(--bdr);border-left:4px solid ${col};border-radius:10px;padding:8px 12px;background:var(--surf);"><div style="font-size:22px;font-weight:700;color:${col};line-height:1.1;">${n}</div><div style="font-size:11px;font-weight:700;color:var(--navy);">${label}</div><div style="font-size:10.5px;color:var(--txt-m);">${sub}</div></div>`;
+  h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;">`
+    +tile(rC,'Reinforcing loops',_R_COL,'feed themselves')
+    +tile(bC,'Balancing loops',_B_COL,'correct themselves')
+    +(uC?tile(uC,'Not yet classifiable',_U_COL,'a link has no sign'):'')+`</div>`;
+  // Plain findings
+  const F=[];
+  if(loops.length){
+    F.push(['LOOPS',_R_COL,`${loops.length} feedback loop${loops.length===1?'':'s'} found${I.loopsComplete?'':' (search not finished: there may be more)'}. ${rC?`${rC} reinforcing, which ${rC===1?'amplifies':'amplify'} whatever is happening.`:'None reinforcing.'} ${bC?`${bC} balancing, which ${bC===1?'resists':'resist'} change.`:'None balancing.'}`]);
+    if(rC&&!bC) F.push(['WATCH',_NEG_COL,'Reinforcing loops with nothing balancing them can run away. Nothing on this map pushes back.']);
+    if(bC&&!rC) F.push(['NOTE',_B_COL,'Only balancing loops: this system tends to settle where it is, and is hard to shift.']);
+  } else F.push(['LOOPS',_U_COL,'No feedback loops found: influence on this map flows one way and never comes back round.']);
+  const top=[...(I.nodeLoopCount||new Map()).entries()].map(([id,c])=>[pool.find(n=>n.id===id),c]).filter(x=>x[0]).sort((a,b)=>b[1]-a[1]||String(a[0].label).localeCompare(String(b[0].label))).slice(0,6);
+  if(top.length&&I.loopsFoundTotal>1) F.push(['LEVERAGE','#7C3AED',`${e(top[0][0].label)} sits in ${top[0][1]} of the ${I.loopsFoundTotal} loops. A change there ripples furthest.`]);
+  if(I.limitsToGrowth&&I.limitsToGrowth.length){ const p=I.limitsToGrowth[0]; F.push(['LIMIT',_B_COL,`${e(p.sharedNode.label)} sits in a loop that snowballs and a loop that pushes back. Pushing harder on the snowballing side alone tightens the limit.`]); }
+  if(pl.none>0) F.push(['MISSING',_U_COL,`${pl.none} link${pl.none===1?' has':'s have'} no + or &minus;${uC?`, which leaves ${uC} loop${uC===1?'':'s'} unclassified`:''}: ${pl.unsigned.slice(0,4).map(([a,b])=>`${e(a.label)} &rarr; ${e(b.label)}`).join(', ')}${pl.unsigned.length>4?`, and ${pl.unsigned.length-4} more`:''}.`]);
+  h+=F.map(([t,c,x])=>`<div class="report-row" style="flex-direction:column;align-items:flex-start;gap:2px;border-left:3px solid ${c};padding-left:10px;margin:6px 0;"><div style="font-size:10px;font-weight:700;letter-spacing:0.05em;color:${c};">${t}</div><div style="font-size:12px;line-height:1.5;">${x}</div></div>`).join('');
+  // Signs chart
+  if(pl.pos+pl.neg+pl.none>0){
+    h+=`<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;background:var(--surf);margin:12px 0;"><div style="font-size:11.5px;font-weight:700;color:var(--navy);">The signs on the links</div><div style="font-size:10.5px;color:var(--txt-m);margin:1px 0 8px;">Every link that has an arrow</div>${_donutLegend([{label:'+ move together',value:pl.pos,colour:_POS_COL},{label:'− move apart',value:pl.neg,colour:_NEG_COL},{label:'No sign yet',value:pl.none,colour:'#94A3B8'}],110)}</div>`;
+  }
+  // Where the loops pass through
+  if(top.length>1){
+    h+=`<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;background:var(--surf);margin-bottom:12px;"><div style="font-size:11.5px;font-weight:700;color:var(--navy);">In the most loops</div><div style="font-size:10.5px;color:var(--txt-m);margin:1px 0 8px;">Change one of these and the most loops feel it</div>${_barRows(top.map(([n,c])=>({label:n.label,value:c,colour:'#7C3AED'})))}</div>`;
+  }
+  // Each loop
+  if(loops.length){
+    _insightLoops=loops;
+    const card=(L,i)=>{
+      const t=cls[i].type, col=t==='R'?_R_COL:t==='B'?_B_COL:_U_COL, name=t==='R'?'Reinforcing':t==='B'?'Balancing':'Not yet classifiable';
+      const more=I.loopVariants&&I.loopVariants[i]>1?` <span style="font-size:10.5px;color:var(--txt-m);">+${I.loopVariants[i]-1} similar</span>`:'';
+      return `<div class="report-row" onclick="highlightLoopFromReport(${i})" style="display:block;cursor:pointer;border-left:4px solid ${col};padding:6px 10px;margin:6px 0;" title="Click to show this loop on the map">
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.05em;color:${col};text-transform:uppercase;">${name} &middot; ${L.length} steps${more}</div>
+        ${_loopTrailHTML(L,steps[i]||[],t)}
+        <div style="font-size:11.5px;color:var(--txt-m);line-height:1.5;">${_loopSentence(L,steps[i]||[],t)}</div></div>`;
+    };
+    const SHOW=5, idx=loops.map((_,i)=>i);
+    h+=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin:14px 0 4px;">Each loop, in plain English</div><div style="font-size:11px;color:var(--txt-m);margin-bottom:4px;">&#9650; means up, &#9660; means down. Click a loop to see it on the map.</div>`;
+    h+=idx.slice(0,SHOW).map(i=>card(loops[i],i)).join('');
+    if(idx.length>SHOW) h+=`<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:11px;color:var(--txt-m);">Show the other ${idx.length-SHOW} loop${idx.length-SHOW===1?'':'s'}</summary>${idx.slice(SHOW).map(i=>card(loops[i],i)).join('')}</details>`;
+    h+=`<div style="font-size:10.5px;color:var(--txt-m);margin-top:6px;">${I.loopsComplete?`Every loop of up to ${I.loopSearchDepth} steps was searched for.`:`The search stopped at ${I.loopSearchDepth||'fewer than 3'} steps because the map is dense, so longer loops are not listed.`}</div>`;
+  }
+  // Limits to growth
+  if(I.limitsToGrowth&&I.limitsToGrowth.length){
+    h+=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin:14px 0 4px;">Limits to growth</div><div style="font-size:11px;color:var(--txt-m);margin-bottom:4px;">A reinforcing loop and a balancing loop that share a factor. The growth runs until the balancing loop catches up.</div>`;
+    const lim=p=>{ const r=loops[p.rIdx].map(n=>e(n.label)).join(' &rarr; '), b=loops[p.bIdx].map(n=>e(n.label)).join(' &rarr; ');
+      return `<div class="report-row" style="display:block;border-left:4px solid ${_B_COL};padding:6px 10px;margin:6px 0;"><div style="font-size:12px;"><strong style="color:var(--navy);">${e(p.sharedNode.label)}</strong> is where a loop that snowballs meets a loop that pushes back.</div><div style="font-size:11px;color:var(--txt-m);margin-top:3px;"><span style="color:${_R_COL};font-weight:700;">Pushes it on:</span> ${r}</div><div style="font-size:11px;color:var(--txt-m);margin-top:2px;"><span style="color:${_B_COL};font-weight:700;">Pushes back:</span> ${b}</div><div style="font-size:11px;color:var(--txt-m);font-style:italic;margin-top:3px;">Easing what pushes back usually does more than pushing harder.</div></div>`; };
+    // Several balancing loops can run through the same reinforcing loop at the same factor: show each such pairing once
+    const seenLim=new Set(), LT=I.limitsToGrowth.filter(p=>{ const k=p.rIdx+'|'+p.sharedNode.id; if(seenLim.has(k)) return false; seenLim.add(k); return true; });
+    h+=LT.slice(0,3).map(lim).join('');
+    if(LT.length>3) h+=`<details style="margin-top:6px;"><summary style="cursor:pointer;font-size:11px;color:var(--txt-m);">Show ${LT.length-3} more</summary>${LT.slice(3).map(lim).join('')}</details>`;
+  }
+  // Where to push from
+  const rc=I.rootCauses||[], fo=I.finalOutcomes||[];
+  if(rc.length||fo.length){
+    h+=`<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin:14px 0 4px;">Where it starts and where it ends</div>`;
+    const lst=a=>a.slice(0,6).map(n=>e(n.label)).join(', ')+(a.length>6?` and ${a.length-6} more`:'');
+    if(rc.length) h+=`<div class="report-row" style="display:block;border-left:3px solid #0EA5E9;padding:4px 10px;margin:6px 0;font-size:12px;line-height:1.5;"><strong>${I.causeRule==='strict'?'Starting points':'Near starting points'}:</strong> ${lst(rc)}. ${I.causeRule==='strict'?'Nothing on the map causes these, so they are what you act on from outside.':'Very little causes these, and they cause several things.'}</div>`;
+    if(fo.length) h+=`<div class="report-row" style="display:block;border-left:3px solid #0EA5E9;padding:4px 10px;margin:6px 0;font-size:12px;line-height:1.5;"><strong>${I.outcomeRule==='strict'?'End results':'Near end results'}:</strong> ${lst(fo)}. ${I.outcomeRule==='strict'?'Nothing follows on from these.':'Several things feed in and at most one thing follows.'}</div>`;
+  }
+  return h+`</div>`;
 }
 function _reportChartsHTML(I,F){
   const pool=I.pool||[]; if(pool.length<4) return '';
@@ -10234,7 +10355,7 @@ function buildSummaryReport(){
 
   {
     const _I=computeInsights(), _F=computeFindings(_I);
-    html+=_selectionBannerHTML()+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
+    html+=_selectionBannerHTML()+(MAP_TYPE==='systems'?_systemsReportHTML(_I):'')+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
   }
 
   if(vis.some(n=>n.colourLabel)&&Object.keys(catCounts).length){
@@ -10324,37 +10445,6 @@ function buildSummaryReport(){
   if(MAP_TYPE==='argument'){
     const AI=computeInsights();
     if(AI.arg) html+=`<div class="report-section"><h4>Argument</h4>`+insightSummaryLines(AI).map(t=>`<div class="report-row">${escHtml(t)}</div>`).join('')+`</div>`;
-  }
-  if(MAP_TYPE==='systems'){
-    const LI=computeInsights();
-    _insightLoops=LI.loops||[];
-    html+=`<div class="report-section"><h4>Feedback loops</h4>`;
-    if(!LI.directedEdges) html+=`<div style="font-size:12px;color:var(--txt-m);">No arrows set, so loops can't be detected. Give connections arrows to see them.</div>`;
-    else if(!_insightLoops.length) html+=`<div style="font-size:12px;color:var(--txt-m);">None found: influence flows one way.</div>`;
-    else {
-      const rC=LI.loopClass.filter(c=>c.type==='R').length, bC=LI.loopClass.filter(c=>c.type==='B').length, uC=LI.loopClass.filter(c=>c.type==='unassigned').length;
-      html+=`<div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">A loop is a chain of effects that circles back on itself. ${rC} reinforcing, ${bC} balancing${uC?`, ${uC} need a + or - before they can be told apart`:''}.</div>`+
-      _insightLoops.map((L,li)=>{
-        const cls=LI.loopClass[li];
-        const tag=cls.type==='unassigned'?'<span class="report-stat">?</span>':`<span class="report-stat" style="background:${cls.type==='R'?'#FEF3C7':'#DBEAFE'};color:${cls.type==='R'?'#92400E':'#1E40AF'};">${cls.type}</span>`;
-        return `<div class="report-row" onclick="highlightLoopFromReport(${li})" style="cursor:pointer;" title="Click to highlight this loop on the map">${tag} ${L.map(n=>escHtml(n.label)).join(' → ')} → ${escHtml(L[0].label)}</div>`;
-      }).join('');
-    }
-    html+=`</div>`;
-    if(LI.limitsToGrowth&&LI.limitsToGrowth.length){
-      html+=`<div class="report-section"><h4>Limits to growth</h4>`+
-        LI.limitsToGrowth.map(p=>{
-          const rNodes=LI.loops[p.rIdx].map(n=>escHtml(n.label)).join(' → ');
-          const bNodes=LI.loops[p.bIdx].map(n=>escHtml(n.label)).join(' → ');
-          return `<div class="report-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
-            <div><strong style="color:var(--navy);">${escHtml(p.sharedNode.label)}</strong> is a growth engine held back by a limit.</div>
-            <div style="font-size:11px;color:var(--txt-m);">Reinforcing (R): ${rNodes}</div>
-            <div style="font-size:11px;color:var(--txt-m);">Balancing (B): ${bNodes}</div>
-            <div style="font-size:11px;color:var(--txt-m);font-style:italic;">Leverage point: ease the constraint, not just the push.</div>
-          </div>`;
-        }).join('');
-      html+=`</div>`;
-    }
   }
   if(MAP_TYPE==='stakeholder'){
     const SI=computeInsights();
