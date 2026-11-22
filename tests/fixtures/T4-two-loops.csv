@@ -1,0 +1,5 @@
+Name,Connected to,Arrow,Polarity
+A,B,forward,+
+B,C,forward,+
+C,"A, D",forward,+
+D,B,forward,-
