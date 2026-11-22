@@ -16,3 +16,5 @@ Before any change, read and follow `AI_WORKFLOW.md`. In particular:
 - Do not hand-edit `viewer.html`; regenerate it with `python3 tools/build-viewer.py` when required by `CLAUDE.md`.
 - Preserve unrelated user changes.
 - Test proportionately, review the diff, and report exactly what was checked.
+
+If `docs/HANDOFF.md` exists, read it before starting. It says what was in progress and what to avoid.
