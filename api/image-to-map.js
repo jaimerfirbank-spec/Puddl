@@ -44,6 +44,16 @@ const schema = {
   }
 };
 
+const edgeSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['edges', 'warnings'],
+  properties: {
+    edges: schema.properties.edges,
+    warnings: schema.properties.warnings
+  }
+};
+
 const instructions = `You convert a clear hand-drawn systems or social map into structured data.
 The drawing uses black marker on white paper. Nodes are circles, ovals, or rectangles. Printed labels are inside or very close to nodes. Lines connect nodes and arrowheads show direction.
 
@@ -57,6 +67,37 @@ Rules:
 - Use both only when arrowheads clearly appear at both ends.
 - Do not invent connections. Put doubtful details in warnings and lower confidence.
 - Return empty arrays if the image is not a map.`;
+
+const edgeInstructions = `You are the connection-tracing verifier for a hand-drawn network map.
+The node list and node boxes are already fixed. Inspect the image again and return the complete, corrected edge list only.
+
+Tracing rules:
+- Start at one node outline and visually follow the same uninterrupted ink stroke until it reaches another node outline.
+- A line crossing another line is not a junction. Never switch from one stroke to another at a crossing.
+- Do not connect a node merely because a line passes near, behind, or through it. The stroke must terminate at that node outline.
+- Inspect both ends of every traced stroke for arrowheads. A triangular node is not an arrowhead.
+- source_to_target means the arrowhead is at target. target_to_source means the arrowhead is at source. both requires a clear arrowhead at both node ends.
+- If endpoints are certain but the arrow direction is not, use unclear. If either endpoint is doubtful, omit the edge and add a short warning.
+- Include every visible connection exactly once. Remove duplicate, invented, and crossing-induced connections.
+- Prefer precision over a plausible-looking network. Do not infer relationships from names, proximity, or symmetry.`;
+
+function outputText(body){
+  return body.output_text || (body.output || [])
+    .flatMap(item => item.content || [])
+    .filter(item => item.type === 'output_text')
+    .map(item => item.text)
+    .join('');
+}
+
+async function readStructured(image, prompt, formatSchema, formatName, effort='medium'){
+  const response=await fetch('https://api.openai.com/v1/responses',{
+    method:'POST',signal:AbortSignal.timeout(90000),headers:{Authorization:`Bearer ${process.env.OPENAI_API_KEY}`,'Content-Type':'application/json'},
+    body:JSON.stringify({model:'gpt-6.1-terra',store:false,reasoning:{effort},instructions:prompt,input:[{role:'user',content:[{type:'input_text',text:'Inspect the complete image at high detail and follow the instructions exactly.'},{type:'input_image',image_url:image,detail:'high'}]}],text:{format:{type:'json_schema',name:formatName,strict:true,schema:formatSchema}}})
+  });
+  const body=await response.json();
+  if(!response.ok)throw Error('provider');
+  const text=outputText(body);if(!text)throw Error('empty');return JSON.parse(text);
+}
 
 function send(res, status, body) {
   res.statusCode = status;
@@ -100,52 +141,15 @@ export default async function handler(req, res) {
     });
     if(!allowance.ok) return send(res,503,{error:'Photo reading is temporarily unavailable.'});
     if(await allowance.json()!==true) { res.setHeader('Retry-After','3600'); return send(res,429,{error:'Your account cannot read another photo right now. Check your subscription or try again in an hour.'}); }
-    const apiResponse = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      signal: AbortSignal.timeout(90000),
-      headers: {
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-6.1-terra',
-        store: false,
-        reasoning: { effort: 'medium' },
-        instructions,
-        input: [{
-          role: 'user',
-          content: [
-            { type: 'input_text', text: 'Read this hand-drawn map. Be exact and conservative.' },
-            { type: 'input_image', image_url: image, detail: 'high' }
-          ]
-        }],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'puddl_image_map',
-            description: 'Nodes and directed edges detected in a hand-drawn map.',
-            strict: true,
-            schema
-          }
-        }
-      })
-    });
-
-    const responseBody = await apiResponse.json();
-    if (!apiResponse.ok) {
-      return send(res, 502, { error: 'The photo reader could not finish. Please try again shortly.' });
-    }
-
-    const outputText = responseBody.output_text || (responseBody.output || [])
-      .flatMap(item => item.content || [])
-      .filter(item => item.type === 'output_text')
-      .map(item => item.text)
-      .join('');
-    if (!outputText) return send(res, 502, { error: 'The photo reader returned no result.' });
-
-    const result=JSON.parse(outputText);
+    const result=await readStructured(image,instructions,schema,'puddl_image_map');
     if(!validGraph(result)) return send(res,502,{error:'The photo reading was incomplete. Try a clearer photo.'});
-    return send(res, 200, { result });
+    const nodeGuide=result.nodes.map(node=>({id:node.id,label:node.label,box:[node.x,node.y,node.width,node.height]}));
+    const candidateEdges=result.edges.map(edge=>({source:edge.source,target:edge.target,direction:edge.direction}));
+    const verificationPrompt=edgeInstructions+'\n\nFixed nodes:\n'+JSON.stringify(nodeGuide)+'\n\nFirst-pass candidate edges (verify; do not preserve automatically):\n'+JSON.stringify(candidateEdges);
+    const verified=await readStructured(image,verificationPrompt,edgeSchema,'puddl_verified_edges','high');
+    const verifiedGraph={...result,edges:verified.edges,warnings:[...result.warnings,...verified.warnings]};
+    if(!validGraph(verifiedGraph))return send(res,502,{error:'The connection check was incomplete. Try a clearer photo.'});
+    return send(res, 200, { result:verifiedGraph });
   } catch (error) {
     console.error('image-to-map failed', error.name||'Error');
     return send(res, 500, { error: 'The photo reader could not finish. Please try again.' });
