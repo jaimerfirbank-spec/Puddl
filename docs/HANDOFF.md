@@ -92,3 +92,14 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
 - Never read `index.html` wholesale. Search for the symbol, then read the range.
 - Vercel: `main` deploys to production; every branch gets a preview address; the previous production build
   can be promoted back from the Vercel dashboard.
+
+## Systems maps and the + / - (added 22 Nov)
+
+- Branch `claude/polarity-tests` holds the polarity testing and the new systems report section
+  (`_systemsReportHTML`): how to read the signs, loop tiles, a signs donut, each loop in plain English
+  with up/down trails, limits to growth, starting points and end results. Built from `computeInsights`
+  (`loopSteps`, `polLinks` are new).
+- Demo file: `demo/systems-service-demand.csv`. Known answer: 7 loops listed (2 reinforcing, 4 balancing, 1
+  with a missing sign), 8 found before near-duplicates are folded.
+- Known gaps, left on purpose: two-step loops (two things affecting each other) are not searched for; Puddl
+  keeps one line per pair, so a link written both ways keeps only the first (import now says so).
