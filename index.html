@@ -5316,8 +5316,8 @@ function renderInsights(){
   const _tip=on=>on?'Click again to clear':'Click to light this up on the map';
   // kind: 'node' (it and its connections), 'out' / 'in' (only the arrows leaving / arriving),
   // 'choke' (it and what hangs off it), 'group' (the whole linked group it belongs to)
-  const row=(n,right,kind)=>{ const k=kind||'node'; const on=_on(`${k}:${n.id}`);
-    return `<div onclick="focusInsight('${k}','${esc(n.id)}')" title="${_tip(on)}" style="display:flex;justify-content:space-between;gap:8px;${_clickRowStyle(on)}" ${_hoverAttrs(on)}><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`; };
+  const row=(n,right,kind,noTitle)=>{ const k=kind||'node'; const on=_on(`${k}:${n.id}`);
+    return `<div onclick="focusInsight('${k}','${esc(n.id)}')" ${noTitle?'':`title="${_tip(on)}"`} style="display:flex;justify-content:space-between;gap:8px;${_clickRowStyle(on)}" ${_hoverAttrs(on)}><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`; };
   if(_insOpen.findings===undefined) _insOpen.findings=true;
   const F=MAP_TYPE==='argument'?{list:[],hints:[],grp:null}:computeFindings(I);
   _findings=F.list;
@@ -5633,7 +5633,7 @@ function renderInsights(){
     } else {
       h += grp('bottleneck','Bottleneck score',null,
         `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'Sits on the most paths between the other factors - influence has to pass through it.':MAP_TYPE==='stakeholder'?'Sits on the most routes between the other stakeholders - a gatekeeper even without being the most connected.':'Sits on the most paths between everyone else - a pinch point even without being the most connected.'}</div>`+_bottleneckExplainHTML(mapNounPack()[1])+
-        (I.topBetweenness.length ? I.topBetweenness.map(n=>row(n,Math.round(I.betweenness.get(n.id)))).join('') : none('No node sits between others on a path.')));
+        (I.topBetweenness.length ? I.topBetweenness.map(n=>row(n,_bottleneckCell(n,Math.round(I.betweenness.get(n.id)),I.pool.length),'node',true)).join('') : none('No node sits between others on a path.')));
     }
 
     if(I.overloadedHubs.length){
@@ -6256,6 +6256,13 @@ function _nameList(ids,nById,max){
   document.addEventListener('mouseout',ev=>{ const a=ev.target&&ev.target.closest&&ev.target.closest('[data-tip]'); if(!a||!el) return; const to=ev.relatedTarget; if(to&&a.contains(to)) return; el.style.display='none'; });
 })();
 // Who loses their route to the main body if one node is taken out (the biggest piece left is the main body)
+// Bottleneck score shown with the share of all routes it stands for, and a short plain hover
+function _bottleneckShare(score,poolSize){ const m=poolSize-1, pairs=m*(m-1)/2; return pairs>0?Math.max(0,Math.min(100,Math.round(100*score/pairs))):0; }
+function _bottleneckCell(n,score,poolSize){
+  const pc=_bottleneckShare(score,poolSize), np=mapNounPack()[1];
+  const tip=_tipA([`${n.label}: about ${pc}% of routes`,`Of every 100 pairs of other ${np}, about ${pc} take their shortest route through this one.`,'The higher it is, the more the rest of the map relies on it as a go-between.']);
+  return `<span${tip}>${score} <span style="opacity:0.75;">&middot; ${pc}%</span></span>`;
+}
 // How the bottleneck score is worked out, in words, for anyone who asks
 function _bottleneckExplainHTML(n){
   const e=escHtml;
@@ -10489,9 +10496,9 @@ function buildSummaryReport(){
       html+=`<div class="report-section"><h4>Bottleneck score</h4><div class="report-row" style="color:var(--txt-m);">Skipped: map has more than 200 nodes.</div></div>`;
     } else if(NI.topBetweenness.length){
       html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Bottleneck score: the top ${NI.topBetweenness.length}, in full</summary>
-        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Sits on the most paths between everyone else. The score is roughly how many pairs of the others have their shortest route through it.</div>`+
-        NI.topBetweenness.map(n=>{ const sc=Math.round(NI.betweenness.get(n.id)), m=NI.pool.length-1, pairs=m*(m-1)/2;
-          return `<div class="report-row"${_tipA([n.label,`Score ${sc}: about ${sc} pairs of the others have their shortest route through it`,pairs?`That is ${Math.round(100*sc/pairs)}% of the ${pairs} possible pairs`:''])}>${escHtml(n.label)} <span class="report-stat">${sc}</span></div>`; }).join('')+
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Sits on the most paths between everyone else. The first number is roughly how many pairs of the others have their shortest route through it. The percentage is that as a share of all pairs. Hover for a short explanation.</div>`+
+        NI.topBetweenness.map(n=>{ const sc=Math.round(NI.betweenness.get(n.id));
+          return `<div class="report-row">${escHtml(n.label)} <span class="report-stat">${_bottleneckCell(n,sc,NI.pool.length)}</span></div>`; }).join('')+
         `<div style="font-size:11px;color:var(--txt-m);margin-top:8px;line-height:1.55;"><strong>How it is worked out.</strong> Take every pair of the other ${mapNounPack()[1]} and find the shortest chain of links between them. The score counts how many of those chains pass through this one. If a pair has two equally short chains and only one runs through it, it counts as a half. It is not the same as being the most connected: a quiet one that joins two busy groups can score higher than a busy one in the middle of a crowd. Every link counts, whichever way its arrow points.</div></details>`;
     }
     if(NI.overloadedHubs.length){
