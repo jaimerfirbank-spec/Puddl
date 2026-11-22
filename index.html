@@ -13220,7 +13220,7 @@ const WALK_STEPS=[
   },
   {
     title:'Hover to explore',
-    text:"Hover over any node to see who it connects to. The hovered node stays at full brightness, its immediate connections are slightly visible, and everything else dims. Move away and the map clears instantly.",
+    text:"Hover over any node to see who it connects to. The node and its immediate connections stay bright, the connections one step further out are faded, and everything else dims. Move away and the map clears instantly.",
     target:null, pos:'centre'
   },
   {
@@ -14886,21 +14886,23 @@ function showHoverPanel(id){
   hoverPanelNodeId=id;
   sidePanelNodeId=id;
 
-  // Hover highlight: VIEW MODE ONLY — primary node bright, neighbours faded
+  // Hover highlight: VIEW MODE ONLY — the node and its immediate connections bright, the next ring out faded, the rest dimmed
   const q=document.getElementById('search-input')?document.getElementById('search-input').value.trim():'';
   const hasActiveFilter=q||getMsValues('cat-filter').length||getMsValues('area-filter').length||getMsValues('tag-filter').length||getMsValues('conn-type-filter').length||getMsValues('member-filter').length;
   if(isViewMode&&!hasActiveFilter){
     highlightIds.clear();highlightEdges.clear();secondaryIds.clear();
-    highlightIds.add(id); // Primary — full brightness
+    const endsOf=e=>[typeof e.source==='object'?e.source.id:e.source, typeof e.target==='object'?e.target.id:e.target];
+    const near=new Set([id]);                                   // the node and who it connects to directly
+    edges.forEach(e=>{ const [a,b]=endsOf(e); if(a===id) near.add(b); else if(b===id) near.add(a); });
+    near.forEach(x=>highlightIds.add(x));
+    const outer=new Set();                                       // who those connect to, one step further out
     edges.forEach((e,i)=>{
-      const sid=typeof e.source==='object'?e.source.id:e.source;
-      const tid=typeof e.target==='object'?e.target.id:e.target;
-      if(sid===id||tid===id){
-        highlightEdges.add(i);
-        if(sid!==id) secondaryIds.add(sid); // Neighbour — faded
-        if(tid!==id) secondaryIds.add(tid);
-      }
+      const [a,b]=endsOf(e);
+      if(a===id||b===id||(near.has(a)&&near.has(b))) highlightEdges.add(i);
+      else if(near.has(a)&&!near.has(b)) outer.add(b);
+      else if(near.has(b)&&!near.has(a)) outer.add(a);
     });
+    outer.forEach(x=>secondaryIds.add(x));
     draw();
   }
 
