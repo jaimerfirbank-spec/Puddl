@@ -2781,7 +2781,34 @@ class PinSet extends Set{
   clearAll(){ this.pins=null; super.clear(); }
 }
 let highlightIds=new PinSet(),highlightEdges=new PinSet(),secondaryIds=new Set();
-const LOOP_CAP=100, LOOP_MAX_STEPS=20;
+// Feedback-loop search. LOOP_MAX_STEPS is a completeness promise, not a cap on
+// results: the search runs shortest-first and finishes each length before trying
+// the next, so "every loop up to 8 steps" is something we can actually say. 8 is
+// where a loop stops being readable aloud; 20 produced loops nobody could follow
+// and buried the 3-step ones. LOOP_BUDGET and LOOP_FOUND_MAX stop a dense map
+// freezing the page - hitting either means the answer is honestly incomplete and
+// the UI says which depth it did finish.
+const LOOP_MAX_STEPS=8, LOOP_BUDGET=2000000, LOOP_FOUND_MAX=20000;
+// Near-duplicate loops (same story, one node different) collapse into one row.
+// Jaccard on node sets scales the right way on its own: two 4-step loops sharing
+// 3 nodes score 0.60 and stay apart, two 10-step loops sharing 9 score 0.82 and
+// merge. LOOP_LIST_MAX bounds both the list and the merge comparison.
+const LOOP_MERGE_J=0.8, LOOP_LIST_MAX=200;
+// Below this many nodes the structural figures (brokers, clusters, bottlenecks)
+// describe a picture the user can already see, and read as findings when they are
+// noise. Above this density almost everything connects to everything, so nobody
+// sits between anybody and a broker score stops distinguishing people.
+const MIN_STRUCTURE_NODES=12, MAX_BROKER_DENSITY=25;
+// Betweenness is O(nodes x links). Module scope so the panel can name the number
+// when it explains why the score was not worked out.
+const BETWEENNESS_CAP=200;
+// Above this many factors the loop search is not attempted at all. The panel
+// names the number rather than reporting "no loops found".
+const LOOP_NODE_CAP=5000;
+// How many steps out from a factor the downstream trace follows. Beyond about
+// five, "X affects Y" on a connected map is true of almost everything and stops
+// being a finding.
+const KNOCK_MAX_STEPS=5;
 const _pinnedLoops=new Map();   // loop key -> [node ids]
 let _pinEdgeSig=-1;
 // Each highlighted loop gets its own colour, kept until it's removed. Past 10 the colours repeat, dashed.
@@ -4530,7 +4557,8 @@ function computeInsights(){
   const byLabel=(x,y)=>String(x.label).localeCompare(String(y.label));
   const most=[...pool].sort((x,y)=>total.get(y.id)-total.get(x.id)||byLabel(x,y)).slice(0,5);
   const least=[...pool].sort((x,y)=>total.get(x.id)-total.get(y.id)||byLabel(x,y)).slice(0,5);
-  const isolated=pool.filter(n=>deg.get(n.id)===0).length;
+  const orphanNodes=pool.filter(n=>deg.get(n.id)===0);
+  const isolated=orphanNodes.length;
 
   // One depth-first pass (iterative, so large maps cannot overflow the stack).
   // Also finds bridge EDGES in the same pass: a tree edge (pv,v) is a bridge
@@ -4603,10 +4631,23 @@ function computeInsights(){
   // Density: of every possible connection, how many actually exist.
   const density=pool.length>1?Math.round(edgesIn.length/(pool.length*(pool.length-1)/2)*100):0;
 
+  // Whether the structural figures mean anything on a map this shape. Below
+  // MIN_STRUCTURE_NODES, "who holds it together" is answered by looking at the
+  // picture, and a broker score on 6 nodes reads as a finding when it is noise.
+  // Above MAX_BROKER_DENSITY nearly everything connects to everything, so no one
+  // sits between anyone and brokers stop meaning anything. Both are reported as
+  // a reason the card is not shown, never as a score of zero.
+  const structureEligible=pool.length>=MIN_STRUCTURE_NODES;
+  const brokersMeaningful=structureEligible&&density<=MAX_BROKER_DENSITY;
+  // Links carrying a written label, and links without one. Only worth raising
+  // when some links DO have labels: that is a map someone meant to annotate and
+  // left part-done, rather than one that simply does not use labels.
+  let labelledLinks=0;
+  edgesIn.forEach(e=>{ if(String(e.note||'').trim()) labelledLinks++; });
+  const unlabelledLinks=edgesIn.length-labelledLinks;
+
   // Betweenness centrality (Brandes' algorithm): how often a node sits on the
-  // shortest path between two others. Capped at 200 pool nodes - O(V*E), fine
-  // at that size, not something to run uncapped on a huge map.
-  const BETWEENNESS_CAP=200;
+  // shortest path between two others. O(V*E), capped at BETWEENNESS_CAP nodes.
   let betweenness=null, betweennessCapped=false;
   if(pool.length>BETWEENNESS_CAP){
     betweennessCapped=true;
@@ -4689,6 +4730,31 @@ function computeInsights(){
   const drivers=[...pool].filter(n=>outDeg.get(n.id)>0).sort((x,y)=>outDeg.get(y.id)-outDeg.get(x.id)||byLabel(x,y)).slice(0,5);
   const sinks=[...pool].filter(n=>inDeg.get(n.id)>0).sort((x,y)=>inDeg.get(y.id)-inDeg.get(x.id)||byLabel(x,y)).slice(0,5);
 
+  // Root causes and final outcomes. "Most outgoing arrows" answers a different
+  // question - who is busiest - and a factor can be busy while still being
+  // caused by everything around it. A root cause is one nothing on this map
+  // explains: no arrows point at it. An outcome is one nothing follows from.
+  //
+  // On a map where everything sits on a loop, no factor has zero arrows in, so
+  // the strict rule finds nobody. Rather than show an empty card, fall back to
+  // "almost a root cause" - at most one thing causes it, and it causes several -
+  // and say which rule produced the answer, because they mean different things.
+  let rootCauses=[...pool].filter(n=>inDeg.get(n.id)===0&&outDeg.get(n.id)>0);
+  let finalOutcomes=[...pool].filter(n=>outDeg.get(n.id)===0&&inDeg.get(n.id)>0);
+  let causeRule='strict', outcomeRule='strict';
+  if(!rootCauses.length&&directedEdges){
+    rootCauses=[...pool].filter(n=>inDeg.get(n.id)<=1&&outDeg.get(n.id)>=3);
+    // Neither rule found anything: on this map every factor is both caused by
+    // something and causes something. That is a real finding, not a blank.
+    causeRule=rootCauses.length?'loose':'circular';
+  }
+  if(!finalOutcomes.length&&directedEdges){
+    finalOutcomes=[...pool].filter(n=>outDeg.get(n.id)<=1&&inDeg.get(n.id)>=3);
+    outcomeRule=finalOutcomes.length?'loose':'circular';
+  }
+  rootCauses.sort((x,y)=>outDeg.get(y.id)-outDeg.get(x.id)||byLabel(x,y));
+  finalOutcomes.sort((x,y)=>inDeg.get(y.id)-inDeg.get(x.id)||byLabel(x,y));
+
   // Overloaded hubs: many things arrive, almost nothing leaves - everything
   // piles up here before moving on. Needs arrows actually set; on a network
   // map that is often optional, so this stays empty unless direction was used.
@@ -4697,29 +4763,15 @@ function computeInsights(){
     .sort((x,y)=>(inDeg.get(y.id)-outDeg.get(y.id))-(inDeg.get(x.id)-outDeg.get(x.id))||byLabel(x,y))
     .slice(0,5);
 
-  // Feedback loops (systems maps): directed cycles of 3 to 20 steps. Capped at LOOP_CAP loops and a
-  // work budget so a huge, dense map can't freeze the page. loopsCapped says the list may be incomplete.
-  const loops=[]; let loopsCapped=false;
-  if(MAP_TYPE==='systems'&&directedEdges&&pool.length<=2000){
-    const idx=new Map(pool.map((n,i)=>[n.id,i]));
-    const byId2=new Map(pool.map(n=>[n.id,n]));
-    const seenKey=new Set();
-    let budget=1500000;
-    const dfs=(start,cur,path,onPath)=>{
-      if(budget--<0||loops.length>=LOOP_CAP) return;
-      for(const nxt of dirAdj.get(cur)||[]){
-        if(budget<0||loops.length>=LOOP_CAP) return;
-        if(nxt===start){
-          if(path.length>=3){ const k=path.join('>'); if(!seenKey.has(k)){ seenKey.add(k); loops.push(path.map(id=>byId2.get(id))); } }
-        } else if(!onPath.has(nxt)&&path.length<LOOP_MAX_STEPS&&idx.get(nxt)>idx.get(start)){
-          onPath.add(nxt); path.push(nxt); dfs(start,nxt,path,onPath); path.pop(); onPath.delete(nxt);
-        }
-      }
-    };
-    for(const n of pool){ if(loops.length>=LOOP_CAP||budget<0) break; dfs(n.id,n.id,[n.id],new Set([n.id])); }
-    loopsCapped=loops.length>=LOOP_CAP||budget<0;
-    loops.sort((a,b)=>a.length-b.length);
-  }
+  // Feedback loops (systems maps). Shortest first, and complete to whatever depth
+  // it finished - see findFeedbackLoops() for why that matters.
+  const LOOPS=findFeedbackLoops(pool,dirAdj,MAP_TYPE==='systems'&&directedEdges&&pool.length<=LOOP_NODE_CAP);
+  const loops=LOOPS.loops;                    // representative loops, shortest first
+  const loopVariants=LOOPS.variants;          // near-duplicates folded into each one
+  const loopsComplete=LOOPS.complete;         // did the search finish every depth it tried
+  const loopSearchDepth=LOOPS.depth;          // the longest length it searched exhaustively
+  const loopsFoundTotal=LOOPS.foundTotal;     // loops found before near-duplicates were merged
+  const loopsTruncated=LOOPS.truncated;       // more distinct loops exist than the list shows
   // R/B classification and Limits-to-Growth, systems maps only. edgeByPair
   // resolves each loop's consecutive node pairs back to the real edge, the
   // same a|b / b|a lookup pattern refreshLoopPins() already uses for pins.
@@ -4734,7 +4786,10 @@ function computeInsights(){
     loopClass=loops.map(L=>classifySystemsLoop(L,edgeByPair));
     limitsToGrowth=findLimitsToGrowth(loops,loopClass,total,5);
     edgesIn.forEach(e=>{ if(arrowOf(e)!=='none'&&!e.polarity) unassignedPolarityCount++; });
-    loops.forEach(L=>{ L.forEach(n=>{ nodeLoopCount.set(n.id,(nodeLoopCount.get(n.id)||0)+1); }); });
+    // Counted over every loop found, not just the representatives left after
+    // near-duplicates were merged, so "in 48 loops" describes the real structure.
+    // loopsFoundTotal is the denominator the UI quotes alongside it.
+    nodeLoopCount=LOOPS.nodeCounts;
   }
 
   // Clusters: separate pieces of the map that don't touch (within this view)
@@ -4768,8 +4823,36 @@ function computeInsights(){
   // on each node plus the same +/- polarity field systems maps use, just read
   // as alliance/friction here rather than cause/effect.
   let silentGiants=[], gridlockRisks=[], influenceBridges=[], alignmentHealth=null;
+  let stakeGrid=null, powerNotOnSide=[], highInterestLowPower=[], notEngaged=null;
   if(MAP_TYPE==='stakeholder'){
     silentGiants=pool.filter(n=>n.stakePower==='high'&&n.stakeInterest==='low');
+
+    // The power/interest grid. Power and interest are each high or low (or not
+    // set), so four boxes is the whole picture, not a simplification of it -
+    // this is the grid people are taught, and the one they expect to see.
+    // Within a box, order by how connected someone is: that is real data off
+    // the map, where a finer power score would be a number somebody made up.
+    const scored=pool.filter(n=>n.stakePower&&n.stakeInterest);
+    const box=(p,i)=>scored.filter(n=>n.stakePower===p&&n.stakeInterest===i)
+                           .sort((a,b)=>(total.get(b.id)||0)-(total.get(a.id)||0)||byLabel(a,b));
+    stakeGrid={
+      scored:scored.length, unscored:pool.length-scored.length,
+      // high power + high interest: the people the work lives or dies by
+      manage:box('high','high'),
+      // high power + low interest: the silent giants, a risk if surprised late
+      satisfy:box('high','low'),
+      // low power + high interest: care most, heard least
+      inform:box('low','high'),
+      // low power + low interest: keep an eye, spend little
+      monitor:box('low','low')
+    };
+    highInterestLowPower=stakeGrid.inform;
+
+    // Power, but not on side. Deliberately separate from gridlock risks, which
+    // is about friction BETWEEN two powerful people; this is about one powerful
+    // person's own stance, whoever they are in conflict with.
+    powerNotOnSide=pool.filter(n=>n.stakePower==='high'&&(n.stakeStance==='skeptic'||n.stakeStance==='blocker'))
+                       .sort((a,b)=>(total.get(b.id)||0)-(total.get(a.id)||0)||byLabel(a,b));
 
     const byId=new Map(pool.map(n=>[n.id,n]));
     const posAdj=new Map(pool.map(n=>[n.id,new Set()]));
@@ -4821,18 +4904,161 @@ function computeInsights(){
       if(e.polarity==='positive') posC++; else if(e.polarity==='negative') negC++;
     });
     if(posC+negC>0) alignmentHealth={positive:posC,negative:negC,total:posC+negC,pct:Math.round(posC/(posC+negC)*100)};
+
+    // Who is going unattended. Three different kinds of "not engaged", kept
+    // apart because the thing to do about each one differs: nobody has drawn a
+    // link to them at all; they are on the map but no chain of links reaches
+    // the centre; or nobody has decided where they stand yet. fCounts.un
+    // already counted the unreachable but nothing ever showed who they were.
+    const unlinked=pool.filter(n=>deg.get(n.id)===0);
+    const unlinkedIds=new Set(unlinked.map(n=>n.id));
+    const unreachable=focus
+      ? pool.filter(n=>n.id!==focus.id&&!unlinkedIds.has(n.id)&&fD&&!fD.has(n.id))
+      : [];
+    const unscored=pool.filter(n=>!n.stakePower||!n.stakeInterest||!n.stakeStance);
+    notEngaged={unlinked,unreachable,unscored,
+                total:new Set([...unlinked,...unreachable,...unscored].map(n=>n.id)).size};
   }
 
   pool.forEach(n=>{ const y=yearOf(n.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].p++; });
   edgesIn.forEach(e=>{ const y=yearOf(e.date); if(!y) return; years[y]=years[y]||{p:0,c:0}; years[y].c++; });
 
-  return {filtered,pool,deg,total,most,least,isolated,bridges:bridges.slice(0,5),linked,alone,
+  return {filtered,pool,deg,total,most,least,isolated,orphanNodes,
+          structureEligible,brokersMeaningful,labelledLinks,unlabelledLinks,
+          bridges:bridges.slice(0,5),linked,alone,
           groupList,cats,fieldSummaries,types,typeLabel,years,edgesCount:edgesIn.length,
-          outDeg,inDeg,drivers,sinks,directedEdges,loops,loopsCapped,compCount,compBig,focus,focusGuessed,fD,fCounts,
+          outDeg,inDeg,drivers,sinks,rootCauses,finalOutcomes,causeRule,outcomeRule,
+          directedEdges,loops,loopVariants,loopsComplete,loopSearchDepth,
+          loopsFoundTotal,loopsTruncated,compCount,compBig,focus,focusGuessed,fD,fCounts,
           loopClass,limitsToGrowth,unassignedPolarityCount,nodeLoopCount,
           silentGiants,gridlockRisks,influenceBridges,alignmentHealth,
+          stakeGrid,powerNotOnSide,highInterestLowPower,notEngaged,
           criticalLinks,density,betweenness,betweennessCapped,topBetweenness,overloadedHubs,
           arg:MAP_TYPE==='argument'?argumentAnalysis(pool):null};
+}
+// Feedback loops, shortest first.
+//
+// The old search was one depth-first sweep that stopped at the first 100 loops it
+// happened to find and only THEN sorted them by length. On anything bigger than a
+// toy map that meant the 100 came from the first two or three starting nodes, and
+// the short, readable loops elsewhere were never reached at all. On the 500-factor
+// test map it reported loops of 7 to 20 steps and missed the map's only 3-step
+// loop entirely - the one a person would actually act on.
+//
+// This searches by increasing length instead: every loop of 3 steps, then every
+// loop of 4, and so on. Each length is finished before the next is started, so
+// whatever depth it reaches, the answer for every length up to that depth is
+// complete. That turns the honest message from "here are the first 100 we found"
+// into "here is every loop up to N steps", which is a claim that can be checked.
+//
+// Each loop is walked only from its lowest-indexed node, so a loop is found once
+// rather than once per member. Only nodes inside a strongly connected component of
+// two or more can sit on a cycle, so everything else is skipped before the walk
+// starts - that is what makes an acyclic or mostly-acyclic map almost free.
+function findFeedbackLoops(pool,dirAdj,enabled){
+  const empty={loops:[],variants:[],complete:true,depth:0,foundTotal:0,truncated:false,nodeCounts:new Map()};
+  if(!enabled||!pool.length) return empty;
+
+  // --- strongly connected components (Tarjan, iterative so a deep graph can't
+  // overflow the stack). Only a component of 2+ can hold a directed cycle.
+  const index=new Map(), low=new Map(), onStack=new Map(), comp=new Map();
+  const stack=[]; let counter=0, compId=0;
+  for(const root of pool){
+    if(index.has(root.id)) continue;
+    const work=[{v:root.id,it:(dirAdj.get(root.id)||[])[Symbol.iterator]()}];
+    index.set(root.id,counter); low.set(root.id,counter); counter++;
+    stack.push(root.id); onStack.set(root.id,true);
+    while(work.length){
+      const f=work[work.length-1];
+      let descended=false;
+      let step=f.it.next();
+      while(!step.done){
+        const w=step.value;
+        if(!index.has(w)){
+          index.set(w,counter); low.set(w,counter); counter++;
+          stack.push(w); onStack.set(w,true);
+          work.push({v:w,it:(dirAdj.get(w)||[])[Symbol.iterator]()});
+          descended=true; break;
+        }
+        if(onStack.get(w)) low.set(f.v,Math.min(low.get(f.v),index.get(w)));
+        step=f.it.next();
+      }
+      if(descended) continue;
+      work.pop();
+      if(work.length){ const p=work[work.length-1].v; low.set(p,Math.min(low.get(p),low.get(f.v))); }
+      if(low.get(f.v)===index.get(f.v)){
+        for(;;){ const w=stack.pop(); onStack.set(w,false); comp.set(w,compId); if(w===f.v) break; }
+        compId++;
+      }
+    }
+  }
+  const compSize=new Map();
+  comp.forEach(c=>compSize.set(c,(compSize.get(c)||0)+1));
+
+  // Keep only the nodes that can be on a cycle, and only the links that stay
+  // inside their own component - a link leaving its component can never come back.
+  const order=pool.filter(n=>(compSize.get(comp.get(n.id))||0)>=2);
+  if(!order.length) return empty;
+  const idx=new Map(order.map((n,i)=>[n.id,i]));
+  const byId=new Map(pool.map(n=>[n.id,n]));
+  const cyc=new Map();
+  order.forEach(n=>cyc.set(n.id,(dirAdj.get(n.id)||[]).filter(m=>idx.has(m)&&comp.get(m)===comp.get(n.id))));
+
+  // --- search, one length at a time
+  let budget=LOOP_BUDGET, stopped=false, depthDone=0;
+  const found=[];
+  for(let depth=3;depth<=LOOP_MAX_STEPS;depth++){
+    const atDepth=[];
+    for(const s of order){
+      if(stopped) break;
+      const sid=s.id, si=idx.get(sid);
+      const path=[sid], onPath=new Set([sid]);
+      const walk=cur=>{
+        for(const nxt of cyc.get(cur)||[]){
+          if(--budget<=0||found.length+atDepth.length>=LOOP_FOUND_MAX){ stopped=true; return; }
+          if(nxt===sid){ if(path.length===depth) atDepth.push(path.slice()); continue; }
+          // skip anything already on this path, and anything that would start the
+          // loop somewhere other than its lowest-indexed node (found once, not N times)
+          if(onPath.has(nxt)||idx.get(nxt)<si||path.length>=depth) continue;
+          onPath.add(nxt); path.push(nxt);
+          walk(nxt);
+          path.pop(); onPath.delete(nxt);
+          if(stopped) return;
+        }
+      };
+      walk(sid);
+    }
+    // A depth that ran out of budget part-way is not a complete answer for that
+    // length, so its partial results are dropped rather than reported as the lot.
+    if(stopped) break;
+    found.push(...atDepth);
+    depthDone=depth;
+  }
+
+  // Count every loop found, not just the ones that survive merging below - the
+  // "in N loops" figure means more when it counts the real structure.
+  const nodeCounts=new Map();
+  found.forEach(L=>L.forEach(id=>nodeCounts.set(id,(nodeCounts.get(id)||0)+1)));
+
+  // --- fold near-duplicates together. found is already shortest-first, so the
+  // representative kept for each group is the shortest version of that story.
+  const reps=[], variants=[], sets=[];
+  let truncated=false;
+  for(const L of found){
+    const S=new Set(L);
+    let merged=false;
+    for(let i=0;i<sets.length;i++){
+      const T=sets[i];
+      let inter=0; S.forEach(x=>{ if(T.has(x)) inter++; });
+      const uni=S.size+T.size-inter;
+      if(uni&&inter/uni>=LOOP_MERGE_J){ variants[i]++; merged=true; break; }
+    }
+    if(merged) continue;
+    if(reps.length>=LOOP_LIST_MAX){ truncated=true; continue; }
+    sets.push(S); reps.push(L.map(id=>byId.get(id))); variants.push(1);
+  }
+  return {loops:reps,variants,complete:!stopped,depth:depthDone,
+          foundTotal:found.length,truncated,nodeCounts};
 }
 // Causal Loop Diagrams: classify a detected cycle by counting '-' edges round
 // it. Even (incl. 0) = Reinforcing (R), compounds in one direction. Odd =
@@ -4922,11 +5148,32 @@ function insightSummaryLines(I){
     if(!I.directedEdges){
       S.push("No arrows are set, so Puddle can't tell what drives what. Open a connection and give it an arrow to see drivers, outcomes and feedback loops.");
     } else {
-      if(I.drivers[0]) S.push(`${I.drivers[0].label} influences the most other factors: ${I.outDeg.get(I.drivers[0].id)} outgoing arrows.`);
-      if(I.sinks[0]) S.push(`${I.sinks[0].label} is affected by the most: ${I.inDeg.get(I.sinks[0].id)} incoming arrows.`);
+      // Naming one winner when several tie reads as a finding about that one
+      // factor. Say how many are level and name the first few instead.
+      // Count ties across the whole map, not just the top five the card shows,
+      // or "and 2 others" undercounts when more than five are level.
+      const tied=(list,deg)=>{
+        if(!list.length) return null;
+        const top=deg.get(list[0].id);
+        if(top<2) return null;   // "the most affected has 1 arrow" is not a finding
+        return I.pool.filter(n=>deg.get(n.id)===top);
+      };
+      const dTop=tied(I.drivers,I.outDeg), sTop=tied(I.sinks,I.inDeg);
+      const nameList=l=>l.length===1?l[0].label
+        :l.length===2?`${l[0].label} and ${l[1].label}`
+        :`${l.slice(0,2).map(n=>n.label).join(', ')} and ${l.length-2} other${l.length-2===1?'':'s'}`;
+      const arrows=(k,dir)=>`${k} ${dir} arrow${k===1?'':'s'}`;
+      if(dTop) S.push(`${nameList(dTop)} ${dTop.length===1?'influences':'each influence'} the most other factors: ${arrows(I.outDeg.get(dTop[0].id),'outgoing')}${dTop.length>1?' each':''}.`);
+      if(sTop) S.push(`${nameList(sTop)} ${sTop.length===1?'is':'are'} affected by the most: ${arrows(I.inDeg.get(sTop[0].id),'incoming')}${sTop.length>1?' each':''}.`);
+      if(I.rootCauses.length&&I.causeRule==='strict')
+        S.push(`${I.rootCauses.length===1?'1 factor has':`${I.rootCauses.length} factors have`} nothing on this map causing ${I.rootCauses.length===1?'it':'them'}: ${nameList(I.rootCauses)}.`);
       if(I.loops.length){
         const rC=I.loopClass.filter(c=>c.type==='R').length, bC=I.loopClass.filter(c=>c.type==='B').length, uC=I.loopClass.filter(c=>c.type==='unassigned').length;
-        S.push(`${I.loopsCapped?'At least '+I.loops.length:I.loops.length} feedback loop${I.loops.length===1?'':'s'} found: ${rC} reinforcing, ${bC} balancing${uC?`, ${uC} not yet classifiable (give every connection a + or -)`:''}.`);
+        const scope=I.loopsComplete
+          ? `every loop up to ${I.loopSearchDepth} steps`
+          : (I.loopSearchDepth>=3 ? `every loop up to ${I.loopSearchDepth} steps, then the search stopped: this map is too dense to find them all`
+                                  : `the search stopped early: this map is too dense to find every loop`);
+        S.push(`${I.loops.length} feedback loop${I.loops.length===1?'':'s'} found — ${scope}. ${rC} reinforcing, ${bC} balancing${uC?`, ${uC} not yet classifiable (give every connection a + or -)`:''}.`);
       } else {
         S.push('No feedback loops found in this view: influence flows one way.');
       }
@@ -4957,8 +5204,16 @@ function insightSummaryLines(I){
       S.push(`${noun(c.d1)} ${c.d1===1?'is':'are'} directly linked to ${I.focus.label}, ${c.d2} two steps away, and ${c.far+c.un} further out or not connected to it at all.`);
     }
   } else {
-    if(hub&&I.total.get(hub.id)>0) S.push(`${hub.label} is the best connected: ${I.total.get(hub.id)} connection${I.total.get(hub.id)===1?'':'s'}. News and favours travel through ${NOUN[1]} like this.`);
-    if(I.bridges.length) S.push(`${I.bridges[0].node.label} is the only link holding ${I.bridges[0].cutOff} ${NOUN[1]} to the rest. If they left, that part would be cut off.`);
+    // "News and favours" only makes sense when the nodes are people. A network
+    // map of organisations, services or assets uses the same wording today, and
+    // a general map calls them "nodes", where the sentence reads as nonsense.
+    if(hub&&I.total.get(hub.id)>0) S.push(`${hub.label} is the best connected: ${I.total.get(hub.id)} connection${I.total.get(hub.id)===1?'':'s'}.${MAP_TYPE==='network'?` Whatever travels round this map passes through ${NOUN[1]} like this.`:''}`);
+    // Don't make the broker claim on a map too small for brokers to mean anything:
+    // the card itself now declines to answer, and the two would contradict.
+    if(I.bridges.length&&I.structureEligible){
+      const cut=I.bridges[0].cutOff;
+      S.push(`${I.bridges[0].node.label} is the only thing holding ${noun(cut)} to the rest. Take it out and that part is cut off.`);
+    }
     if(I.isolated>0) S.push(`${noun(I.isolated)} ${I.isolated===1?'has':'have'} no connections at all.`);
   }
   if(I.compCount>1) S.push(`This view is ${I.compCount} separate clusters that don't touch. The biggest holds ${noun(I.compBig)}.`);
@@ -4989,6 +5244,17 @@ function renderInsights(){
     return `<div style="border-top:1px solid var(--bdr);margin-top:6px;"><div onclick="toggleInsGroup('${k}')" style="display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 2px 5px;cursor:pointer;user-select:none;"><span style="font-size:10.5px;font-weight:700;letter-spacing:0.04em;color:var(--ink-h);">${t}${badge}</span><span id="insa-${k}" style="font-size:10px;color:var(--ink-h);">${on?'▾':'▸'}</span></div><div id="insg-${k}" style="display:${on?'block':'none'};padding-bottom:4px;">${inner}</div></div>`;
   };
   const none=t=>`<div style="color:var(--ink-h);font-size:11px;padding:3px 6px;">${t}</div>`;
+  // A card that was never worked out must not look like a card that was worked
+  // out and found nothing. Both used to render a grey "0". skipped() takes the
+  // badge away entirely and says, in the header, why there is no answer.
+  const skipped=(k,t,why)=>`<div style="border-top:1px solid var(--bdr);margin-top:6px;padding:7px 2px 5px;">`+
+    `<div style="font-size:10.5px;font-weight:700;letter-spacing:0.04em;color:var(--ink-h);">${t} <span style="font-weight:600;text-transform:none;letter-spacing:0;">— not worked out</span></div>`+
+    `<div style="font-size:10.5px;color:var(--ink-h);padding-top:3px;line-height:1.45;">${why}</div></div>`;
+  // Cards whose answer only means something on a big enough, sparse enough map.
+  // The reason is phrased as a fact about this map, not an apology.
+  const tooSmall=`This map has ${plural(I.pool.length,'person')}. Below ${MIN_STRUCTURE_NODES} the answer is whatever you can already see by looking at it.`;
+  const tooDense=`${I.density}% of all possible connections exist here. When nearly everything links to everything, no one sits between anyone, so the answer would not single anybody out.`;
+  const structureWhy=!I.structureEligible?tooSmall:(!I.brokersMeaningful?tooDense:null);
   const row=(n,right)=>`<div onclick="selectSearchSuggestion('${esc(n.id)}')" style="display:flex;justify-content:space-between;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer;" onmouseover="this.style.background='var(--surf-3)'" onmouseout="this.style.background=''"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`;
   const pair=(a,b)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 6px;"><span>${a}</span><span style="color:var(--ink-h);">${b}</span></div>`;
   const bar=pct=>`<div style="height:6px;border-radius:3px;background:var(--ink);opacity:.7;width:${Math.max(2,Math.round(pct))}%;margin:2px 6px 6px;"></div>`;
@@ -5002,19 +5268,121 @@ function renderInsights(){
   if(S.length) h += `<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--ink);background:var(--surf-2);border-radius:6px;font-size:11.5px;line-height:1.55;">${S.map(t=>`<div style="margin:2px 0;">${esc(t)}</div>`).join('')}</div>`;
 
   if(I.filtered) h += `<div style="font-size:10.5px;color:var(--ink-h);margin-top:4px;">Lists show each ${NOUN[0]}'s total connections across the whole map.</div>`;
+
+  // ── Can I trust this map? ──────────────────────────────────────────────────
+  // Everything that would quietly bend the numbers above, gathered in one place
+  // instead of scattered through the cards or left unsaid. Each line is a thing
+  // about THIS map that the reader can act on, so an empty strip is meaningful:
+  // it says the map is in good shape, not that nothing was checked.
+  {
+    const checks=[];
+    if(I.isolated>0){
+      const names=I.orphanNodes.slice(0,3).map(n=>esc(n.label)).join(', ');
+      checks.push([`${plural(I.isolated,'person')} with no connections`,
+        `${names}${I.isolated>3?`, +${I.isolated-3} more`:''}. They are counted in the totals but sit outside every structural figure.`]);
+    }
+    if(I.compCount>1)
+      checks.push([`${I.compCount} separate parts that never touch`,
+        `The biggest holds ${noun(I.compBig)}. Nothing can travel between the parts, so paths and brokers are worked out within each part only.`]);
+    if(MAP_TYPE==='systems'&&!I.directedEdges&&I.edgesCount>0)
+      checks.push([`No connection has a direction yet`,
+        `Without arrows there is no way to tell what drives what, so drivers, outcomes and feedback loops cannot be worked out at all.`]);
+    if(MAP_TYPE==='systems'&&I.unassignedPolarityCount>0)
+      checks.push([`${plural(I.unassignedPolarityCount,'connection')} with no + or -`,
+        `A loop containing any of these cannot be called reinforcing or balancing, so it is listed as "not yet classifiable" rather than guessed.`]);
+    if(MAP_TYPE==='stakeholder'){
+      const missingAttrs=I.pool.filter(n=>!n.stakePower||!n.stakeInterest||!n.stakeStance).length;
+      if(missingAttrs>0)
+        checks.push([`${plural(missingAttrs,'stakeholder')} missing power, interest or stance`,
+          `Every stakeholder figure below counts only the ones that have been scored.`]);
+    }
+    if(!I.structureEligible&&I.pool.length>1)
+      checks.push([`Too few ${NOUN[1]} for the structural figures`,
+        `Brokers, choke points and bottlenecks need about ${MIN_STRUCTURE_NODES} ${NOUN[1]} before they say anything you could not see by looking.`]);
+    else if(!I.brokersMeaningful)
+      checks.push([`Very densely connected (${I.density}%)`,
+        `When nearly everything links to everything, nobody sits between anybody, so broker and bottleneck figures stop singling anyone out.`]);
+    // Only worth raising on a map that uses labels at all - otherwise it is
+    // nagging about a field this user has chosen not to use.
+    if(I.labelledLinks>0&&I.unlabelledLinks>0)
+      checks.push([`${plural(I.unlabelledLinks,'connection')} with no label`,
+        `${I.labelledLinks} of ${I.edgesCount} say what the connection is. The rest are counted but their meaning is not recorded.`]);
+
+    h += `<div style="margin-top:10px;border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;">`+
+      `<div style="font-size:10.5px;font-weight:700;letter-spacing:0.04em;color:var(--ink-h);">CAN I TRUST THIS MAP?</div>`+
+      (checks.length
+        ? checks.map(([t,d])=>`<div style="margin-top:6px;font-size:11.5px;line-height:1.45;"><strong>${t}</strong><div style="color:var(--ink-h);font-size:10.5px;">${d}</div></div>`).join('')
+        : `<div style="margin-top:4px;font-size:11px;color:var(--ink-h);line-height:1.45;">Nothing found that would bend the figures below: no stranded ${NOUN[1]}, one connected map, and enough of it to work with.</div>`)+
+      `</div>`;
+  }
   if(MAP_TYPE==='stakeholder'&&I.focus){
     const direct=I.pool.filter(n=>I.fD&&I.fD.get(n.id)===1).sort((a,b)=>I.total.get(b.id)-I.total.get(a.id));
     h += grp('focus',`Directly linked to ${esc(I.focus.label)}`,direct.length,
       direct.length ? direct.slice(0,10).map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('Nothing is linked to the centre yet.'));
   }
   if(MAP_TYPE==='stakeholder'){
-    const missingAttrs=I.pool.filter(n=>!n.stakePower||!n.stakeInterest||!n.stakeStance).length;
-    if(missingAttrs>0) h += `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--surf-3);font-size:11px;color:var(--ink-m);margin-bottom:6px;"><span>${plural(missingAttrs,'stakeholder')} ${missingAttrs===1?'is':'are'} missing power, interest or stance.</span><span style="color:var(--ink-h);">Open a node to set them</span></div>`;
+    const G=I.stakeGrid||{scored:0,unscored:0,manage:[],satisfy:[],inform:[],monitor:[]};
+    const basedOn=G.unscored?` Based on the ${G.scored} of ${I.pool.length} stakeholders scored so far.`:'';
+    // Who matters most: the whole power/interest grid, not one corner of it.
+    // Each box says what to DO, because that is the only reason to sort people
+    // into boxes at all.
+    if(!G.scored){
+      h += skipped('grid','Who matters most',
+        `Nobody on this map has power and interest set yet, so there is nothing to sort. Open a stakeholder and set both to see the power and interest grid.`);
+    } else {
+      const quad=(label,what,list)=>
+        `<div style="margin-top:4px;"><div style="font-size:10.5px;font-weight:700;color:var(--ink-m);padding:0 6px;">${label} <span style="font-weight:400;color:var(--ink-h);">${list.length}</span></div>`+
+        `<div style="font-size:10px;color:var(--ink-h);padding:0 6px 2px;">${what}</div>`+
+        (list.length?list.slice(0,6).map(n=>row(n,plural(I.total.get(n.id)||0,'connection'))).join('')
+                    :`<div style="color:var(--ink-h);font-size:10.5px;padding:1px 6px 3px;">Nobody.</div>`)+
+        (list.length>6?`<div style="color:var(--ink-h);font-size:10px;padding:0 6px 3px;">+${list.length-6} more</div>`:'')+
+        `</div>`;
+      h += grp('grid','Who matters most',G.scored,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Power against interest. Most connected first within each box.${basedOn}</div>`+
+        quad('High power, high interest','Work closely with these. The job lives or dies by them.',G.manage)+
+        quad('High power, low interest','Keep them satisfied. They can stop this, and will not see it coming.',G.satisfy)+
+        quad('Low power, high interest','Keep them informed. They care most and are heard least.',G.inform)+
+        quad('Low power, low interest','Light touch. Check now and then.',G.monitor));
+    }
 
-    h += grp('silentgiants','Silent giants',I.silentGiants.length,
-      I.silentGiants.length
-        ? `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">High power, low interest - a risk if surprised late.</div>`+I.silentGiants.map(n=>row(n,'')).join('')
-        : none('None found. Needs power and interest set on every stakeholder.'));
+    // Power, but not on side.
+    const stanceScored=I.pool.filter(n=>n.stakePower&&n.stakeStance).length;
+    if(!stanceScored){
+      h += skipped('notonside','Power, but not on side',
+        `No stakeholder has both power and a stance set, so there is nothing to check. Set where people stand to see who can block this.`);
+    } else {
+      h += grp('notonside','Power, but not on side',I.powerNotOnSide.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">High power, and sceptical or blocking. These are the people who can stop this.${stanceScored<I.pool.length?` Based on the ${stanceScored} with both set.`:''}</div>`+
+        (I.powerNotOnSide.length
+          ? I.powerNotOnSide.map(n=>row(n,n.stakeStance==='blocker'?'blocker':'sceptic')).join('')
+          : none(`Nobody with high power is currently sceptical or blocking.`)));
+    }
+
+    // High interest, little influence. Same box as the grid's "keep informed",
+    // surfaced on its own because it is the group most often left out of a plan.
+    if(G.scored){
+      h += grp('quietstake','High interest, little influence',I.highInterestLowPower.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">They care most about the outcome and have least say in it. Often the people the work is actually for.${basedOn}</div>`+
+        (I.highInterestLowPower.length
+          ? I.highInterestLowPower.map(n=>row(n,plural(I.total.get(n.id)||0,'connection'))).join('')
+          : none(`Nobody scored so far has high interest with low power.`)));
+    }
+
+    // Not yet engaged: three separate problems with three different answers.
+    const NE=I.notEngaged;
+    if(NE&&NE.total>0){
+      const part=(label,list,what)=>list.length
+        ? `<div style="margin-top:4px;"><div style="font-size:10.5px;font-weight:700;color:var(--ink-m);padding:0 6px;">${label} <span style="font-weight:400;color:var(--ink-h);">${list.length}</span></div>`+
+          `<div style="font-size:10px;color:var(--ink-h);padding:0 6px 2px;">${what}</div>`+
+          list.slice(0,6).map(n=>row(n,'')).join('')+
+          (list.length>6?`<div style="color:var(--ink-h);font-size:10px;padding:0 6px 3px;">+${list.length-6} more</div>`:'')+`</div>`
+        : '';
+      h += grp('notengaged','Not yet engaged',NE.total,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Nobody here is being worked with yet, for three different reasons.</div>`+
+        part('No connections at all',NE.unlinked,'On the map, but joined to nothing. Nobody has recorded a relationship.')+
+        part('Cannot be reached from the centre',NE.unreachable,'Linked to others, but no chain of links leads back to the centre of this map.')+
+        part('Not scored yet',NE.unscored,'Missing power, interest or stance, so they are left out of the figures above.'));
+    }
 
     if(I.gridlockRisks.length){
       h += grp('gridlock','Gridlock risks',I.gridlockRisks.length,
@@ -5043,13 +5411,43 @@ function renderInsights(){
       A.branches.length ? A.branches.map(b=>row(b.node,`${b.ev} evidence`)).join('') : none('No evidence linked yet.'));
   }
   if(MAP_TYPE==='systems'&&I.directedEdges){
-    if(I.unassignedPolarityCount>0){
-      h += `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--surf-3);font-size:11px;color:var(--ink-m);margin-bottom:6px;"><span>${plural(I.unassignedPolarityCount,'connection')} ${I.unassignedPolarityCount===1?'has':'have'} no + or - yet.</span><span style="color:var(--ink-h);">Loops can't be told apart without it</span></div>`;
+    // Root causes and outcomes in one card, with the rule that produced them
+    // written out. The previous pair ranked by arrow count, which answers "who
+    // is busiest" - a factor can be busy and still be caused by everything
+    // around it, so it was never a root cause in the sense people read it as.
+    {
+      const LIM=6;
+      const half=(label,what,list,rule,deg,unit)=>
+        `<div style="margin-top:4px;"><div style="font-size:10.5px;font-weight:700;color:var(--ink-m);padding:0 6px;">${label} <span style="font-weight:400;color:var(--ink-h);">${list.length}</span></div>`+
+        `<div style="font-size:10px;color:var(--ink-h);padding:0 6px 2px;">${what} <em>${rule}</em></div>`+
+        (list.length?list.slice(0,LIM).map(n=>row(n,`${deg.get(n.id)} ${unit}`)).join('')
+                    :`<div style="color:var(--ink-h);font-size:10.5px;padding:1px 6px 3px;">None.</div>`)+
+        (list.length>LIM?`<div style="color:var(--ink-h);font-size:10px;padding:0 6px 3px;">+${list.length-LIM} more</div>`:'')+
+        `</div>`;
+      h += grp('causes','Root causes and outcomes',I.rootCauses.length+I.finalOutcomes.length,
+        half('Root causes',
+          I.causeRule==='circular'?'Every factor here is caused by something else on the map.':'Nothing on this map explains these.',
+          I.rootCauses,
+          I.causeRule==='strict'?'No arrows point at them.'
+            :I.causeRule==='loose'?'Nothing here has zero causes, so these are the nearest thing: at most one cause, and they drive three or more.'
+            :'There is no starting point to pull on — the causes run in circles. Look at the feedback loops instead.',
+          I.outDeg,'out')+
+        half('Final outcomes',
+          I.outcomeRule==='circular'?'Every factor here leads on to something else.':'Nothing follows on from these.',
+          I.finalOutcomes,
+          I.outcomeRule==='strict'?'No arrows lead out of them.'
+            :I.outcomeRule==='loose'?'Nothing here is a dead end, so these are the nearest thing: at most one thing follows, and three or more feed in.'
+            :'There is no end point — every factor feeds something else.',
+          I.inDeg,'in'));
+      const sub=(label,list,deg,unit)=>
+        `<div style="margin-top:4px;"><div style="font-size:10.5px;font-weight:700;color:var(--ink-m);padding:0 6px 2px;">${label}</div>`+
+        (list.length?list.map(n=>row(n,`${deg.get(n.id)} ${unit}`)).join('')
+                    :`<div style="color:var(--ink-h);font-size:10.5px;padding:1px 6px 3px;">None.</div>`)+`</div>`;
+      h += grp('drivers','Busiest factors',null,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Being busy is not the same as being a root cause — these can be both cause and effect.</div>`+
+        sub('Influence the most',I.drivers,I.outDeg,'out')+
+        sub('Affected by the most',I.sinks,I.inDeg,'in'));
     }
-    h += grp('drivers','Drivers: most outgoing influence',null,
-      I.drivers.length ? I.drivers.map(n=>row(n,`${I.outDeg.get(n.id)} out`)).join('') : none('No arrows in this view.'));
-    h += grp('sinks','Most affected: incoming influence',null,
-      I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows in this view.'));
     _insightLoops=I.loops;
     const rbBadge=(cls)=>{
       if(!cls||cls.type==='unassigned') return '<span style="display:inline-block;min-width:16px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:var(--surf-3);color:var(--ink-h);" title="One or more connections in this loop have no polarity yet">?</span>';
@@ -5062,14 +5460,26 @@ function renderInsights(){
       const anyPin=I.loops.some(L=>_pinnedLoops.has(loopKey(L)));
       lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 6px;">${plural(rCount,'reinforcing loop')}, ${plural(bCount,'balancing loop')}${uCount?', '+plural(uCount,'loop')+' not yet classifiable (missing polarity)':''}.</div>`;
       lh += `<div style="display:flex;gap:6px;margin:2px 0 6px;"><button onclick="highlightAllLoops()" style="flex:1;font-size:10.5px;height:26px;">↻ Highlight all</button>${anyPin?`<button onclick="clearLoopPins()" style="font-size:10.5px;height:26px;padding:0 10px;">Clear</button>`:''}</div>`;
-      lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Click loops to highlight them. Click again to remove one.${I.loopsCapped?' Showing the first '+I.loops.length+'.':''}</div>`;
+      // Say exactly how much of the map was searched. "Showing the first 100"
+      // told the user nothing about what was missed; a depth they can check does.
+      const scopeLine=I.loopsComplete
+        ? `Searched every loop up to ${I.loopSearchDepth} steps. Longer loops are not listed.`
+        : (I.loopSearchDepth>=3
+            ? `Searched every loop up to ${I.loopSearchDepth} steps, then stopped: this map is too dense to find them all.`
+            : `The search stopped early: this map is too dense to find every loop.`);
+      const mergedCount=(I.loopVariants||[]).filter(v=>v>1).length;
+      lh += `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Click loops to highlight them. Click again to remove one.<br>${scopeLine}${mergedCount?` ${plural(mergedCount,'loop')} had near-identical versions, folded in.`:''}${I.loopsTruncated?` More than ${LOOP_LIST_MAX} different loops exist; showing the ${I.loops.length} shortest.`:''}</div>`;
       lh += I.loops.map((L,li)=>{
         const on=_pinnedLoops.has(loopKey(L));
         const lc=on?loopColourOf(_pinColourIdx.get(loopKey(L))||0,document.documentElement.getAttribute('data-theme')==='dark').col:'';
-        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span>${rbBadge(I.loopClass[li])}<span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span></span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
+        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span>${rbBadge(I.loopClass[li])}<span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span>${(I.loopVariants&&I.loopVariants[li]>1)?`<span style="color:var(--ink-h);" title="Near-identical loops differing by a node or two, shown as this one">+${I.loopVariants[li]-1} similar</span>`:''}</span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
       }).join('');
     } else lh += none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
-    h += grp('loops','Feedback loops',(I.loopsCapped?I.loops.length+'+':I.loops.length),lh);
+    if(I.pool.length>LOOP_NODE_CAP)
+      h += skipped('loops','Feedback loops',
+        `This map has ${plural(I.pool.length,'person')}. The loop search is not attempted above ${LOOP_NODE_CAP}, so this is not "no loops" — it was never worked out. Filter the map down to see them.`);
+    else
+      h += grp('loops','Feedback loops',(I.loopsTruncated?I.loops.length+'+':I.loops.length),lh);
 
     if(I.limitsToGrowth.length){
       let gh='';
@@ -5087,14 +5497,24 @@ function renderInsights(){
 
     const leverage=[...I.nodeLoopCount.entries()].filter(([id,c])=>c>=2).sort((a,b)=>b[1]-a[1]).slice(0,5);
     if(leverage.length){
+      // Always quote the denominator. "In 48 loops" on its own invites the reader
+      // to assume 48 of all the loops there are, when it is 48 of the ones searched.
+      const denom=I.loopsFoundTotal||0;
       h += grp('leverage','Structural leverage points',leverage.length,
-        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">In more than one feedback loop - a change here ripples furthest.</div>`+
-        leverage.map(([id,c])=>{ const n=I.pool.find(p=>p.id===id); return n?row(n,`in ${c} loops`):''; }).join(''));
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">In more than one feedback loop - a change here ripples furthest.${denom?` Counted over the ${denom} loop${denom===1?'':'s'} found up to ${I.loopSearchDepth} steps.`:''}</div>`+
+        leverage.map(([id,c])=>{ const n=I.pool.find(p=>p.id===id); return n?row(n,denom?`in ${c} of ${denom}`:`in ${c} loops`):''; }).join(''));
     }
   } else {
+    // When everything is tied, "most" and "fewest" sort to the same five names
+    // and the two cards contradict each other by saying opposite things about
+    // the same people. Show one card and say the connections are level instead.
+    const sameList=I.most.length&&I.most.length===I.least.length&&I.most.every((n,i)=>n.id===I.least[i].id);
+    const allLevel=I.pool.length>1&&new Set(I.pool.map(n=>I.total.get(n.id))).size===1;
     h += grp('most','Most connected',null,
-      I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.'));
-    h += grp('least','Fewest connections',null, I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') || none('None yet.'));
+      (allLevel?`<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Every ${NOUN[0]} here has the same number of connections, so nobody stands out.</div>`:'')+
+      (I.most.length ? I.most.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') : none('None yet.')));
+    if(!sameList)
+      h += grp('least','Fewest connections',null, I.least.map(n=>row(n,plural(I.total.get(n.id),'connection'))).join('') || none('None yet.'));
     // Stakeholder maps often set arrows too: who pushes influence out, and who takes it.
     if(MAP_TYPE==='stakeholder'&&I.directedEdges){
       h += grp('drivers','Driving: most influence out',null,
@@ -5105,17 +5525,28 @@ function renderInsights(){
         (I.sinks.length ? I.sinks.map(n=>row(n,`${I.inDeg.get(n.id)} in`)).join('') : none('No arrows point at anyone yet.')));
     }
   }
-  h += grp('bridges', MAP_TYPE==='systems' ? 'Choke points' : 'Critical nodes', I.bridges.length,
-    `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Removing one ${NOUN[0]} cuts others off.</div>`+
-    (I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none(`No single ${NOUN[0]} links separate groups.`)));
+  const brokerTitle=MAP_TYPE==='systems'?'Choke points':'Critical nodes';
+  if(structureWhy){
+    h += skipped('bridges',brokerTitle,structureWhy);
+  } else {
+    h += grp('bridges', brokerTitle, I.bridges.length,
+      `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">Removing one ${NOUN[0]} cuts others off.</div>`+
+      (I.bridges.length ? I.bridges.map(b=>row(b.node,`cuts off ${b.cutOff}`)).join('') : none(`Nothing hangs off a single ${NOUN[0]}: every part of this map stays joined up if any one ${NOUN[0]} goes.`)));
+  }
 
   if(MAP_TYPE!=='argument'){
-    h += grp('critlinks','Critical links',I.criticalLinks.length,
-      `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'The only route influence can take between two parts of the system - remove it and they split.':'The only connection between two parts of the map - remove it and they split.'}</div>`+
-      (I.criticalLinks.length ? I.criticalLinks.map(c=>`<div style="padding:4px 6px;font-size:11.5px;">${esc(c.a.label)} — ${esc(c.b.label)} <span style="color:var(--ink-h);">cuts off ${c.cutOff}</span></div>`).join('') : none('No single connection splits the map.')));
+    if(structureWhy){
+      h += skipped('critlinks','Critical links',structureWhy);
+    } else {
+      h += grp('critlinks','Critical links',I.criticalLinks.length,
+        `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'The only route influence can take between two parts of the system - remove it and they split.':'The only connection between two parts of the map - remove it and they split.'}</div>`+
+        (I.criticalLinks.length ? I.criticalLinks.map(c=>`<div style="padding:4px 6px;font-size:11.5px;">${esc(c.a.label)} — ${esc(c.b.label)} <span style="color:var(--ink-h);">cuts off ${c.cutOff}</span></div>`).join('') : none('No single connection holds two parts together: every part is reachable more than one way.')));
+    }
 
     if(I.betweennessCapped){
-      h += `<div style="font-size:10.5px;color:var(--ink-h);padding:4px 6px;">Bottleneck score skipped: map has more than 200 ${NOUN[1]}.</div>`;
+      h += skipped('bottleneck','Bottleneck score',`This map has ${plural(I.pool.length,'person')}. Working out who sits between everyone else takes too long above ${BETWEENNESS_CAP}, so it was not attempted. Filter the map down to see it.`);
+    } else if(structureWhy){
+      h += skipped('bottleneck','Bottleneck score',structureWhy);
     } else {
       h += grp('bottleneck','Bottleneck score',null,
         `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'Sits on the most paths between the other factors - influence has to pass through it.':MAP_TYPE==='stakeholder'?'Sits on the most routes between the other stakeholders - a gatekeeper even without being the most connected.':'Sits on the most paths between everyone else - a pinch point even without being the most connected.'}</div>`+
@@ -5159,6 +5590,9 @@ function renderInsights(){
   }
   h += grp('growth','Growth by year',null,yh);
 
+  // One caveat for the panel, not one per card. The point needs making once;
+  // repeated under fourteen cards in a 300px column it becomes wallpaper.
+  h += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bdr);font-size:10.5px;color:var(--ink-h);line-height:1.45;">These figures describe what is drawn on this map, not necessarily what is true on the ground. A ${NOUN[0]} nobody has added, or a connection nobody drew, cannot show up here.</div>`;
   h += `<div style="margin-top:10px;display:flex;justify-content:space-between;gap:6px;"><button onclick="renderInsights()" style="font-size:11px;height:26px;padding:0 10px;">Refresh</button><button onclick="openReport()" title="The matrix, strength and version views" style="font-size:11px;height:26px;padding:0 10px;">Full report</button></div>`;
   body.innerHTML=h;
 }
@@ -11245,33 +11679,74 @@ function knockNodeAlpha(n,base){
   if(!KNOCK) return base;
   return KNOCK.step.get(n.id)===3?0.25:base;
 }
+// What a change here reaches, and which way it pushes.
+//
+// This used to walk arrow-less links in BOTH directions, so on a map with no
+// arrows the "ripple" was just everything within three hops - an answer that
+// looked like causation and was not. It also ignored the +/- signs entirely, so
+// a chain of two minuses came out looking the same as a chain of two pluses.
+//
+// Now: only arrows are followed, so a map with no direction returns nothing and
+// says why. Signs multiply along each path, the way a causal chain actually
+// composes - two negatives make a positive. A factor reached by one path that
+// pushes it up and another that pushes it down is "mixed", which matters more
+// than either sign on its own: it is where an intervention fights itself.
+//
+// Direction only. Nothing here says how MUCH, because the map does not record
+// strengths and inventing them would be the most misleading thing it could do.
 function computeKnock(originId){
   const out=new Map();
-  const add=(from,to,i)=>{ if(!out.has(from)) out.set(from,[]); out.get(from).push({to,i}); };
+  const add=(from,to,i,sign)=>{ if(!out.has(from)) out.set(from,[]); out.get(from).push({to,i,sign}); };
+  let directed=0;
   edges.forEach((e,i)=>{
     const s=(e.source&&typeof e.source==='object')?e.source.id:e.source;
     const t=(e.target&&typeof e.target==='object')?e.target.id:e.target;
     if(s===t) return;
     const a=arrowOf(e);
-    if(a!=='backward') add(s,t,i);    // forward, both, and plain lines
-    if(a!=='forward')  add(t,s,i);    // backward, both, and plain lines
+    if(a==='none') return;                       // no arrow, no claim about cause
+    // 0 = sign not set on this link, so anything beyond it is direction-only
+    const sign=e.polarity==='positive'?1:e.polarity==='negative'?-1:0;
+    if(a!=='backward'){ add(s,t,i,sign); directed++; }
+    if(a!=='forward'){ add(t,s,i,sign); directed++; }
   });
-  const step=new Map([[originId,0]]), edgeStep=new Map();
+
+  // Breadth-first by steps. effect: 1 up, -1 down, 0 unknown (an unsigned link
+  // somewhere on the way), 'mixed' when both directions reach the same factor.
+  // One step of a path: compose this link's sign onto what the path carried so
+  // far. 'mixed' and 0 (unknown) both survive everything downstream of them -
+  // nothing further along can un-muddy a path that is already unclear.
+  const compose=(carried,sign)=>
+    carried==='mixed' ? 'mixed' :
+    (carried===0||sign===0) ? 0 : carried*sign;
+  // Two paths arriving at the same factor.
+  const reconcile=(a,b)=>{
+    if(a===b) return a;
+    if(a==='mixed'||b==='mixed') return 'mixed';
+    if(a===0||b===0) return 0;        // one path's sign is unknown
+    return 'mixed';                   // one pushes up, the other pushes down
+  };
+  const step=new Map([[originId,0]]), edgeStep=new Map(), effect=new Map([[originId,1]]);
   let frontier=[originId];
-  for(let k=1;k<=3&&frontier.length;k++){
+  for(let k=1;k<=KNOCK_MAX_STEPS&&frontier.length;k++){
     const next=[];
     frontier.forEach(u=>{
-      (out.get(u)||[]).forEach(({to,i})=>{
-        if(step.has(to)) return;
-        step.set(to,k); edgeStep.set(i,k); next.push(to);
+      const carried=effect.get(u);
+      (out.get(u)||[]).forEach(({to,i,sign})=>{
+        if(to===originId) return;
+        const here=compose(carried,sign);
+        if(!step.has(to)){ step.set(to,k); effect.set(to,here); next.push(to); }
+        else effect.set(to,reconcile(effect.get(to),here));
+        if(!edgeStep.has(i)) edgeStep.set(i,k);
       });
     });
     frontier=next;
   }
-  step.delete(originId);
-  const counts=[0,0,0,0];
-  step.forEach(k=>counts[k]++);
-  return {step,edgeStep,counts};
+  step.delete(originId); effect.delete(originId);
+  const counts=[0,0,0,0,0,0];
+  step.forEach(k=>{ if(k<counts.length) counts[k]++; });
+  let up=0,down=0,mixed=0,unknown=0;
+  effect.forEach(v=>{ if(v==='mixed') mixed++; else if(v===1) up++; else if(v===-1) down++; else unknown++; });
+  return {step,edgeStep,effect,counts,directed,totals:{up,down,mixed,unknown,all:step.size}};
 }
 function ctxMakeFocus(){
   const id=ctxMenuNodeId; closeNodeCtxMenu();
@@ -11287,18 +11762,32 @@ function ctxKnockOn(){
   highlightIds.add(id);
   r.step.forEach((k,nid)=>{ if(k===1) highlightIds.add(nid); else secondaryIds.add(nid); });
   r.edgeStep.forEach((k,i)=>{ if(k===1) highlightEdges.add(i); });
-  KNOCK={origin:id,label:n.label,step:r.step,edgeStep:r.edgeStep,counts:r.counts};
+  KNOCK={origin:id,label:n.label,step:r.step,edgeStep:r.edgeStep,counts:r.counts,
+         effect:r.effect,totals:r.totals,directed:r.directed};
   showKnockBanner();
   draw();
 }
 function showKnockBanner(){
   const el=document.getElementById('knock-banner');
   if(!el||!KNOCK) return;
-  const [,d1,d2,d3]=KNOCK.counts;
   const name=escHtml(KNOCK.label);
-  const body=(d1+d2+d3)
-    ? `<strong>Ripple from ${name}:</strong>&nbsp;${d1} direct &middot; ${d2} at step 2 &middot; ${d3} at step 3`
-    : `<strong>${name}</strong> has no arrows leading out to follow.`;
+  const T=KNOCK.totals||{up:0,down:0,mixed:0,unknown:0,all:0};
+  let body;
+  if(!KNOCK.directed){
+    // The old version followed arrow-less links both ways and called the result
+    // a ripple. Saying nothing is the honest answer when nothing has a direction.
+    body=`<strong>Nothing to follow from ${name}.</strong> No connection on this map has an arrow, so there is no way to tell what affects what.`;
+  } else if(!T.all){
+    body=`<strong>${name}</strong> has no arrows leading out, so nothing downstream of it is recorded.`;
+  } else {
+    const bits=[];
+    if(T.up) bits.push(`${T.up} pushed up`);
+    if(T.down) bits.push(`${T.down} pushed down`);
+    if(T.mixed) bits.push(`${T.mixed} mixed`);
+    if(T.unknown) bits.push(`${T.unknown} direction only`);
+    body=`<strong>If ${name} rises:</strong>&nbsp;${bits.join(' &middot; ')}`
+       +`<span style="color:var(--ink-h);">&nbsp;within ${KNOCK_MAX_STEPS} steps</span>`;
+  }
   el.innerHTML=`<span>${body}</span><span style="color:var(--ink-h);margin-left:4px;">Esc clears</span>`;
   el.style.display='flex';
 }
