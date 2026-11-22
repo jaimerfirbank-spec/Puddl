@@ -518,7 +518,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 #hover-panel{
   position:absolute;
   top:12px;right:66px;
-  width:340px;max-width:calc(100% - 90px);max-height:min(520px,calc(100% - 70px));
+  width:clamp(220px,28vw,290px);max-width:calc(100% - 90px);max-height:min(420px,calc(100% - 70px));
   background:var(--surf);
   border:1px solid var(--bdr);
   border-radius:var(--radius-lg);
@@ -530,9 +530,12 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   font-family:'DM Sans',sans-serif;
 }
 #hover-panel.visible{opacity:1;pointer-events:auto;}
-#hover-panel .sp-value{word-break:break-word;font-size:12.5px;line-height:1.4;}
-#hover-panel .sp-label{font-size:10px;margin-bottom:1px;}
-#hover-panel .sp-field{margin-bottom:6px;}
+#hover-panel .sp-value{word-break:break-word;font-size:12px;line-height:1.4;}
+#hover-panel .sp-label{font-size:9.5px;margin-bottom:1px;}
+#hover-panel .sp-field{margin-bottom:5px;}
+#hover-panel .hp-row{display:flex;gap:8px;align-items:baseline;margin-bottom:3px;}
+#hover-panel .hp-k{flex:0 0 66px;font-size:10px;color:var(--ink-h);}
+#hover-panel .hp-v{flex:1;min-width:0;font-size:12px;color:var(--ink);word-break:break-word;line-height:1.35;}
 #hover-panel.docked{
   opacity:1;pointer-events:auto;top:0;right:0;bottom:42px;
   width:clamp(320px,33vw,520px);max-width:none;max-height:none;
@@ -549,17 +552,17 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 #hover-panel-footer button{pointer-events:auto;cursor:pointer;}
 #hover-panel-header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:7px 11px 6px;
+  padding:6px 10px 5px;
   border-bottom:1px solid var(--bdr);flex-shrink:0;
   background:var(--surf);
 }
 #hover-panel-title{
-  font-size:15px;font-weight:700;color:var(--ink);
+  font-size:14px;font-weight:700;color:var(--ink);
   flex:1;min-width:0;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;
   letter-spacing:-0.02em;
 }
-#hover-panel-body{overflow-y:auto;padding:7px 11px 5px;}
+#hover-panel-body{overflow-y:auto;padding:6px 10px 4px;}
 #hover-panel-footer{
   display:flex;gap:6px;padding:5px 10px;
   border-top:1px solid var(--bdr);flex-shrink:0;
@@ -6461,7 +6464,7 @@ function renderHoverPanel(n){
   FIELD_DEFS.forEach(f=>{
     const v=n.customFields&&n.customFields[f.id];
     if(v!==undefined&&v!==null&&String(v).trim()!=='')
-      html+=`<div class="sp-field"><div class="sp-label">${escHtml(f.name)}</div><div class="sp-value" style="white-space:pre-wrap;">${escHtml(v)}</div></div>`;
+      html+=`<div class="hp-row"><span class="hp-k">${escHtml(f.name)}</span><span class="hp-v" style="white-space:pre-wrap;">${escHtml(v)}</span></div>`;
   });
 
   if(!isCentre){
@@ -6535,30 +6538,26 @@ function renderHoverPanel(n){
       return s===n.id||t===n.id;
     });
     if(conns.length){
-      // Grouped by strength, names as small tags side by side, so a busy node does not run off the screen.
-      // Strongest first; past ten the rest fold behind "Show all".
+      // One line of counts, then the strongest few as small tags. The rest sit behind "more".
       const rank={strong:0,moderate:1,weak:2};
       const list=conns.map(e=>{
         const s=typeof e.source==='object'?e.source.id:e.source;
         const t=typeof e.target==='object'?e.target.id:e.target;
         return {other:nodes.find(nd=>nd.id===(s===n.id?t:s)),strength:e.strength||'moderate'};
       }).filter(x=>x.other).sort((x,y)=>(rank[x.strength]??3)-(rank[y.strength]??3)||String(x.other.label).localeCompare(String(y.other.label)));
-      const LIMIT=8, expanded=_hpConnAll.has(n.id), foldable=list.length>LIMIT+2;
+      const LIMIT=5, expanded=_hpConnAll.has(n.id), foldable=list.length>LIMIT+1;
       const shown=(expanded||!foldable)?list:list.slice(0,LIMIT);
-      html+=`<div class="sp-field"><div class="sp-label">Connections (${list.length})</div>`;
-      const order=['strong','moderate','weak'];
-      [...order,...[...new Set(list.map(x=>x.strength))].filter(k=>!order.includes(k))].forEach(k=>{
-        const all=list.filter(x=>x.strength===k); if(!all.length) return;
-        const mine=shown.filter(x=>x.strength===k); if(!mine.length) return;
+      const counts=['strong','moderate','weak'].map(k=>{
+        const c=list.filter(x=>x.strength===k).length; if(!c) return '';
         const st=CONNECTION_STYLES.find(x=>x.id===k), col=st?hexFromColour(st.colour):'#888';
-        html+=`<div style="margin-top:5px;"><div style="font-size:12px;font-weight:600;color:var(--ink-m);border-left:3px solid ${col};padding-left:7px;">${escHtml(st?st.label:k)} <span style="font-weight:500;color:var(--ink-h);">${all.length}</span></div><div style="display:flex;flex-wrap:wrap;margin-top:2px;">`;
-        mine.forEach(x=>{
-          html+=`<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;margin:2px 4px 0 0;border-radius:20px;font-size:12px;color:var(--ink);background:var(--surf-3);border:1px solid var(--bdr);max-width:100%;"><span style="width:7px;height:7px;border-radius:50%;background:${x.other.colour||'#ddd'};flex-shrink:0;"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(x.other.label)}</span></span>`;
-        });
-        html+=`</div></div>`;
+        return `<span style="white-space:nowrap;"><span style="display:inline-block;width:8px;height:3px;border-radius:2px;background:${col};vertical-align:middle;margin-right:3px;"></span>${c} ${k}</span>`;
+      }).filter(Boolean).join(' &nbsp;');
+      html+=`<div class="sp-field" style="margin-top:6px;"><div style="font-size:12px;font-weight:600;color:var(--ink);">${list.length} connection${list.length===1?'':'s'}</div><div style="font-size:10.5px;color:var(--ink-m);margin-top:1px;">${counts}</div><div style="display:flex;flex-wrap:wrap;margin-top:3px;">`;
+      shown.forEach(x=>{
+        html+=`<span style="display:inline-flex;align-items:center;gap:4px;padding:1px 7px 1px 5px;margin:2px 3px 0 0;border-radius:20px;font-size:11px;color:var(--ink);background:var(--surf-3);border:1px solid var(--bdr);max-width:100%;"><span style="width:6px;height:6px;border-radius:50%;background:${x.other.colour||'#ddd'};flex-shrink:0;"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(x.other.label)}</span></span>`;
       });
-      if(foldable) html+=`<button onclick="hpToggleConns(${n.id})" style="margin-top:7px;font-size:12px;height:28px;padding:0 12px;">${expanded?'Show fewer':`Show all ${list.length} (${list.length-LIMIT} more)`}</button>`;
-      html+=`</div>`;
+      if(foldable) html+=`<button onclick="hpToggleConns(${n.id})" style="margin:2px 0 0;font-size:11px;height:22px;padding:0 9px;border-radius:20px;">${expanded?'Show fewer':`+${list.length-LIMIT} more`}</button>`;
+      html+=`</div></div>`;
     }
 
     // Shared by (combined mode)
@@ -6571,7 +6570,7 @@ function renderHoverPanel(n){
 
   // Notes
   const notes=n.notes||(currentMapMode!=='team'?(n.pNotesIndividual||n.pNotesOrganisation||n.pNotesProject||n.pNotesMeeting||''):'');
-  if(notes) html+=`<div class="sp-field"><div class="sp-label">Notes</div><div class="sp-value" style="white-space:pre-wrap;line-height:1.5;">${notes}</div></div>`;
+  if(notes) html+=`<div class="sp-field"><div class="sp-label">Notes</div><div class="sp-value" style="white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;" title="${escHtml(String(notes))}">${notes}</div></div>`;
 
   // Tags
   if(n.tags&&n.tags.length){
@@ -6586,22 +6585,16 @@ function renderHoverPanel(n){
     html+=`<div class="sp-field" style="background:#fff8e6;border-radius:var(--radius);padding:6px 8px;border:1px solid #E09000;margin-top:6px;"><div style="font-size:12.5px;color:#7a4e00;">⏰ Not updated for ${days} days</div></div>`;
   }
 
-  // History timeline
-  if(n.history&&n.history.length){
-    html+=`<div class="sp-field" style="margin-top:8px;">
-      <div class="sp-label" style="margin-bottom:5px;">Timeline</div>
-      <div style="border-left:2px solid var(--bdr);padding-left:10px;display:flex;flex-direction:column;gap:4px;">`;
-    n.history.slice(0,5).forEach(h=>{
-      const d=new Date(h.ts);
-      const ds=d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'});
-      html+=`<div style="position:relative;">
-        <div style="position:absolute;left:-14px;top:4px;width:6px;height:6px;border-radius:50%;background:var(--bdr-m);border:1.5px solid var(--surf);"></div>
-        <div style="font-size:11.5px;color:var(--ink-h);font-weight:600;">${ds}</div>
-        <div style="font-size:12px;color:var(--ink-m);">${h.text}</div>
-      </div>`;
+  // History: only genuine changes. "Imported from spreadsheet" says nothing worth a hover.
+  const _hist=(n.history||[]).filter(h=>!/^imported from/i.test(String(h.text||'')));
+  if(_hist.length){
+    html+=`<div class="sp-field" style="margin-top:4px;"><div class="sp-label">Latest</div>`;
+    _hist.slice(0,2).forEach(h=>{
+      const ds=new Date(h.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'});
+      html+=`<div style="font-size:11px;color:var(--ink-m);line-height:1.35;"><span style="color:var(--ink-h);font-weight:600;">${ds}</span> ${h.text}</div>`;
     });
-    if(n.history.length>5) html+=`<div style="font-size:11.5px;color:var(--ink-h);font-style:italic;">+${n.history.length-5} earlier entries</div>`;
-    html+=`</div></div>`;
+    if(_hist.length>2) html+=`<div style="font-size:10.5px;color:var(--ink-h);font-style:italic;">+${_hist.length-2} earlier</div>`;
+    html+=`</div>`;
   }
 
   if(!html) html=`<div style="color:var(--ink-h);font-size:12px;padding:4px 0;">No details yet — click Edit to add.</div>`;
