@@ -4528,7 +4528,12 @@ function syncSecBadges(){
   const db=document.getElementById('sec-dates-badge'); if(db) db.style.display=dates?'inline-block':'none';
 }
 function computeInsights(){
-  const people=nodes.filter(n=>n.type!=='centre');
+  // When the timeline is set to a date, count the map as it stood on that date: anything the
+  // timeline is hiding is left out, so the figures move as the map grows.
+  const _asAt=!!DATE_ASAT;
+  const _nById=new Map(nodes.map(n=>[n.id,n]));
+  const _dateOut=(e,a,b)=>_asAt&&edgeHiddenByDate(e,_nById.get(a),_nById.get(b));
+  const people=nodes.filter(n=>n.type!=='centre'&&!(_asAt&&_dateHidden.has(n.id)));
   // Pinned feedback loops are a highlight, not a filter: they don't narrow the insights
   const _pins=highlightIds.pins;
   const filtered=_pins?[...highlightIds].some(id=>!_pins.has(id)):highlightIds.size>0;
@@ -4539,7 +4544,7 @@ function computeInsights(){
   edges.forEach(e=>{
     const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
     const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
-    if(a===b||!inPool.has(a)||!inPool.has(b)) return;
+    if(a===b||!inPool.has(a)||!inPool.has(b)||_dateOut(e,a,b)) return;
     adj.get(a).add(b); adj.get(b).add(a); edgesIn.push(e);
   });
   const deg=new Map(pool.map(n=>[n.id,adj.get(n.id).size]));
@@ -4549,7 +4554,7 @@ function computeInsights(){
   edges.forEach(e=>{
     const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
     const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
-    if(a===b||!peopleIds.has(a)||!peopleIds.has(b)) return;
+    if(a===b||!peopleIds.has(a)||!peopleIds.has(b)||_dateOut(e,a,b)) return;
     if(totalAdj.has(a)) totalAdj.get(a).add(b);
     if(totalAdj.has(b)) totalAdj.get(b).add(a);
   });
@@ -5261,7 +5266,7 @@ function renderInsights(){
 
   let h = I.filtered
     ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--surf-3);font-size:11.5px;"><span><strong>Filtered view:</strong> ${plural(I.pool.length,'person')}</span><button onclick="clearSearch()" style="font-size:10.5px;height:24px;padding:0 8px;">Show full map</button></div>`
-    : `<div style="font-size:11.5px;color:var(--ink-h);">Full map: ${plural(I.pool.length,'person')}. Search or filter to look at part of it.</div>`;
+    : `<div style="font-size:11.5px;color:var(--ink-h);">${DATE_ASAT?'Map as it stood on '+esc(DATE_ASAT)+':':'Full map:'} ${plural(I.pool.length,'person')}. Search or filter to look at part of it.</div>`;
   h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these ${NOUN[1]}. ${plural(I.isolated,'person')} with none.${MAP_TYPE!=='argument'?` ${I.density}% of possible connections exist.`:''}</div>`;
 
   const S=insightSummaryLines(I);
