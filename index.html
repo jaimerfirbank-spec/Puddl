@@ -6566,6 +6566,8 @@ function clearSearch(){
   });
   _insOpen={}; try{ localStorage.setItem('puddl-ins-open','{}'); }catch(e){}
 }
+// A different or brand-new map should not inherit the last one's open dropdowns or filters
+function freshMapPanels(){ try{ clearSearch(); }catch(e){} }
 function clearHighlight(){
   clearKnock();
   if(typeof revertLoopCircle==='function') revertLoopCircle();
@@ -6937,6 +6939,7 @@ function confirmPuddlImport(){
     const now=Date.now();
     if(d.nodes) d.nodes.forEach(n=>{ n.lastUpdated=now; });
     restoreSnap(JSON.stringify(d));
+    freshMapPanels();
     restoreNodeImages();
     saveState(); markUnsaved(); draw();
     addLog('Imported Puddle map (replace): '+(d.mapTitle||'untitled'));
@@ -8470,6 +8473,7 @@ function confirmImport(){
   // --- Replace mode: clear canvas first ---
   if(_importMode==='replace'){
     nodes.length=0; edges.length=0; loops.length=0; idCtr=0;
+    freshMapPanels();
   }
   if(!MAP_NOUN){
     const _ni=(_importCurrentMapping.cols||[]).findIndex(c=>c.role==='name');
@@ -12137,6 +12141,7 @@ function confirmWho(){
     return;
   }
   mapTitle=name;
+  if(nodes.length===0) freshMapPanels();
   const hdr=document.getElementById('header-project-name');
   if(hdr) hdr.textContent=name;
   const mtd=document.getElementById('map-title-display');
@@ -13911,6 +13916,7 @@ function _executeReset(){
   // Now wipe everything
   nodes.length=0; edges.length=0; loops.length=0;
   idCtr=0; history=[]; historyIdx=-1;
+  freshMapPanels();
   bgImg=null;
   const bgDataEl=document.getElementById('bg-image-data');
   if(bgDataEl) bgDataEl.textContent='';
@@ -15856,6 +15862,7 @@ async function cloudOpenMap(id){
   try {
     if (typeof saveState === 'function') saveState();   // so Ctrl+Z gets back
     restoreSnap(JSON.stringify(data.data));
+    freshMapPanels();
     // restoreSnap() never touches zoom/pan - whatever view was on screen
     // before (a different map's layout) would otherwise carry over. Fit this
     // map's own nodes to the screen, same as a freshly opened file.
