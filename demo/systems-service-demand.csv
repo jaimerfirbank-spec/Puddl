@@ -1,0 +1,24 @@
+Name,Connected to,Arrow,Polarity
+Quality of Care,Reputation,forward,+
+Reputation,Referrals,forward,+
+Referrals,Caseload,forward,+
+Caseload,Waiting Times,forward,+
+Waiting Times,Reputation,forward,-
+Caseload,Staff Workload,forward,+
+Staff Workload,Burnout,forward,+
+Burnout,Sickness Absence,forward,+
+Sickness Absence,Staff Capacity,forward,-
+Staff Capacity,Staff Workload,forward,-
+Staff Capacity,Quality of Care,forward,+
+Staff Workload,Quality of Care,forward,-
+Funding,Staff Capacity,forward,+
+Caseload,Funding,forward,+
+Waiting Times,Drop-outs,forward,+
+Drop-outs,Caseload,forward,-
+Training,Quality of Care,forward,+
+Burnout,Morale,forward,-
+Morale,Burnout,forward,-
+Morale,Quality of Care,forward,
+Volunteers,Staff Workload,forward,-
+Referral Criteria,Referrals,forward,+
+Quality of Care,Complaints,forward,-

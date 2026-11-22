@@ -3226,6 +3226,10 @@ function computeInsights(){
   if(MAP_TYPE==='systems'){
     const edgeByPair=new Map();
     edgesIn.forEach(e=>{
+      // A loop drawn by hand adds drawing-aid lines with no arrow and no sign. When one
+      // runs against a real signed link it must not replace it, or a loop that can be
+      // classified is reported as "not yet classifiable".
+      if(e.isLoop&&arrowOf(e)==='none') return;
       const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
       const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
       edgeByPair.set(a+'|'+b,e); edgeByPair.set(b+'|'+a,e);

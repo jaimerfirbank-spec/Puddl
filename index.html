@@ -4813,6 +4813,10 @@ function computeInsights(){
   if(MAP_TYPE==='systems'){
     const edgeByPair=new Map();
     edgesIn.forEach(e=>{
+      // A loop drawn by hand adds drawing-aid lines with no arrow and no sign. When one
+      // runs against a real signed link it must not replace it, or a loop that can be
+      // classified is reported as "not yet classifiable".
+      if(e.isLoop&&arrowOf(e)==='none') return;
       const a=(e.source&&typeof e.source==='object')?e.source.id:e.source;
       const b=(e.target&&typeof e.target==='object')?e.target.id:e.target;
       edgeByPair.set(a+'|'+b,e); edgeByPair.set(b+'|'+a,e);
@@ -7018,8 +7022,8 @@ function importArrowOf(raw){
 function importPolarityOf(raw){
   const t=String(raw==null?'':raw).trim().toLowerCase();
   if(!t) return '';
-  if(['+','positive','pos','p','same','s','increases','increase','plus','reinforcing'].includes(t)) return 'positive';
-  if(['-','−','–','—','negative','neg','n','opposite','o','decreases','decrease','minus','balancing'].includes(t)) return 'negative';
+  if(['+','+1','positive','pos','p','same','s','increases','increase','plus','reinforcing'].includes(t)) return 'positive';
+  if(['-','−','–','—','-1','−1','negative','neg','n','opposite','o','decreases','decrease','minus','balancing'].includes(t)) return 'negative';
   return '';
 }
 function _importGuessRole(h,nameTaken){
@@ -7675,11 +7679,33 @@ function _showImportSummaryScreen(plan){
   if(normalEdgeCount)
     html+=row('🔗',`Up to ${normalEdgeCount} connection${normalEdgeCount!==1?'s':''} will be added`,
       'Duplicate connections are skipped');
+  // One line per pair of things: a connection written the other way round to one
+  // earlier in the file is left out. On a systems map that can be a different
+  // claim with a different sign (A raises B, B lowers A), so say which one.
+  let _backSigned=0;
+  {
+    const seenDir=new Set(), skippedBack=[];
+    plan.toAddEdges.forEach(e=>{
+      if(e.isMainConn||unm.has(e)) return;
+      const a=String(e.fromName).trim().toLowerCase(), b=String(e.toName).trim().toLowerCase();
+      if(a===b) return;
+      if(seenDir.has(b+'>'+a)&&!seenDir.has(a+'>'+b)) skippedBack.push(e);
+      seenDir.add(a+'>'+b);
+    });
+    _backSigned=skippedBack.filter(e=>e.polarity).length;
+    if(skippedBack.length){
+      const sign=e=>e.polarity==='positive'?' (+)':e.polarity==='negative'?' (-)':'';
+      const list=skippedBack.slice(0,6).map(e=>`${escHtml(e.fromName)} → ${escHtml(e.toName)}${sign(e)}`).join(', ')+(skippedBack.length>6?`, +${skippedBack.length-6} more`:'');
+      html+=row('⚠️',`${skippedBack.length} connection${skippedBack.length!==1?'s':''} go${skippedBack.length===1?'es':''} the opposite way to one already in the file`,
+        `Puddl keeps one line between any two things, so only the first is kept. Left out: ${list}. If both directions matter, set the line to two-way after importing.`);
+    }
+  }
   if(plan.mainConnCount>0)
     html+=row('🎯',`${plan.mainConnCount} node${plan.mainConnCount!==1?'s':''} will connect to "${plan.mainNodeName}"`,
       'Based on "Connected to main node" column');
-  if(plan.polaritySet>0)
-    html+=row('±',`${plan.polaritySet} connection${plan.polaritySet!==1?'s':''} will get a + or -`,
+  const _polN=plan.polaritySet-_backSigned;
+  if(_polN>0)
+    html+=row('±',`${_polN} connection${_polN!==1?'s':''} will get a + or -`,
       MAP_TYPE==='systems'
         ? 'Needed to tell reinforcing loops from balancing ones. A signed connection with no arrow is read in the direction it was written.'
         : 'Read as alliance (+) or friction (-) between two stakeholders.');
