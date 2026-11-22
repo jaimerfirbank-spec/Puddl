@@ -517,7 +517,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
 #hover-panel{
   position:absolute;
   top:12px;right:66px;
-  width:340px;max-width:calc(100% - 90px);max-height:calc(100% - 70px);
+  width:340px;max-width:calc(100% - 90px);max-height:min(520px,calc(100% - 70px));
   background:var(--surf);
   border:1px solid var(--bdr);
   border-radius:var(--radius-lg);
@@ -529,13 +529,15 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   font-family:'DM Sans',sans-serif;
 }
 #hover-panel.visible{opacity:1;pointer-events:auto;}
-#hover-panel .sp-value{word-break:break-word;}
+#hover-panel .sp-value{word-break:break-word;font-size:12.5px;line-height:1.4;}
+#hover-panel .sp-label{font-size:10px;margin-bottom:1px;}
+#hover-panel .sp-field{margin-bottom:6px;}
 #hover-panel.docked{
   opacity:1;pointer-events:auto;top:0;right:0;bottom:42px;
   width:clamp(320px,33vw,520px);max-width:none;max-height:none;
   border-radius:0;border-top:none;border-right:none;box-shadow:var(--shadow-xl);
 }
-#hover-panel.docked #hover-panel-title{font-size:13.5px;}
+#hover-panel.docked #hover-panel-title{font-size:15.5px;}
 #hover-panel.docked #hover-panel-body{padding:8px 12px 6px;}
 .zoom-btns{transition:right .2s ease;}
 #canvas-area.hp-docked .zoom-btns{right:calc(clamp(320px,33vw,520px) + 14px);}
@@ -551,7 +553,7 @@ canvas#bg{position:absolute;top:0;left:0;width:100%;height:100%;cursor:default;}
   background:var(--surf);
 }
 #hover-panel-title{
-  font-size:13px;font-weight:700;color:var(--ink);
+  font-size:15px;font-weight:700;color:var(--ink);
   flex:1;min-width:0;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;
   letter-spacing:-0.02em;
@@ -14963,6 +14965,11 @@ function hideHoverPanel(immediate){
 
 
 
+const _hpConnAll=new Set();
+function hpToggleConns(id){
+  if(_hpConnAll.has(id)) _hpConnAll.delete(id); else _hpConnAll.add(id);
+  const n=nodes.find(x=>x.id===id); if(n) renderHoverPanel(n);
+}
 function renderHoverPanel(n){
   const isCentre=n.type==='centre';
   document.getElementById('hover-panel-title').textContent=n.label;
@@ -15061,17 +15068,29 @@ function renderHoverPanel(n){
       return s===n.id||t===n.id;
     });
     if(conns.length){
-      html+=`<div class="sp-field"><div class="sp-label">Connections (${conns.length})</div>`;
-      conns.forEach(e=>{
+      // Grouped by strength, names as small tags side by side, so a busy node does not run off the screen.
+      // Strongest first; past ten the rest fold behind "Show all".
+      const rank={strong:0,moderate:1,weak:2};
+      const list=conns.map(e=>{
         const s=typeof e.source==='object'?e.source.id:e.source;
         const t=typeof e.target==='object'?e.target.id:e.target;
-        const otherId=s===n.id?t:s;
-        const other=nodes.find(nd=>nd.id===otherId);
-        if(other){
-          const ec=other.colour||'#ddd';
-          html+=`<div style="display:flex;align-items:center;gap:5px;padding:2px 0;border-bottom:1px solid var(--bdr);"><span style="width:7px;height:7px;border-radius:50%;background:${ec};flex-shrink:0;"></span><span style="font-size:11px;color:var(--ink);">${other.label}</span><span style="font-size:9px;color:var(--ink-h);margin-left:auto;">${e.strength||'moderate'}</span></div>`;
-        }
+        return {other:nodes.find(nd=>nd.id===(s===n.id?t:s)),strength:e.strength||'moderate'};
+      }).filter(x=>x.other).sort((x,y)=>(rank[x.strength]??3)-(rank[y.strength]??3)||String(x.other.label).localeCompare(String(y.other.label)));
+      const LIMIT=8, expanded=_hpConnAll.has(n.id), foldable=list.length>LIMIT+2;
+      const shown=(expanded||!foldable)?list:list.slice(0,LIMIT);
+      html+=`<div class="sp-field"><div class="sp-label">Connections (${list.length})</div>`;
+      const order=['strong','moderate','weak'];
+      [...order,...[...new Set(list.map(x=>x.strength))].filter(k=>!order.includes(k))].forEach(k=>{
+        const all=list.filter(x=>x.strength===k); if(!all.length) return;
+        const mine=shown.filter(x=>x.strength===k); if(!mine.length) return;
+        const st=CONNECTION_STYLES.find(x=>x.id===k), col=st?hexFromColour(st.colour):'#888';
+        html+=`<div style="margin-top:5px;"><div style="font-size:12px;font-weight:600;color:var(--ink-m);border-left:3px solid ${col};padding-left:7px;">${escHtml(st?st.label:k)} <span style="font-weight:500;color:var(--ink-h);">${all.length}</span></div><div style="display:flex;flex-wrap:wrap;margin-top:2px;">`;
+        mine.forEach(x=>{
+          html+=`<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;margin:2px 4px 0 0;border-radius:20px;font-size:12px;color:var(--ink);background:var(--surf-3);border:1px solid var(--bdr);max-width:100%;"><span style="width:7px;height:7px;border-radius:50%;background:${x.other.colour||'#ddd'};flex-shrink:0;"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(x.other.label)}</span></span>`;
+        });
+        html+=`</div></div>`;
       });
+      if(foldable) html+=`<button onclick="hpToggleConns(${n.id})" style="margin-top:7px;font-size:12px;height:28px;padding:0 12px;">${expanded?'Show fewer':`Show all ${list.length} (${list.length-LIMIT} more)`}</button>`;
       html+=`</div>`;
     }
 
@@ -15097,7 +15116,7 @@ function renderHoverPanel(n){
   // Stale warning
   if(n.lastUpdated&&isNodeStale(n)){
     const days=Math.round((Date.now()-n.lastUpdated)/(1000*60*60*24));
-    html+=`<div class="sp-field" style="background:#fff8e6;border-radius:var(--radius);padding:6px 8px;border:1px solid #E09000;margin-top:6px;"><div style="font-size:11px;color:#7a4e00;">⏰ Not updated for ${days} days</div></div>`;
+    html+=`<div class="sp-field" style="background:#fff8e6;border-radius:var(--radius);padding:6px 8px;border:1px solid #E09000;margin-top:6px;"><div style="font-size:12.5px;color:#7a4e00;">⏰ Not updated for ${days} days</div></div>`;
   }
 
   // History timeline
@@ -15110,11 +15129,11 @@ function renderHoverPanel(n){
       const ds=d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'});
       html+=`<div style="position:relative;">
         <div style="position:absolute;left:-14px;top:4px;width:6px;height:6px;border-radius:50%;background:var(--bdr-m);border:1.5px solid var(--surf);"></div>
-        <div style="font-size:10px;color:var(--ink-h);font-weight:600;">${ds}</div>
-        <div style="font-size:10px;color:var(--ink-m);">${h.text}</div>
+        <div style="font-size:11.5px;color:var(--ink-h);font-weight:600;">${ds}</div>
+        <div style="font-size:12px;color:var(--ink-m);">${h.text}</div>
       </div>`;
     });
-    if(n.history.length>5) html+=`<div style="font-size:10px;color:var(--ink-h);font-style:italic;">+${n.history.length-5} earlier entries</div>`;
+    if(n.history.length>5) html+=`<div style="font-size:11.5px;color:var(--ink-h);font-style:italic;">+${n.history.length-5} earlier entries</div>`;
     html+=`</div></div>`;
   }
 
