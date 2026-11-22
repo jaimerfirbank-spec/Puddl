@@ -2432,6 +2432,17 @@ function selectConnColour(col){
           </select>
         </div>
         <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">What each item is</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">The word Puddle uses for the things on your map, in Insights and in reports.</p>
+          <select id="settings-map-noun" onchange="setMapNoun(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);">
+            <option value="">The default for this map type</option>
+            <option value="person">People</option>
+            <option value="organisation">Organisations</option>
+            <option value="service">Services</option>
+            <option value="item">Items</option>
+          </select>
+        </div>
+        <div style="margin-bottom:24px;">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Large map display</h4>
           <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Maps with 300 nodes or more get darker nodes, smaller nodes and thinner connections so they stay readable. Simple drawing uses small squares and straight lines from 600 nodes, so very large maps stay smooth.</p>
           <div style="font-size:12px;font-weight:600;color:var(--ink);margin:12px 0 4px 0;">Node contrast</div>
@@ -2642,6 +2653,7 @@ let dragGroupInit=null;   // Shift-drag: {id:{x,y}} for the node and its direct 
 let panDragging=false,panSX=0,panSY=0,panPX=0,panPY=0;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
+let MAP_NOUN='';                  // '' = the default word for the map type; or 'person', 'organisation', 'service', 'item'
 let SHOW_MERGE_MARKS=true;        // the small two-circle badge on nodes that were merged on import
 let FIELD_DEFS=[];
 // Dates: nodes/connections may carry n.date / e.date as 'YYYY-MM-DD'. Undated items always show.
@@ -3099,6 +3111,7 @@ function snap(){
     simpleMode:SIMPLE_MODE,
     showNodeLabels:showNodeLabels,
     mapType:MAP_TYPE,
+    mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
@@ -3166,6 +3179,8 @@ function restoreSnap(s){
   NODE_SIZE_MODE=['auto','always','never'].includes(d.nodeSizeMode)?d.nodeSizeMode:'auto';
   NODE_RING=d.nodeRing===true;
   MAP_TYPE=MAP_TYPES.includes(d.mapType)?d.mapType:'general';
+  MAP_NOUN=['person','organisation','service','item'].includes(d.mapNoun)?d.mapNoun:'';
+  { const _mn=document.getElementById('settings-map-noun'); if(_mn) _mn.value=MAP_NOUN; }
   updateHeaderMapType();
   if(MAP_TYPE==='argument'){
     ensureArgStyles();
@@ -5153,6 +5168,8 @@ function argumentAnalysis(pool){
           offTree:claims.length?pool.filter(n=>n.argPart&&!seen.has(n.id)):[]};
 }
 function mapNounPack(){
+  const _o={person:['person','people'],organisation:['organisation','organisations'],service:['service','services'],item:['item','items']}[MAP_NOUN];
+  if(_o) return _o;
   return MAP_TYPE==='network'?['person','people']:MAP_TYPE==='systems'?['factor','factors']:MAP_TYPE==='stakeholder'?['stakeholder','stakeholders']:MAP_TYPE==='argument'?['point','points']:['node','nodes'];
 }
 function mapTypeLabel(){
@@ -5283,6 +5300,22 @@ function renderInsights(){
   // 'choke' (it and what hangs off it), 'group' (the whole linked group it belongs to)
   const row=(n,right,kind)=>{ const k=kind||'node'; const on=_on(`${k}:${n.id}`);
     return `<div onclick="focusInsight('${k}','${esc(n.id)}')" title="${_tip(on)}" style="display:flex;justify-content:space-between;gap:8px;${_clickRowStyle(on)}" ${_hoverAttrs(on)}><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(n.label)}</span><span style="color:var(--ink-h);flex-shrink:0;">${right}</span></div>`; };
+  if(_insOpen.findings===undefined) _insOpen.findings=true;
+  const F=MAP_TYPE==='argument'?{list:[],hints:[],grp:null}:computeFindings(I);
+  _findings=F.list;
+  const _findingsCard=()=>{
+    if(!F.list.length&&!F.hints.length) return '';
+    const showAll=!!_insOpen.findingsAll, shown=showAll?F.list:F.list.slice(0,7);
+    let inner=shown.map((f,i)=>{
+      const on=_on('finding:'+f.id), col=_FINDING_TAG_COL[f.tag]||'#64748B';
+      return `<div onclick="focusFinding(${i})" title="${_tip(on)}" style="padding:7px 8px;margin:3px 0;border-radius:8px;cursor:pointer;border-left:3px solid ${col};${on?'background:var(--surf-3);':''}" ${_hoverAttrs(on)}><div style="font-size:9.5px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:${col};">${esc(f.tag)}</div><div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.4;margin-top:1px;">${esc(f.text)}</div>${(f.evidence||f.note)?`<div style="font-size:11px;color:var(--ink-h);line-height:1.4;margin-top:2px;">${esc(f.evidence||'')}${f.note?' '+esc(f.note):''}</div>`:''}</div>`;
+    }).join('');
+    if(F.list.length>7) inner+=`<button onclick="toggleFindingsAll()" style="font-size:10.5px;height:24px;padding:0 9px;margin:4px 0 2px;">${showAll?'Show fewer':'Show all '+F.list.length}</button>`;
+    if(F.grp&&F.grp.cands&&F.grp.cands.length>=2) inner+=`<div style="font-size:10.5px;color:var(--ink-h);margin-top:8px;">Comparing groups by <select onchange="setFindingsGroup(this.value)" style="font-size:10.5px;height:22px;max-width:150px;"><option value="">Automatic (${esc(F.grp.name)})</option>${F.grp.cands.map(c=>`<option value="${esc(c.id)}"${FINDINGS_GROUP_FIELD===c.id?' selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`;
+    else if(F.grp) inner+=`<div style="font-size:10.5px;color:var(--ink-h);margin-top:8px;">Comparing groups by <strong>${esc(F.grp.name)}</strong></div>`;
+    inner+=F.hints.map(t=>`<div style="font-size:10.5px;color:var(--ink-h);margin-top:6px;line-height:1.4;">${esc(t)}</div>`).join('');
+    return grp('findings','What this map tells you',F.list.length||null,inner);
+  };
   const _focusBar=()=>_insightFocus
     ? `<div style="margin-top:8px;padding:7px 8px;border-radius:8px;background:var(--surf-3);font-size:11.5px;line-height:1.45;"><div><strong>Lit up:</strong> ${esc(_insightFocus.label)}</div><div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap;"><button onclick="clearInsightFocus()" style="font-size:10.5px;height:24px;padding:0 9px;">Clear</button><button onclick="toggleInsightNext()" style="font-size:10.5px;height:24px;padding:0 9px;">${_insightShowNext?'Hide':'Show'} what is next to it</button></div></div>`
     : `<div style="font-size:10.5px;color:var(--ink-h);margin-top:6px;">Click any name or link in the lists below to light it up on the map.</div>`;
@@ -5295,8 +5328,9 @@ function renderInsights(){
   h += _focusBar();
   h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these ${NOUN[1]}. ${plural(I.isolated,'person')} with none.${MAP_TYPE!=='argument'?` ${I.density}% of possible connections exist.`:''}</div>`;
 
+  h += _findingsCard();
   const S=insightSummaryLines(I);
-  if(S.length) h += `<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--ink);background:var(--surf-2);border-radius:6px;font-size:11.5px;line-height:1.55;">${S.map(t=>`<div style="margin:2px 0;">${esc(t)}</div>`).join('')}</div>`;
+  if(S.length&&!F.list.length) h += `<div style="margin-top:8px;padding:8px 10px;border-left:3px solid var(--ink);background:var(--surf-2);border-radius:6px;font-size:11.5px;line-height:1.55;">${S.map(t=>`<div style="margin:2px 0;">${esc(t)}</div>`).join('')}</div>`;
 
   if(I.filtered) h += `<div style="font-size:10.5px;color:var(--ink-h);margin-top:4px;">Lists show each ${NOUN[0]}'s total connections across the whole map.</div>`;
 
@@ -5698,8 +5732,8 @@ function _pinMsg(){
 // lists keep covering the whole map instead of narrowing to whatever was clicked.
 function _pk(a,b){ a=String(a); b=String(b); return a<b?a+'|'+b:b+'|'+a; }
 function _eEnd(e,k){ const v=e[k]; return (v&&typeof v==='object')?v.id:v; }
-function _insGraph(){
-  const pool=_insCache.pool||[];
+function _insGraph(poolIn){
+  const pool=poolIn||_insCache.pool||[];
   const ids=new Set(pool.map(n=>n.id));
   const nById=new Map(nodes.map(n=>[n.id,n]));
   const adj=new Map(pool.map(n=>[n.id,new Set()]));
@@ -5739,8 +5773,8 @@ function _insNext(adj,set){
   set.forEach(u=>(adj.get(u)||[]).forEach(v=>{ if(!set.has(v)) out.add(v); }));
   return out;
 }
-function focusInsight(kind,ref){
-  const G=_insGraph(), adj=G.adj;
+function _focusFor(kind,ref,Gin){
+  const G=Gin||_insGraph(), adj=G.adj;
   const lab=id=>{ const n=G.nById.get(id); return n?n.label:String(id); };
   const nodeId=()=>{ const n=nodes.find(x=>String(x.id)===String(ref)); return (n&&adj.has(n.id))?n.id:null; };
   let f=null;
@@ -5785,13 +5819,23 @@ function focusInsight(kind,ref){
        label:kind==='out'?`${lab(v)}: influence going out`:(kind==='in'?`${lab(v)}: influence coming in`:lab(v)),
        ids:new Set([v]),pairs,sec:new Set(N)};
   }
+  return f;
+}
+function focusInsight(kind,ref){ const f=_focusFor(kind,ref); if(f) _applyFocus(f); }
+// f: {key,label,ids,pairs,sec} and, for a finding about a moment in time, setDate to move the timeline there
+function _applyFocus(f){
   if(_insightFocus&&_insightFocus.key===f.key){ clearInsightFocus(); return; }   // click again to let go
-  _insightFocus={key:f.key,label:f.label,ids:[...f.ids],pairs:[...f.pairs],sec:[...f.sec]};
+  const before=_insightFocus?_insightFocus.restoreAt:undefined;
+  let restoreAt=before;
+  if(f.setDate!==undefined){ if(restoreAt===undefined) restoreAt=DATE_ASAT||null; setDateAsAt(f.setDate); }
+  _insightFocus={key:f.key,label:f.label,ids:[...f.ids],pairs:[...f.pairs],sec:[...(f.sec||[])],restoreAt};
   _afterPinChange(`${f.label} lit up. Click it again, or press Clear, to put the map back.`);
 }
 function clearInsightFocus(){
   if(!_insightFocus) return;
+  const back=_insightFocus.restoreAt;
   _insightFocus=null;
+  if(back!==undefined) setDateAsAt(back||null);          // a finding that moved the timeline puts it back
   _afterPinChange('Highlight cleared.');
 }
 function toggleInsightNext(){
@@ -5819,6 +5863,424 @@ function syncMergeMarksUI(){
   const a=document.getElementById('btn-mergemarks-show'), b=document.getElementById('btn-mergemarks-hide');
   if(a){ a.style.background=SHOW_MERGE_MARKS?'var(--ink)':''; a.style.color=SHOW_MERGE_MARKS?'var(--surf)':''; }
   if(b){ b.style.background=!SHOW_MERGE_MARKS?'var(--ink)':''; b.style.color=!SHOW_MERGE_MARKS?'var(--surf)':''; }
+}
+
+// ── Findings: what the map says, in plain words ──────────────────────────────────
+// The lists in Insights count and rank. These say what the counts mean, one sentence each, with the
+// numbers behind it, and clicking one lights up what it is about. A finding only appears when the data
+// backs it up, and the card says what is missing when it cannot say more.
+let FINDINGS_GROUP_FIELD=null;   // field to compare groups by; null picks one automatically
+let _findings=[];                // what is on screen now, so a click can find its finding
+
+function _fieldVal(n,f){ const v=n.customFields&&n.customFields[f.id]; return (v===undefined||v===null||String(v).trim()==='')?'':String(v).trim(); }
+function _fieldStats(pool,f){
+  const counts={}; let filled=0;
+  pool.forEach(n=>{ const v=_fieldVal(n,f); if(v){ filled++; counts[v]=(counts[v]||0)+1; } });
+  return {f,counts,filled,k:Object.keys(counts).length};
+}
+// What to sort the map into groups by: a field with a handful of values, filled in for most items
+// How well a way of sorting items into groups explains where the connections are: the share of
+// connections that stay inside a group, beyond what chance would give. Near 0 means no pattern.
+function _modularity(of,linkList,byId){
+  let L=0; const within={}, tot={};
+  linkList.forEach(([a,b])=>{
+    const ga=of(byId.get(a)), gb=of(byId.get(b)); if(!ga||!gb) return;
+    L++; tot[ga]=(tot[ga]||0)+1; tot[gb]=(tot[gb]||0)+1; if(ga===gb) within[ga]=(within[ga]||0)+1;
+  });
+  if(L<10) return 0;
+  let q=0; Object.keys(tot).forEach(g=>{ q+=(within[g]||0)/L-Math.pow(tot[g]/(2*L),2); });
+  return q;
+}
+function _findingsGrouping(pool,linkList){
+  const need=Math.max(6,Math.ceil(pool.length*0.6));
+  const cands=FIELD_DEFS.map(f=>_fieldStats(pool,f)).filter(c=>c.filled>=need&&c.k>=2&&c.k<=12);
+  const list=cands.map(c=>({id:c.f.id,name:c.f.name}));
+  let c=null;
+  if(FINDINGS_GROUP_FIELD) c=cands.find(x=>x.f.id===FINDINGS_GROUP_FIELD)||null;
+  if(!c&&linkList&&linkList.length>=10){            // the grouping that best explains where the connections are
+    const byId=new Map(pool.map(n=>[n.id,n])); let bq=0.05;
+    cands.forEach(x=>{ if(x.k<3) return; const q=_modularity(n=>_fieldVal(n,x.f),linkList,byId); if(q>bq){ bq=q; c=x; } });
+  }
+  if(!c) c=cands.find(x=>x.k>=3&&x.k<=10&&/sector|categor|type|theme|kind|group|area/i.test(x.f.name))||null;
+  if(!c) c=[...cands].filter(x=>x.k>=3&&x.k<=8).sort((a,b)=>b.filled-a.filled||Math.abs(a.k-5)-Math.abs(b.k-5))[0]||null;
+  if(c) return {name:c.f.name,fieldId:c.f.id,of:n=>_fieldVal(n,c.f),counts:c.counts,k:c.k,cands:list};
+  const cc={}; let filled=0;
+  pool.forEach(n=>{ if(n.colourLabel){ filled++; cc[n.colourLabel]=(cc[n.colourLabel]||0)+1; } });
+  const k=Object.keys(cc).length;
+  if(filled>=need&&k>=2&&k<=12) return {name:'Category',fieldId:null,of:n=>n.colourLabel||'',counts:cc,k,cands:list};
+  return null;
+}
+function _groupWord(name){ const w=String(name||'').trim().toLowerCase(); return /^[a-z]+$/.test(w)?w:'group'; }
+function _groupPlural(name){ const w=_groupWord(name); return w==='group'?'groups':(/y$/.test(w)?w.slice(0,-1)+'ies':(/s$/.test(w)?w:w+'s')); }
+function _q(v){ return '\u201c'+v+'\u201d'; }
+function _pairKey(a,b){ a=String(a); b=String(b); return a<b?a+'\u0001'+b:b+'\u0001'+a; }
+function _monthLabel(d){ try{ return new Date(d+'T12:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'}); }catch(e){ return d; } }
+function _addDays(s,n){ const d=new Date(s+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _monthEnds(lo,hi){
+  const out=[]; let y=+lo.slice(0,4), m=+lo.slice(5,7)-1;
+  const hy=+hi.slice(0,4), hm=+hi.slice(5,7)-1;
+  for(let guard=0;guard<240;guard++){
+    const last=new Date(y,m+1,0);
+    out.push(last.getFullYear()+'-'+String(last.getMonth()+1).padStart(2,'0')+'-'+String(last.getDate()).padStart(2,'0'));
+    if(y===hy&&m===hm) break;
+    m++; if(m>11){ m=0; y++; }
+  }
+  return out;
+}
+// The map as it stood on a date, using the same rules as the timeline, without disturbing it
+function _withDate(d,fn){
+  const keep=DATE_ASAT, hid=new Set(_dateHidden);
+  try{ DATE_ASAT=d||null; recomputeDateHidden(); return fn(); }
+  finally{ DATE_ASAT=keep; _dateHidden.clear(); hid.forEach(x=>_dateHidden.add(x)); }
+}
+function _snapAt(d,only){
+  return _withDate(d,()=>{
+    const ppl=nodes.filter(n=>n.type!=='centre'&&!(d&&_dateHidden.has(n.id))&&(!only||only.has(n.id)));
+    const ids=new Set(ppl.map(n=>n.id)), nById=new Map(nodes.map(n=>[n.id,n]));
+    const adj=new Map(ppl.map(n=>[n.id,new Set()])), links=[], seen=new Set();
+    edges.forEach(e=>{
+      const a=_eEnd(e,'source'), b=_eEnd(e,'target');
+      if(a===b||!ids.has(a)||!ids.has(b)) return;
+      if(d&&edgeHiddenByDate(e,nById.get(a),nById.get(b))) return;
+      const k=_pk(a,b); if(seen.has(k)) return; seen.add(k);
+      adj.get(a).add(b); adj.get(b).add(a); links.push([a,b]);
+    });
+    return {ppl,adj,links,nById};
+  });
+}
+function _metrics(S,grp){
+  let iso=0; const isoIds=[];
+  S.ppl.forEach(n=>{ if(!S.adj.get(n.id).size){ iso++; isoIds.push(n.id); } });
+  const seen=new Set(); let pieces=0;
+  S.ppl.forEach(n=>{
+    if(seen.has(n.id)||!S.adj.get(n.id).size) return;
+    pieces++; const st=[n.id]; seen.add(n.id);
+    while(st.length){ const u=st.pop(); S.adj.get(u).forEach(v=>{ if(!seen.has(v)){ seen.add(v); st.push(v); } }); }
+  });
+  let cross=0, measured=0; const pairs=new Map();
+  if(grp) S.links.forEach(([a,b])=>{
+    const ga=grp.of(S.nById.get(a)), gb=grp.of(S.nById.get(b));
+    if(!ga||!gb) return;
+    measured++;
+    if(ga!==gb){ cross++; const k=_pairKey(ga,gb); pairs.set(k,(pairs.get(k)||0)+1); }
+  });
+  return {n:S.ppl.length,links:S.links.length,iso,isoIds,pieces,cross,measured,pairs};
+}
+// The map month by month, from the first date on it to the last
+function _timeSeries(grp,only){
+  const range=mapDateRange();
+  if(!range||range.lo.slice(0,7)===range.hi.slice(0,7)) return null;
+  let pts=_monthEnds(range.lo,range.hi);
+  if(pts.length>36){ const step=Math.ceil(pts.length/36); pts=pts.filter((p,i)=>i%step===0||i===pts.length-1); }
+  return pts.map(d=>Object.assign({d},_metrics(_snapAt(d,only),grp)));
+}
+
+function computeFindings(I){
+  const pool=I.pool||[];
+  const NOUN=mapNounPack(), ns=NOUN[0], np=NOUN[1];
+  const noun=k=>`${k} ${k===1?ns:np}`;
+  const list=[], hints=[];
+  const N=pool.length;
+  const G=_insGraph(pool), adj=G.adj;
+  const linkList=[], seen=new Set();
+  adj.forEach((s,a)=>s.forEach(b=>{ const k=_pk(a,b); if(!seen.has(k)){ seen.add(k); linkList.push([a,b]); } }));
+  const L=linkList.length;
+  if(N<8||L<8) return {list,hints:['This map is still small. Findings start to appear once about ten items are connected.'],grp:null,series:null,G,linkList};
+  const lab=id=>{ const n=G.nById.get(id); return n?n.label:String(id); };
+  const deg=id=>adj.has(id)?adj.get(id).size:0;
+  const names=(ids,k)=>{ const a=[...ids].map(lab); return a.slice(0,k).join(', ')+(a.length>k?` and ${a.length-k} more`:''); };
+  const edgesOf=(v,nb)=>[...nb].map(x=>_pk(v,x));
+  const add=(id,tag,text,evidence,focusFn,note)=>list.push({id,tag,text,evidence,note,focus:()=>Object.assign({},focusFn(),{key:'finding:'+id})});
+  const grp=MAP_TYPE==='argument'?null:_findingsGrouping(pool,linkList);
+  const gw=grp?_groupWord(grp.name):'', gp=grp?_groupPlural(grp.name):'';
+  const only=_selectionActive()?new Set(nodes.filter(n=>highlightIds.has(n.id)).map(n=>n.id)):null;   // the selection, if there is one
+  const series=_timeSeries(grp,only);
+  const thenRow=series?series.find(r=>r.links>=15):null;
+  const nowRow=series?series[series.length-1]:null;
+  const gOf=id=>grp?grp.of(G.nById.get(id)):'';
+
+  // 1. How much the connections cross the lines between groups, then and now
+  if(grp&&series&&thenRow&&thenRow!==nowRow&&thenRow.measured>=15&&nowRow.measured>=15){
+    const a=thenRow.cross/thenRow.measured, b=nowRow.cross/nowRow.measured, pa=Math.round(100*a), pb=Math.round(100*b);
+    const focusCross=()=>{ const cr=linkList.filter(([x,y])=>gOf(x)&&gOf(y)&&gOf(x)!==gOf(y)); const ids=new Set(); cr.forEach(([x,y])=>{ ids.add(x); ids.add(y); });
+                           return {label:`Connections that cross ${gw} lines`,ids,pairs:cr.map(([x,y])=>_pk(x,y)),sec:[]}; };
+    const grew=nowRow.cross>=2*thenRow.cross&&nowRow.cross-thenRow.cross>=5;
+    if(b-a>=0.10) add('mixing','Change over time',
+        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections crossed a ${gw} line. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
+        `${thenRow.cross} of ${thenRow.measured} connections then, ${nowRow.cross} of ${nowRow.measured} now. Connections across ${gp} are where joined-up working shows.`,focusCross);
+    else if(grew) add('mixing','Change over time',
+        `Connections across ${gp} grew from ${thenRow.cross} to ${nowRow.cross}.`,
+        `${thenRow.cross} of ${thenRow.measured} connections in ${_monthLabel(thenRow.d)}, ${nowRow.cross} of ${nowRow.measured} in ${_monthLabel(nowRow.d)}. The map as a whole grew faster, so their share went from ${pa}% to ${pb}%.`,focusCross);
+    else if(a-b>=0.10) add('mixing','Change over time',
+        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections crossed a ${gw} line. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
+        `${thenRow.cross} of ${thenRow.measured} connections then, ${nowRow.cross} of ${nowRow.measured} now. More of the connecting is now happening inside one ${gw}.`,focusCross);
+  }
+  // 2. Two groups that started to connect, preferring the pair that began by going through one item
+  if(grp&&series&&thenRow&&thenRow!==nowRow){
+    const S0=_snapAt(thenRow.d,only), per=new Map();
+    S0.links.forEach(([x,y])=>{
+      const gx=grp.of(S0.nById.get(x)), gy=grp.of(S0.nById.get(y)); if(!gx||!gy||gx===gy) return;
+      const k=_pairKey(gx,gy); if(!per.has(k)) per.set(k,{m0:0,occ:new Map()});
+      const r=per.get(k); r.m0++; r.occ.set(x,(r.occ.get(x)||0)+1); r.occ.set(y,(r.occ.get(y)||0)+1);
+    });
+    let best=null;
+    nowRow.pairs.forEach((c1,k)=>{
+      const r=per.get(k), c0=r?r.m0:0;
+      if(c0<2||c1<5||c1<2*c0) return;
+      let bro=null; r.occ.forEach((c,id)=>{ if(!bro||c>bro.c) bro={id,c}; });
+      const share=bro?bro.c/c0:0, cand={k,c0,c1,bro,share,through:share>=0.66};
+      if(!best||(cand.through&&!best.through)||(cand.through===best.through&&(c1-c0)>(best.c1-best.c0))) best=cand;
+    });
+    if(best){
+      const [A,B]=best.k.split('\u0001');
+      add('broker','Change over time',
+        `Connections between ${_q(A)} and ${_q(B)} grew from ${best.c0} to ${best.c1}.`,
+        best.through?`In ${_monthLabel(thenRow.d)}, ${best.bro.c===best.c0?'all '+best.c0:best.bro.c+' of the '+best.c0} ran through ${lab(best.bro.id)}.`:`From ${_monthLabel(thenRow.d)} to ${_monthLabel(nowRow.d)}.`,
+        ()=>{ const cr=linkList.filter(([x,y])=>gOf(x)&&gOf(y)&&_pairKey(gOf(x),gOf(y))===best.k); const ids=new Set(); cr.forEach(([x,y])=>{ ids.add(x); ids.add(y); });
+              return {label:`Connections between ${_q(A)} and ${_q(B)}`,ids,pairs:cr.map(([x,y])=>_pk(x,y)),sec:[]}; });
+    }
+  }
+  // 3. Items with no connection at all, at the worst point
+  if(series&&nowRow){
+    let peak=null; series.forEach(r=>{ if(!peak||r.iso>peak.iso) peak=r; });
+    if(peak&&peak!==nowRow&&peak.iso>=3&&peak.iso>nowRow.iso){
+      add('isolation','Change over time',
+        `In ${_monthLabel(peak.d)}, ${noun(peak.iso)} had no connection${peak.pieces>1?` and the map was in ${peak.pieces} separate pieces`:''}.`,
+        `By ${_monthLabel(nowRow.d)}: ${nowRow.iso===0?'every one is connected':noun(nowRow.iso)+' still with none'}, and the map is ${nowRow.pieces===1?'one piece':nowRow.pieces+' pieces'}.`,
+        ()=>({label:`${_monthLabel(peak.d)}: ${noun(peak.iso)} with no connection`,ids:peak.isoIds,pairs:[],sec:[],setDate:peak.d}),'Click to see the map as it was.');
+    }
+  }
+  // 4. One item the rest depends on
+  const br=(I.bridges||[]).slice().sort((a,b)=>b.cutOff-a.cutOff);
+  if(br.length&&br[0].cutOff>=Math.max(3,Math.round(N*0.03))){
+    const top=br[0], f0=_focusFor('choke',top.node.id,G);
+    if(f0){
+      const cut=[...f0.ids].filter(x=>x!==top.node.id);
+      add('single','Who holds it together',
+        `${top.node.label} is the only thing holding ${noun(top.cutOff)} to the rest.`,
+        `Take it out and ${names(cut,3)} ${cut.length===1?'is':'are'} cut off.`,
+        ()=>f0);
+    }
+  }
+  // 5. How much of the map runs through a few items
+  const byDeg=[...pool].sort((a,b)=>deg(b.id)-deg(a.id)||String(a.label).localeCompare(String(b.label)));
+  const touching=S=>linkList.filter(([x,y])=>S.has(x)||S.has(y)).length;
+  const top2=new Set(byDeg.slice(0,2).map(n=>n.id)), top5=new Set(byDeg.slice(0,5).map(n=>n.id));
+  const p2=Math.round(100*touching(top2)/L), p5=Math.round(100*touching(top5)/L);
+  if(L>=20&&(p2>=15||p5>=30)){
+    const use2=p2>=15, set=use2?top2:top5;
+    add('concentration','Who holds it together',
+      use2?`${lab(byDeg[0].id)} and ${lab(byDeg[1].id)} are in ${p2}% of all connections.`:`The five best connected are in ${p5}% of all connections.`,
+      use2?`The five best connected are in ${p5}%.`:names(set,5)+'.',
+      ()=>{ const pairs=[], sec=new Set(); set.forEach(v=>adj.get(v).forEach(x=>{ pairs.push(_pk(v,x)); if(!set.has(x)) sec.add(x); }));
+            return {label:use2?`${lab(byDeg[0].id)} and ${lab(byDeg[1].id)}`:'The five best connected',ids:set,pairs,sec}; });
+  }
+  // 6. People served by several items that are not connected to each other
+  const gaps=[];
+  FIELD_DEFS.forEach(f=>{
+    if(grp&&grp.fieldId===f.id) return;
+    const st=_fieldStats(pool,f);
+    if(st.filled<Math.max(6,Math.ceil(N*0.6))||st.k<2||st.k>40) return;
+    const byVal={}; pool.forEach(n=>{ const v=_fieldVal(n,f); if(v) (byVal[v]=byVal[v]||[]).push(n.id); });
+    Object.entries(byVal).forEach(([v,ids])=>{
+      if(ids.length<4||ids.length>15||/^(n\/?a|none|unknown|other|-+)$/i.test(v)) return;
+      const set=new Set(ids); let lk=0;
+      ids.forEach(a=>adj.get(a).forEach(b=>{ if(set.has(b)&&String(a)<String(b)) lk++; }));
+      const poss=ids.length*(ids.length-1)/2;
+      const alone=ids.filter(a=>![...adj.get(a)].some(b=>set.has(b))).length;
+      if(lk/poss<=0.2&&alone>=Math.ceil(ids.length/2)) gaps.push({f,v,ids,set,lk,alone});
+    });
+  });
+  gaps.sort((a,b)=>(b.alone/b.ids.length)-(a.alone/a.ids.length)||b.ids.length-a.ids.length);
+  gaps.slice(0,2).forEach((g,gi)=>{
+    const serve=/serve|audience|client|beneficiar|target/i.test(g.f.name);
+    const head=serve?`${g.ids.length} ${np} serve “${g.v}”`:`${g.ids.length} ${np} are listed under “${g.v}” (${g.f.name})`;
+    const tail=g.lk===0?'and none of them is connected to another.':(g.lk===1?'and only one connection joins any two of them.':`and only ${g.lk} connections join any of them.`);
+    add('gap'+gi,'Gaps',`${head}, ${tail}`,
+      g.lk===0?'':`${g.alone} of the ${g.ids.length} ${g.alone===1?'is':'are'} not connected to any of the others.`,
+      ()=>{ const pairs=[], sec=new Set(); g.ids.forEach(a=>adj.get(a).forEach(b=>{ if(g.set.has(b)) pairs.push(_pk(a,b)); else sec.add(b); }));
+            return {label:`${g.v}: ${g.ids.length} ${np}`,ids:g.set,pairs,sec}; });
+  });
+  // 7. Two groups that barely connect
+  if(grp&&grp.k>=3){
+    const sizes=grp.counts, vals=Object.keys(sizes).filter(v=>sizes[v]>=5), cross=new Map();
+    linkList.forEach(([x,y])=>{ const gx=gOf(x), gy=gOf(y); if(!gx||!gy||gx===gy) return; const k=_pairKey(gx,gy); if(!cross.has(k)) cross.set(k,[]); cross.get(k).push([x,y]); });
+    let best=null;
+    for(let i=0;i<vals.length;i++) for(let j=i+1;j<vals.length;j++){
+      const c=(cross.get(_pairKey(vals[i],vals[j]))||[]).length, size=sizes[vals[i]]+sizes[vals[j]];
+      if(c<=2&&(!best||c<best.c||(c===best.c&&size>best.size))) best={A:vals[i],B:vals[j],c,size};
+    }
+    if(best){
+      const links=cross.get(_pairKey(best.A,best.B))||[];
+      add('thin','Gaps',
+        best.c===0?`${_q(best.A)} and ${_q(best.B)} have no connection to each other.`:(best.c===1?`${_q(best.A)} and ${_q(best.B)} are joined by a single connection.`:`${_q(best.A)} and ${_q(best.B)} are joined by just two connections.`),
+        best.c===0?`${sizes[best.A]} ${np} in one and ${sizes[best.B]} in the other.`:links.map(([x,y])=>`${lab(x)} to ${lab(y)}`).join(' and ')+'.',
+        ()=>{ const ids=new Set(); if(best.c===0){ pool.forEach(n=>{ const g=grp.of(n); if(g===best.A||g===best.B) ids.add(n.id); }); } else links.forEach(([x,y])=>{ ids.add(x); ids.add(y); });
+              return {label:`${_q(best.A)} and ${_q(best.B)}`,ids,pairs:links.map(([x,y])=>_pk(x,y)),sec:[]}; });
+    }
+  }
+  // 8. The one item that reaches across most groups
+  if(grp&&grp.k>=3){
+    const reach=new Map();
+    pool.forEach(n=>{ const s=new Set(); const g0=grp.of(n); if(g0) s.add(g0); adj.get(n.id).forEach(x=>{ const g=gOf(x); if(g) s.add(g); }); reach.set(n.id,s.size); });
+    const r=[...reach.entries()].sort((a,b)=>b[1]-a[1]);
+    if(r.length>1&&r[0][1]>=3&&r[0][1]>r[1][1]&&(r[0][1]===grp.k||r[0][1]>=r[1][1]+2)){
+      const [lid,r1]=r[0], r2=r[1][1];
+      add('reach','Who holds it together',
+        r1===grp.k?`${lab(lid)} is the only ${ns} that reaches all ${grp.k} ${gp}.`:`${lab(lid)} reaches ${r1} of the ${grp.k} ${gp}.`,
+        `No other ${ns} reaches more than ${r2}.`,
+        ()=>({label:lab(lid),ids:[lid],pairs:edgesOf(lid,adj.get(lid)),sec:[...adj.get(lid)]}));
+    }
+  }
+  // 9. Items hanging by one connection
+  const single=pool.filter(n=>deg(n.id)===1);
+  if(single.length>=5&&single.length/N>=0.08){
+    let where='';
+    if(grp){ const c={}; single.forEach(n=>{ const g=grp.of(n); if(g) c[g]=(c[g]||0)+1; }); const t=Object.entries(c).sort((a,b)=>b[1]-a[1])[0]; if(t&&t[1]>=2) where=`The most, ${t[1]}, are in ${t[0]}.`; }
+    add('hanging','Gaps',`${single.length} of ${N} ${np} hang off a single connection.`,where,
+      ()=>{ const ids=new Set(single.map(n=>n.id)), pairs=[], sec=new Set(); single.forEach(n=>adj.get(n.id).forEach(x=>{ pairs.push(_pk(n.id,x)); sec.add(x); }));
+            return {label:`${single.length} ${np} with one connection`,ids,pairs,sec}; });
+  }
+  // 10. Whether new connections are speeding up or slowing down
+  if(series){
+    const ds=[]; edges.forEach(e=>{ const ea=_eEnd(e,'source'), eb=_eEnd(e,'target'); if(only&&!(only.has(ea)&&only.has(eb))) return; const d=edgeDateOf(e,G.nById.get(ea),G.nById.get(eb)); if(d) ds.push(d); });
+    if(ds.length>=20){
+      const hi=ds.reduce((a,b)=>a>b?a:b), t1=_addDays(hi,-90), t2=_addDays(hi,-180);
+      const w1=ds.filter(d=>d>t1).length, w2=ds.filter(d=>d>t2&&d<=t1).length;
+      if(w2>=8&&w1*2<=w2) add('slowing','Change over time',`New connections have slowed: ${w1} in the latest three months, against ${w2} in the three months before.`,`Up to ${_monthLabel(hi)}.`,()=>({label:'Where new connections have slowed',ids:[],pairs:[],sec:[]}));
+      else if(w1>=8&&w1>=2*w2) add('speeding','Change over time',`New connections are speeding up: ${w1} in the latest three months, against ${w2} in the three months before.`,`Up to ${_monthLabel(hi)}.`,()=>({label:'Where new connections are speeding up',ids:[],pairs:[],sec:[]}));
+    }
+  }
+  if(!grp&&MAP_TYPE!=='systems') hints.push('Add a column that sorts items into groups, such as Sector, and this will also show how well the groups connect to each other.');
+  if(!series) hints.push('Add a Date added column and this will also show how the map changed over time.');
+  return {list,hints,grp,series,G,linkList};
+}
+function focusFinding(i){ const f=_findings[i]; if(f) _applyFocus(f.focus()); }
+function setFindingsGroup(v){ FINDINGS_GROUP_FIELD=v||null; if(_insightFocus) clearInsightFocus(); else renderInsights(); }
+function toggleFindingsAll(){ _insOpen.findingsAll=!_insOpen.findingsAll; renderInsights(); }
+
+// The same findings, and the tables behind them, for the printable report
+function _findingsReportHTML(F){
+  if(!F.list.length&&!F.hints.length) return '';
+  const e=escHtml;
+  let h=`<div class="report-section"><h4>What this map tells you</h4>`;
+  h+=F.list.length?F.list.map(f=>{ const col=_FINDING_TAG_COL[f.tag]||'#64748B'; return `<div class="report-row" style="flex-direction:column;align-items:flex-start;gap:2px;border-left:3px solid ${col};padding-left:10px;margin:6px 0;"><div style="font-size:10px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:${col};">${e(f.tag)}</div><div style="font-size:13px;font-weight:600;color:var(--navy);line-height:1.45;">${e(f.text)}</div>${f.evidence?`<div style="font-size:11.5px;color:var(--txt-m);">${e(f.evidence)}</div>`:''}</div>`; }).join(''):`<div class="report-row" style="color:var(--txt-m);">Nothing stands out yet.</div>`;
+  if(F.grp) h+=`<div style="font-size:11px;color:var(--txt-m);margin-top:6px;">Groups compared by: ${e(F.grp.name)}.</div>`;
+  h+=F.hints.map(t=>`<div style="font-size:11px;color:var(--txt-m);margin-top:4px;">${e(t)}</div>`).join('');
+  return h+`</div>`;
+}
+function _changeTableHTML(series,grp){
+  if(!series||series.length<2) return '';
+  const np=mapNounPack()[1], e=escHtml, cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+  const want=Math.min(5,series.length), idx=[];
+  for(let i=0;i<want;i++) idx.push(Math.round(i*(series.length-1)/(want-1)));
+  const cols=[...new Set(idx)].map(i=>series[i]);
+  const row=(label,f)=>`<tr><td style="padding:4px 8px 4px 0;color:var(--txt-m);">${label}</td>${cols.map(c=>`<td style="padding:4px 8px;text-align:right;font-weight:600;color:var(--navy);">${f(c)}</td>`).join('')}</tr>`;
+  let h=`<div class="report-section"><h4>How the map changed</h4><div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Worked out from the dates on the map.</div><div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:12px;width:100%;"><thead><tr><th></th>${cols.map(c=>`<th style="padding:4px 8px;text-align:right;font-size:11px;color:var(--txt-h);font-weight:600;">${e(_monthLabel(c.d))}</th>`).join('')}</tr></thead><tbody>`;
+  h+=row(`${cap(np)} on the map`,c=>c.n)+row('Connections',c=>c.links)+row('With no connection',c=>c.iso)+row('Separate pieces',c=>c.pieces);
+  if(grp) h+=row(`Cross a ${_groupWord(grp.name)} line`,c=>c.measured?Math.round(100*c.cross/c.measured)+'%':'–');
+  return h+`</tbody></table></div></div>`;
+}
+function _groupGridHTML(F){
+  const grp=F.grp; if(!grp||grp.k<2) return '';
+  const e=escHtml;
+  const vals=Object.entries(grp.counts).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
+  const ix=new Map(vals.map((v,i)=>[v,i]));
+  const M=vals.map(()=>vals.map(()=>0));
+  F.linkList.forEach(([a,b])=>{
+    const ia=ix.get(grp.of(F.G.nById.get(a))), ib=ix.get(grp.of(F.G.nById.get(b)));
+    if(ia===undefined||ib===undefined) return;
+    M[ia][ib]++; if(ia!==ib) M[ib][ia]++;
+  });
+  let mx=1; M.forEach(r=>r.forEach(v=>{ if(v>mx) mx=v; }));
+  const cell=(v,diag)=>`<td style="padding:5px 6px;text-align:center;font-weight:600;color:var(--navy);background:rgba(37,99,235,${(0.05+0.5*v/mx).toFixed(2)});${diag?'border:1.5px solid rgba(37,99,235,0.5);':''}">${v}</td>`;
+  let h=`<div class="report-section"><h4>Who connects to whom, by ${e(_groupWord(grp.name))}</h4><div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Each number is how many connections join the two groups. The outlined number is connections inside one group.</div><div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:11px;width:100%;"><thead><tr><th></th>${vals.map(v=>`<th style="padding:4px 6px;font-weight:600;color:var(--txt-h);vertical-align:bottom;">${e(v)}<div style="font-weight:400;">${grp.counts[v]}</div></th>`).join('')}</tr></thead><tbody>`;
+  vals.forEach((v,i)=>{ h+=`<tr><td style="padding:5px 8px 5px 0;font-weight:600;color:var(--txt-h);white-space:nowrap;">${e(v)} <span style="font-weight:400;">(${grp.counts[v]})</span></td>${vals.map((w,j)=>cell(M[i][j],i===j)).join('')}</tr>`; });
+  return h+`</tbody></table></div></div>`;
+}
+function _changeFromDatesHTML(){ const F=computeFindings(computeInsights()); return _changeTableHTML(F.series,F.grp); }
+
+// ── Small charts for the report: inline SVG and plain bars, no libraries ──────────
+const _FINDING_TAG_COL={'Change over time':'#2563EB','Who holds it together':'#7C3AED','Gaps':'#D97706'};
+const _CHART_PALETTE=['#2563EB','#059669','#EA580C','#7C3AED','#0891B2','#DB2777','#CA8A04','#64748B'];
+// Each group takes the colour most of its items already have on the map, so a chart matches the screen
+function _groupColours(grp,pool){
+  const out={}, used=new Set();
+  Object.keys(grp.counts).forEach((v,i)=>{
+    const c={}; pool.forEach(n=>{ if(grp.of(n)===v&&n.colour) c[n.colour]=(c[n.colour]||0)+1; });
+    const top=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];
+    let col=top?top[0]:null;
+    if(!col||used.has(col)) col=_CHART_PALETTE[i%_CHART_PALETTE.length];
+    used.add(col); out[v]=col;
+  });
+  return out;
+}
+function _svgDonut(items,size){
+  const live=items.filter(it=>it.value>0), total=live.reduce((a,b)=>a+b.value,0);
+  if(!total) return '';
+  const cx=size/2, cy=size/2, r=size/2-3, ri=r*0.6;
+  const P=(rad,a)=>[(cx+rad*Math.cos(a)).toFixed(2),(cy+rad*Math.sin(a)).toFixed(2)];
+  let a0=-Math.PI/2, out='';
+  live.forEach(it=>{
+    const frac=it.value/total, a1=a0+frac*2*Math.PI, tip=`<title>${escHtml(it.label)}: ${it.value}</title>`;
+    if(frac>0.9999) out+=`<circle cx="${cx}" cy="${cy}" r="${(r+ri)/2}" fill="none" stroke="${it.colour}" stroke-width="${r-ri}">${tip}</circle>`;
+    else{
+      const large=frac>0.5?1:0, [x0,y0]=P(r,a0), [x1,y1]=P(r,a1), [x2,y2]=P(ri,a1), [x3,y3]=P(ri,a0);
+      out+=`<path d="M${x0},${y0} A${r},${r} 0 ${large} 1 ${x1},${y1} L${x2},${y2} A${ri},${ri} 0 ${large} 0 ${x3},${y3} Z" fill="${it.colour}">${tip}</path>`;
+    }
+    a0=a1;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="flex-shrink:0;">${out}<text x="${cx}" y="${cy+1}" text-anchor="middle" dominant-baseline="middle" style="font-size:${Math.round(size*0.17)}px;font-weight:700;fill:var(--navy);">${total}</text></svg>`;
+}
+function _donutLegend(items,size){
+  const e=escHtml;
+  return `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">${_svgDonut(items,size)}<div style="flex:1;min-width:110px;font-size:11px;">${items.filter(it=>it.value>0).map(it=>`<div style="display:flex;align-items:center;gap:6px;margin:2px 0;"><span style="width:9px;height:9px;border-radius:50%;background:${it.colour};flex-shrink:0;"></span><span style="flex:1;color:var(--txt-m);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${e(it.label)}">${e(it.label)}</span><span style="font-weight:600;color:var(--navy);">${it.value}</span></div>`).join('')}</div></div>`;
+}
+function _barRows(items){
+  const e=escHtml, mx=Math.max(1,...items.map(i=>i.value));
+  return items.map(it=>`<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:11px;"><div style="width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--txt-m);" title="${e(it.label)}">${e(it.label)}</div><div style="flex:1;background:var(--surf-2);border-radius:4px;height:9px;"><div style="width:${Math.max(3,Math.round(100*it.value/mx))}%;height:9px;border-radius:4px;background:${it.colour};"></div></div><div style="width:26px;text-align:right;font-weight:600;color:var(--navy);">${it.value}</div></div>`).join('');
+}
+function _svgColumns(vals,dates,colour,pct){
+  const W=250, H=92, padL=4, padR=4, top=16, base=H-18, n=vals.length;
+  const mx=pct?100:Math.max(1,...vals), slot=(W-padL-padR)/n, bw=Math.max(3,slot-3);
+  const short=d=>{ try{ return new Date(d+'T12:00:00').toLocaleDateString('en-GB',{month:'short',year:'2-digit'}); }catch(e){ return d; } };
+  let bars='';
+  vals.forEach((v,i)=>{
+    const h=Math.round((base-top)*(v/mx)), x=(padL+i*slot+(slot-bw)/2).toFixed(1), y=base-h;
+    bars+=`<rect x="${x}" y="${y}" width="${bw.toFixed(1)}" height="${Math.max(h,v>0?1:0)}" rx="2" fill="${colour}" opacity="${i===n-1?1:0.78}"><title>${escHtml(short(dates[i]))}: ${v}${pct?'%':''}</title></rect>`;
+  });
+  const last=vals[n-1];
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="display:block;max-width:300px;"><line x1="${padL}" y1="${base}" x2="${W-padR}" y2="${base}" stroke="var(--bdr)"/>${bars}<text x="${padL}" y="${H-5}" style="font-size:9.5px;fill:var(--txt-m);">${escHtml(short(dates[0]))}</text><text x="${W-padR}" y="${H-5}" text-anchor="end" style="font-size:9.5px;fill:var(--txt-m);">${escHtml(short(dates[n-1]))}</text><text x="${W-padR}" y="10" text-anchor="end" style="font-size:11px;font-weight:700;fill:${colour};">${last}${pct?'%':''}</text></svg>`;
+}
+function _reportChartsHTML(I,F){
+  const pool=I.pool||[]; if(pool.length<4) return '';
+  const e=escHtml, np=mapNounPack()[1], cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+  const adj=F.G.adj, gcol=F.grp?_groupColours(F.grp,pool):null, gw=F.grp?_groupWord(F.grp.name):'';
+  const card=(title,sub,inner)=>`<div style="border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;background:var(--surf);min-width:0;"><div style="font-size:11.5px;font-weight:700;color:var(--navy);">${e(title)}</div><div style="font-size:10.5px;color:var(--txt-m);margin:1px 0 8px;">${e(sub||'')}</div>${inner}</div>`;
+  const cards=[];
+  if(F.grp) cards.push(card(`${cap(np)} by ${gw}`,`${pool.length} on the map`,_donutLegend(Object.entries(F.grp.counts).sort((a,b)=>b[1]-a[1]).map(([v,c])=>({label:v,value:c,colour:gcol[v]})),128)));
+  if(F.series&&F.series.length>=2){
+    const dts=F.series.map(r=>r.d);
+    cards.push(card('Connections over time','Total on the map at the end of each month',_svgColumns(F.series.map(r=>r.links),dts,'#2563EB')));
+    if(Math.max(...F.series.map(r=>r.iso))>0) cards.push(card(`${cap(np)} with no connection`,'At the end of each month',_svgColumns(F.series.map(r=>r.iso),dts,'#DC2626')));
+    if(F.grp&&F.series.some(r=>r.measured>=10)) cards.push(card(`Connections that cross ${gw} lines`,'Share of all connections, by month',_svgColumns(F.series.map(r=>r.measured>=10?Math.round(100*r.cross/r.measured):0),dts,'#7C3AED',true)));
+  }
+  const byDeg=[...pool].sort((a,b)=>adj.get(b.id).size-adj.get(a.id).size||String(a.label).localeCompare(String(b.label))).slice(0,8);
+  cards.push(card('Best connected','Connections each',_barRows(byDeg.map(n=>({label:n.label,value:adj.get(n.id).size,colour:(gcol&&gcol[F.grp.of(n)])||n.colour||'#64748B'})))));
+  const br=(I.bridges||[]).slice().sort((a,b)=>b.cutOff-a.cutOff).slice(0,6);
+  if(br.length) cards.push(card('What the map leans on','Take one out and this many are cut off',_barRows(br.map(b=>({label:b.node.label,value:b.cutOff,colour:'#EA580C'})))));
+  const bk=[['1',1,1,'#D97706'],['2',2,2,'#64748B'],['3',3,3,'#64748B'],['4–5',4,5,'#2563EB'],['6–9',6,9,'#2563EB'],['10+',10,1e9,'#2563EB']];
+  const hist=bk.map(([l,lo,hi,c])=>({label:l,value:pool.filter(n=>{ const d=adj.get(n.id).size; return d>=lo&&d<=hi; }).length,colour:c}));
+  cards.push(card('How many connections each has',`${cap(np)} with this many (amber: hanging by one)`,_barRows(hist)));
+  return `<div class="report-section"><h4>At a glance</h4><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">${cards.join('')}</div></div>`;
+}
+function _strengthDonutHTML(visEdges){
+  const cnt={strong:0,moderate:0,weak:0};
+  visEdges.forEach(e=>{ const k=e.strength==='strong'?'strong':(e.strength==='weak'?'weak':'moderate'); cnt[k]++; });
+  const sty=id=>{ const s=(CONNECTION_STYLES||[]).find(x=>x.id===id); return s?s.colour:null; };
+  const items=[{label:'Strong',value:cnt.strong,colour:sty('strong')||'#1E40AF'},{label:'Moderate',value:cnt.moderate,colour:sty('moderate')||'#0EA5E9'},{label:'Weak',value:cnt.weak,colour:sty('weak')||'#888888'}];
+  if(!items.some(i=>i.value>0)) return '';
+  return `<div class="report-section"><h4>How strong the connections are</h4>${_donutLegend(items,128)}</div>`;
 }
 
 function pinLoop(i,on){
@@ -7799,6 +8261,11 @@ function confirmImport(){
   if(_importMode==='replace'){
     nodes.length=0; edges.length=0; loops.length=0; idCtr=0;
   }
+  if(!MAP_NOUN){
+    const _ni=(_importCurrentMapping.cols||[]).findIndex(c=>c.role==='name');
+    const _nh=String((typeof importHeaders!=='undefined'&&importHeaders[_ni])||'').trim().toLowerCase();
+    if(/^organi[sz]ations?$|^organi[sz]ation name$/.test(_nh)) setMapNoun('organisation');
+  }
 
   // Argument columns: make sure Supports/Opposes exist, and switch a general map to an argument map
   const _argImport=toAdd.some(r=>r.part)||toUpdate.some(u=>u.incoming.part)||toAddEdges.some(e=>e.type==='supports'||e.type==='opposes');
@@ -9627,28 +10094,50 @@ function updateFilterCount(count, active){
 
 // Also show report button whenever a search/filter is active even with 0 results
 
+// A filter or search is a selection. A loop or finding that is only lit up on the map is not: it is
+// pinned, and pinned items are not what the person asked to look at.
+function _selectionActive(){
+  const pins=highlightIds.pins;
+  return pins?[...highlightIds].some(id=>!pins.has(id)):highlightIds.size>0;
+}
 function getVisibleNodes(){
-  // Returns nodes currently "visible" (highlighted or all if no filter)
-  const hasHL = highlightIds.size > 0;
-  if(!hasHL) return nodes.filter(n=>n.type!=='centre');
-  // Exclude the sentinel -1 (no-match marker)
-  return nodes.filter(n=>n.type!=='centre' && highlightIds.has(n.id) && n.id !== -1);
+  // The items the report covers: the selection, or everything, as the timeline date has it
+  const sel=_selectionActive();
+  return nodes.filter(n=>n.type!=='centre'&&n.id!==-1&&(!sel||highlightIds.has(n.id))&&!(DATE_ASAT&&_dateHidden.has(n.id)));
 }
 
 function getVisibleEdges(){
-  const visIds = new Set(getVisibleNodes().map(n=>n.id));
+  const vis=getVisibleNodes(), visIds=new Set(vis.map(n=>n.id)), nById=new Map(nodes.map(n=>[n.id,n]));
   return edges.filter(e=>{
     const s=typeof e.source==='object'?e.source.id:e.source;
     const t=typeof e.target==='object'?e.target.id:e.target;
-    return visIds.has(s)&&visIds.has(t);
+    if(!visIds.has(s)||!visIds.has(t)) return false;
+    return !(DATE_ASAT&&edgeHiddenByDate(e,nById.get(s),nById.get(t)));
   });
+}
+// What is narrowing the report, in words
+function _selectionParts(){
+  const parts=[], q=((document.getElementById('search-input')||{}).value||'').trim();
+  if(q) parts.push('search \u201c'+q+'\u201d');
+  const lab={'cat-filter':'category','area-filter':'area','conn-type-filter':'connection type','member-filter':'member','tag-filter':'tag'};
+  Object.keys(lab).forEach(id=>{ const st=msSelected[id]; if(st&&st.size) parts.push(lab[id]+': '+[...st].join(', ')); });
+  if(CONN_MIN!==null||CONN_MAX!==null) parts.push(CONN_MIN!==null&&CONN_MAX!==null?CONN_MIN+' to '+CONN_MAX+' connections':(CONN_MIN!==null?CONN_MIN+' or more connections':'up to '+CONN_MAX+' connections'));
+  if(DATE_FROM||DATE_TO) parts.push('added '+(DATE_FROM||'the start')+' to '+(DATE_TO||'now'));
+  if(DATE_ASAT) parts.push('the map as it stood on '+DATE_ASAT);
+  return parts;
+}
+function _selectionBannerHTML(){
+  const parts=_selectionParts(); if(!parts.length&&!_selectionActive()) return '';
+  const np=mapNounPack()[1], shown=getVisibleNodes().length, all=nodes.filter(n=>n.type!=='centre').length;
+  const box=h=>`<div class="report-section"><div style="padding:10px 12px;border-radius:8px;background:var(--surf-2);border-left:3px solid #2563EB;font-size:12px;line-height:1.5;">${h}</div></div>`;
+  if(DATE_ASAT&&parts.length===1) return box(`<strong>This report shows the map as it stood on ${escHtml(DATE_ASAT)}:</strong> ${shown} ${escHtml(np)} by then. Clear the timeline date to see it as it is now.`);
+  return box(`<strong>This report covers part of the map:</strong> ${shown} of ${all} ${escHtml(np)}.${parts.length?' Narrowed by '+escHtml(parts.join('; '))+'.':''} Clear the search and filters to see everything.`);
 }
 
 function openReport(){
   const visible=getVisibleNodes();
-  const q=document.getElementById('search-input').value.trim();
-  const cat=document.getElementById('cat-filter').value;
-  const subtitle=q||cat?`Filtered: ${q||''}${q&&cat?' · ':''}${cat||''}`:'Full map';
+  const _parts=_selectionParts();
+  const subtitle=_parts.length?'Covers part of the map: '+_parts.join(' · '):(_selectionActive()?`Covers ${visible.length} selected`:'Full map');
   document.getElementById('report-modal-subtitle').textContent=subtitle;
   currentReportTab='summary';
   // Reset tab highlight
@@ -9717,7 +10206,12 @@ function buildSummaryReport(){
     <div class="report-row"><strong>Mode:</strong> ${currentMapMode.charAt(0).toUpperCase()+currentMapMode.slice(1)} map</div>
   </div>`;
 
-  if(Object.keys(catCounts).length){
+  {
+    const _I=computeInsights(), _F=computeFindings(_I);
+    html+=_selectionBannerHTML()+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
+  }
+
+  if(vis.some(n=>n.colourLabel)&&Object.keys(catCounts).length){
     html+=`<div class="report-section"><h4>By category</h4>`;
     Object.entries(catCounts).sort((a,b)=>b[1]-a[1]).forEach(([lbl,cnt])=>{
       const node=vis.find(n=>n.colourLabel===lbl);
@@ -9731,28 +10225,10 @@ function buildSummaryReport(){
     html+=`</div>`;
   }
 
-  if(mostConnected.length){
-    html+=`<div class="report-section"><h4>Most connected nodes</h4>`;
-    mostConnected.forEach(n=>{
-      const col=n.colour||'#888';
-      const cnt=connCount[n.id]||0;
-      const detail=[n.pJobTitle,n.pCompany,n.pSector,n.area].filter(Boolean).join(' · ');
-      html+=`<div class="report-row">
-        <div class="report-node-dot" style="background:${col};"></div>
-        <div style="flex:1;">
-          <div style="font-weight:600;color:var(--navy);">${n.label}</div>
-          ${detail?`<div style="font-size:11px;color:var(--txt-m);">${detail}</div>`:''}
-        </div>
-        <span class="report-stat">${cnt} link${cnt!==1?'s':''}</span>
-      </div>`;
-    });
-    html+=`</div>`;
-  }
-
   if(vis.length>0){
     const REPORT_TOP=20;
     const capped=vis.length>REPORT_TOP;
-    html+=`<div class="report-section"><h4>${capped?`Top ${REPORT_TOP} nodes`:'All visible nodes'}</h4>`;
+    html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">${capped?`The top ${REPORT_TOP}`:'Everyone'} in full: who each one connects to</summary>`;
     [...vis].sort((a,b)=>((connCount[b.id]||0)-(connCount[a.id]||0))||a.label.localeCompare(b.label))
       .slice(0,REPORT_TOP).forEach(n=>{
       const col=n.colour||'#888';
@@ -9777,11 +10253,11 @@ function buildSummaryReport(){
           <span style="font-size:10px;color:var(--txt-h);">${connCount[n.id]||0} link${(connCount[n.id]||0)!==1?'s':''}</span>
         </div>
         ${detail?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;">${detail}</div>`:''}
-        ${connLabels.length?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;">→ ${connLabels.join(', ')}</div>`:''}
+        ${connLabels.length?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;">→ ${connLabels.slice(0,8).join(', ')}${connLabels.length>8?` and ${connLabels.length-8} more`:''}</div>`:''}
         ${notes?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;font-style:italic;border-top:1px dashed var(--bdr);padding-top:4px;margin-top:2px;white-space:pre-wrap;">${notes.substring(0,200)}${notes.length>200?'…':''}</div>`:''}
       </div>`;
     });
-    html+=`</div>`;
+    html+=`</details>`;
   }
 
   {
@@ -9797,26 +10273,26 @@ function buildSummaryReport(){
       <div class="report-row">${NI.density}% of possible connections exist. ${NI.compCount>1?NI.compCount+' separate clusters, the biggest holding '+NI.compBig+'.':'One connected piece.'}</div></div>`;
 
     if(NI.bridges.length){
-      html+=`<div class="report-section"><h4>Critical nodes</h4>
+      html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Critical nodes: all ${NI.bridges.length}, in full</summary>
         <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Removing this one node cuts others off from the rest.</div>`+
-        NI.bridges.map(b=>`<div class="report-row">${escHtml(b.node.label)} <span class="report-stat">cuts off ${b.cutOff}</span></div>`).join('')+`</div>`;
+        NI.bridges.map(b=>`<div class="report-row">${escHtml(b.node.label)} <span class="report-stat">cuts off ${b.cutOff}</span></div>`).join('')+`</details>`;
     }
     if(NI.criticalLinks.length){
-      html+=`<div class="report-section"><h4>Critical links</h4>
-        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">The only connection between two parts of the map.</div>`+
-        NI.criticalLinks.map(c=>`<div class="report-row">${escHtml(c.a.label)} — ${escHtml(c.b.label)} <span class="report-stat">cuts off ${c.cutOff}</span></div>`).join('')+`</div>`;
+      html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Critical links: all ${NI.criticalLinks.length}, in full</summary>
+        <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">The only connection between two parts of the map. The ones cutting off just one item are listed last.</div>`+
+        NI.criticalLinks.map(c=>`<div class="report-row">${escHtml(c.a.label)} — ${escHtml(c.b.label)} <span class="report-stat">cuts off ${c.cutOff}</span></div>`).join('')+`</details>`;
     }
     if(NI.betweennessCapped){
       html+=`<div class="report-section"><h4>Bottleneck score</h4><div class="report-row" style="color:var(--txt-m);">Skipped: map has more than 200 nodes.</div></div>`;
     } else if(NI.topBetweenness.length){
-      html+=`<div class="report-section"><h4>Bottleneck score</h4>
+      html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Bottleneck score: the top ${NI.topBetweenness.length}, in full</summary>
         <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Sits on the most paths between everyone else.</div>`+
-        NI.topBetweenness.map(n=>`<div class="report-row">${escHtml(n.label)} <span class="report-stat">${Math.round(NI.betweenness.get(n.id))}</span></div>`).join('')+`</div>`;
+        NI.topBetweenness.map(n=>`<div class="report-row">${escHtml(n.label)} <span class="report-stat">${Math.round(NI.betweenness.get(n.id))}</span></div>`).join('')+`</details>`;
     }
     if(NI.overloadedHubs.length){
-      html+=`<div class="report-section"><h4>Overloaded hubs</h4>
+      html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Overloaded hubs: ${NI.overloadedHubs.length}, in full</summary>
         <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Many arrows in, almost none out.</div>`+
-        NI.overloadedHubs.map(n=>`<div class="report-row">${escHtml(n.label)} <span class="report-stat">${NI.inDeg.get(n.id)} in, ${NI.outDeg.get(n.id)} out</span></div>`).join('')+`</div>`;
+        NI.overloadedHubs.map(n=>`<div class="report-row">${escHtml(n.label)} <span class="report-stat">${NI.inDeg.get(n.id)} in, ${NI.outDeg.get(n.id)} out</span></div>`).join('')+`</details>`;
     }
   }
   if(MAP_TYPE==='argument'){
@@ -9888,7 +10364,11 @@ function buildMatrixReport(){
   const vis=getVisibleNodes();
   const visEdges=getVisibleEdges();
   if(vis.length===0) return `<div style="color:var(--txt-m);padding:20px;text-align:center;">No nodes visible. Apply a filter first or clear the filter to see all nodes.</div>`;
-  if(vis.length>60) return `<div style="color:var(--txt-m);padding:20px;text-align:center;">Too many nodes for a matrix (${vis.length}). Filter to 60 or fewer nodes.</div>`;
+  if(vis.length>60){
+    const _F=computeFindings(computeInsights());
+    if(_F.grp) return `<div style="color:var(--txt-m);padding:4px 0 12px;">Too many for a one-by-one matrix (${vis.length}). Here is who connects to whom, group by group. Filter to 60 or fewer to see the one-by-one matrix.</div>`+_groupGridHTML(_F);
+    return `<div style="color:var(--txt-m);padding:20px;text-align:center;">Too many nodes for a matrix (${vis.length}). Filter to 60 or fewer nodes.</div>`;
+  }
 
   // Order by number of connections, so the busiest nodes cluster top-left
   const _mc={}; vis.forEach(n=>_mc[n.id]=0);
@@ -9979,6 +10459,7 @@ function buildStrengthReport(){
     </div>
   </div>`;
 
+  html+=_strengthDonutHTML(visEdges);
   if(hubs.length){
     html+=`<div class="report-section"><h4>Connectivity scores</h4>
       <div style="font-size:11px;color:var(--txt-m);margin-bottom:8px;">Score = weighted connections (strong=3, moderate=2, weak=1)</div>`;
@@ -9999,15 +10480,15 @@ function buildStrengthReport(){
   }
 
   if(strong.length){
-    html+=`<div class="report-section"><h4>Strong connections</h4>`;
+    html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">The ${strong.length} strong connections, in full</summary>`;
     strong.forEach(e=>{ html+=`<div class="report-row" style="color:var(--navy);font-weight:500;">■ ${getEdgeLabel(e)}</div>`; });
-    html+=`</div>`;
+    html+=`</details>`;
   }
 
   if(weak.length){
-    html+=`<div class="report-section"><h4>Weak connections — worth reviewing</h4>`;
+    html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">The ${weak.length} weak connections, worth reviewing</summary>`;
     weak.forEach(e=>{ html+=`<div class="report-row" style="color:var(--txt-m);">· ${getEdgeLabel(e)}</div>`; });
-    html+=`</div>`;
+    html+=`</details>`;
   }
 
   if(isolated.length){
@@ -10026,7 +10507,8 @@ function buildStrengthReport(){
   return html;
 }
 
-function buildChangeReport(){
+function buildChangeReport(){ return _changeFromDatesHTML()+_buildVersionChangeReport(); }
+function _buildVersionChangeReport(){
   if(namedVersions.length<2){
     return `<div style="padding:20px;color:var(--txt-m);">
       <p style="margin-bottom:12px;">The change report compares two saved versions of your map and shows what has been added, removed, or changed.</p>
@@ -11443,6 +11925,12 @@ function pickMapType(t){
   if(fr) fr.style.display=_splashMapType==='stakeholder'?'block':'none';
   const cr=document.getElementById('splash-claim-row');
   if(cr) cr.style.display=_splashMapType==='argument'?'block':'none';
+}
+function setMapNoun(v){
+  MAP_NOUN=['person','organisation','service','item'].includes(v)?v:'';
+  const mn=document.getElementById('settings-map-noun'); if(mn) mn.value=MAP_NOUN;
+  saveState(); markUnsaved();
+  if(typeof refreshInsightsIfOpen==='function') refreshInsightsIfOpen();
 }
 function setMapType(v){
   MAP_TYPE=MAP_TYPES.includes(v)?v:'general';
