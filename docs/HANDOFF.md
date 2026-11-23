@@ -87,9 +87,9 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
 
 - Pull request #41: wording only, "crossed a sector line" becomes "cross-sector links" (uses the grouping word, so
   a map grouped by place reads "cross-place links"). Waiting for Jaime's yes.
-- Branch `claude/vcfs-label` (no pull request yet): renames the demo sector "Community and VCS" to "VCFS" in
-  the Carrfield files, the partner returns file and the collection template. Data only. Jaime asked for it
-  but wanted no changes before his Monday meeting.
+- Pull request #43 (branch `claude/vcfs-label`): renames the demo sector "Community and VCS" to "VCFS" in
+  the Carrfield files, the partner returns file and the collection template. Data only. Jaime asked for it.
+  Waiting for his yes.
 - Codex's draft pull requests #12 (saving and recovery), #13 (photo import) and #16 (Puddle Lens) are
   untouched by Claude. #12 should be reviewed and tested before any customer puts real data in. The start
   screen change (#36) is merged, so #16 will need to rebase onto it.
