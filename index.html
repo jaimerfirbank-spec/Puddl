@@ -5653,11 +5653,11 @@ function renderInsights(){
     }
 
     if(I.betweennessCapped){
-      h += skipped('bottleneck','Bottleneck score',`This map has ${plural(I.pool.length,'person')}. Working out who sits between everyone else takes too long above ${BETWEENNESS_CAP}, so it was not attempted. Filter the map down to see it.`);
+      h += skipped('bottleneck','Go-between score (bottleneck)',`This map has ${plural(I.pool.length,'person')}. Working out who sits between everyone else takes too long above ${BETWEENNESS_CAP}, so it was not attempted. Filter the map down to see it.`);
     } else if(structureWhy){
-      h += skipped('bottleneck','Bottleneck score',structureWhy);
+      h += skipped('bottleneck','Go-between score (bottleneck)',structureWhy);
     } else {
-      h += grp('bottleneck','Bottleneck score',null,
+      h += grp('bottleneck','Go-between score (bottleneck)',null,
         `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'Sits on the most paths between the other factors - influence has to pass through it.':MAP_TYPE==='stakeholder'?'Sits on the most routes between the other stakeholders - a gatekeeper even without being the most connected.':'Sits on the most paths between everyone else - a pinch point even without being the most connected.'}</div>`+_bottleneckExplainHTML(mapNounPack()[1])+
         (I.topBetweenness.length ? I.topBetweenness.map(n=>row(n,_bottleneckCell(n,Math.round(I.betweenness.get(n.id)),I.pool.length),'node',true)).join('') : none('No node sits between others on a path.')));
     }
@@ -5669,8 +5669,8 @@ function renderInsights(){
     }
   }
 
-  h += grp('groups','Groups',I.linked.length,
-    pair(plural(I.linked.length,'linked group'), plural(I.alone,'person')+' on their own') + I.linked.slice(0,5).map(g=>row(g.best,`group of ${g.size}`,'group')).join(''));
+  h += grp('groups','Connected networks',I.linked.length,
+    pair(plural(I.linked.length,'connected network'), plural(I.alone,'person')+' on their own') + I.linked.slice(0,5).map(g=>row(g.best,`network of ${g.size}`,'group')).join(''));
 
   {
     const mergedNodes=I.pool.filter(n=>n.merged);
@@ -5715,6 +5715,7 @@ function renderInsights(){
   // repeated under fourteen cards in a 300px column it becomes wallpaper.
   h += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bdr);font-size:10.5px;color:var(--ink-h);line-height:1.45;">These figures describe what is drawn on this map, not necessarily what is true on the ground. A ${NOUN[0]} nobody has added, or a connection nobody drew, cannot show up here.</div>`;
   h += `<div style="margin-top:10px;display:flex;justify-content:space-between;gap:6px;"><button onclick="renderInsights()" style="font-size:11px;height:26px;padding:0 10px;">Refresh</button><button onclick="openReport()" title="The matrix, strength and version views" style="font-size:11px;height:26px;padding:0 10px;">Full report</button></div>`;
+  h += _glossaryHTML('panel');
   body.innerHTML=h;
 }
 let _insightLoops=[];
@@ -5843,7 +5844,7 @@ function _focusFor(kind,ref,Gin){
   } else if(kind==='group'){
     const v=nodeId(); if(v===null) return;
     const ids=_insReach(adj,v,null,null);
-    f={key:`group:${v}`,label:`The group of ${ids.size} around ${lab(v)}`,ids,pairs:_insPairsWithin(adj,ids),sec:new Set()};
+    f={key:`group:${v}`,label:`The network of ${ids.size} around ${lab(v)}`,ids,pairs:_insPairsWithin(adj,ids),sec:new Set()};
   } else if(kind==='pair'){
     const c=_insCache.pairs[ref]; if(!c) return;
     const a=c.a.id, b=c.b.id, ids=new Set([a,b]);
@@ -6100,7 +6101,7 @@ function computeFindings(I){
     const top=br[0], f0=_focusFor('choke',top.node.id,G);
     if(f0){
       const cut=[...f0.ids].filter(x=>x!==top.node.id);
-      add('single','Who holds it together',
+      add('single','Who the map depends on',
         `${top.node.label} is the only thing holding ${noun(top.cutOff)} to the rest.`,
         `Take it out and ${names(cut,3)} ${cut.length===1?'is':'are'} cut off.`,
         ()=>f0);
@@ -6113,7 +6114,7 @@ function computeFindings(I){
   const p2=Math.round(100*touching(top2)/L), p5=Math.round(100*touching(top5)/L);
   if(L>=20&&(p2>=15||p5>=30)){
     const use2=p2>=15, set=use2?top2:top5;
-    add('concentration','Who holds it together',
+    add('concentration','Who the map depends on',
       use2?`${lab(byDeg[0].id)} and ${lab(byDeg[1].id)} are in ${p2}% of all connections.`:`The five best connected are in ${p5}% of all connections.`,
       use2?`The five best connected are in ${p5}%.`:names(set,5)+'.',
       ()=>{ const pairs=[], sec=new Set(); set.forEach(v=>adj.get(v).forEach(x=>{ pairs.push(_pk(v,x)); if(!set.has(x)) sec.add(x); }));
@@ -6170,7 +6171,7 @@ function computeFindings(I){
     const r=[...reach.entries()].sort((a,b)=>b[1]-a[1]);
     if(r.length>1&&r[0][1]>=3&&r[0][1]>r[1][1]&&(r[0][1]===grp.k||r[0][1]>=r[1][1]+2)){
       const [lid,r1]=r[0], r2=r[1][1];
-      add('reach','Who holds it together',
+      add('reach','Who the map depends on',
         r1===grp.k?`${lab(lid)} is the only ${ns} that reaches all ${grp.k} ${gp}.`:`${lab(lid)} reaches ${r1} of the ${grp.k} ${gp}.`,
         `No other ${ns} reaches more than ${r2}.`,
         ()=>({label:lab(lid),ids:[lid],pairs:edgesOf(lid,adj.get(lid)),sec:[...adj.get(lid)]}));
@@ -6245,7 +6246,7 @@ function _groupGridHTML(F){
 function _changeFromDatesHTML(){ const F=computeFindings(computeInsights()); return _changeTableHTML(F.series,F.grp); }
 
 // ── Small charts for the report: inline SVG and plain bars, no libraries ──────────
-const _FINDING_TAG_COL={'Change over time':'#2563EB','Who holds it together':'#7C3AED','Gaps':'#D97706'};
+const _FINDING_TAG_COL={'Change over time':'#2563EB','Who the map depends on':'#7C3AED','Gaps':'#D97706'};
 const _CHART_PALETTE=['#2563EB','#059669','#EA580C','#7C3AED','#0891B2','#DB2777','#CA8A04','#64748B'];
 // Each group takes the colour most of its items already have on the map, so a chart matches the screen
 function _groupColours(grp,pool){
@@ -6282,7 +6283,28 @@ function _nameList(ids,nById,max){
   document.addEventListener('mouseout',ev=>{ const a=ev.target&&ev.target.closest&&ev.target.closest('[data-tip]'); if(!a||!el) return; const to=ev.relatedTarget; if(to&&a.contains(to)) return; el.style.display='none'; });
 })();
 // Who loses their route to the main body if one node is taken out (the biggest piece left is the main body)
-// Bottleneck score shown with the share of all routes it stands for, and a short plain hover
+// Plain words on screen, standard names here, so a researcher recognises them.
+function _glossaryHTML(kind){
+  const items=[
+    ['Go-between score (bottleneck score)','betweenness centrality','How many pairs of other items have their shortest route through this one.'],
+    ['Critical node','cut vertex, or articulation point','An item that, if removed, leaves others with no route to the rest.'],
+    ['Critical link','bridge','A single connection that, if broken, splits the map.'],
+    ['Connected network (group)','connected component','Everything joined to each other by some chain of links.'],
+    ['Most connected','degree centrality','How many connections an item has.'],
+    ['Who the map depends on','concentration of connections','The share of all connections that touch the top few. It describes the shape of the map, not what people do.'],
+    ['Cross-sector link','bridging or between-group tie','A connection between two items in different sectors.'],
+    ['Density','network density','The share of all possible connections that actually exist.'],
+    ['Reinforcing and balancing loops','positive and negative feedback loops','Reinforcing loops amplify a change; balancing loops resist it.'],
+    ['Root cause and final outcome','source and sink','Nothing points into a root cause; nothing follows from a final outcome.']
+  ];
+  const e=escHtml, small=kind==='panel';
+  const rows=items.map(([a,b,c])=>`<div style="margin:${small?'5px':'7px'} 0;"><div style="font-weight:700;color:var(--ink);">${e(a)} <span style="font-weight:500;color:var(--ink-m);">is called ${e(b)}</span></div><div style="color:var(--ink-m);">${e(c)}</div></div>`).join('');
+  const foot='<div style="margin-top:8px;font-style:italic;color:var(--ink-h);">Terms follow standard network analysis. Plain names are used on screen; the technical names are given here.</div>';
+  const sum='cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-h);';
+  if(small) return `<details style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bdr);font-size:10.5px;line-height:1.45;"><summary style="${sum}">Plain words, and what they are called</summary>${rows}${foot}</details>`;
+  return `<details class="report-section" style="font-size:12px;line-height:1.5;"><summary style="${sum}margin-bottom:8px;">Plain words, and what they are called</summary>${rows}${foot}</details>`;
+}
+// Go-between score shown with the share of all routes it stands for, and a short plain hover
 function _bottleneckShare(score,poolSize){ const m=poolSize-1, pairs=m*(m-1)/2; return pairs>0?Math.max(0,Math.min(100,Math.round(100*score/pairs))):0; }
 function _bottleneckCell(n,score,poolSize){
   const pc=_bottleneckShare(score,poolSize), np=mapNounPack()[1];
@@ -10513,9 +10535,9 @@ function buildSummaryReport(){
         NI.criticalLinks.map(c=>`<div class="report-row">${escHtml(c.a.label)} — ${escHtml(c.b.label)} <span class="report-stat">cuts off ${c.cutOff}</span></div>`).join('')+`</details>`;
     }
     if(NI.betweennessCapped){
-      html+=`<div class="report-section"><h4>Bottleneck score</h4><div class="report-row" style="color:var(--txt-m);">Skipped: map has more than 200 nodes.</div></div>`;
+      html+=`<div class="report-section"><h4>Go-between score (bottleneck)</h4><div class="report-row" style="color:var(--txt-m);">Skipped: map has more than 200 nodes.</div></div>`;
     } else if(NI.topBetweenness.length){
-      html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Bottleneck score: the top ${NI.topBetweenness.length}, in full</summary>
+      html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Go-between score (bottleneck): the top ${NI.topBetweenness.length}, in full</summary>
         <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Sits on the most paths between everyone else. The first number is roughly how many pairs of the others have their shortest route through it. The percentage is that as a share of all pairs. Hover for a short explanation.</div>`+
         NI.topBetweenness.map(n=>{ const sc=Math.round(NI.betweenness.get(n.id));
           return `<div class="report-row">${escHtml(n.label)} <span class="report-stat">${_bottleneckCell(n,sc,NI.pool.length)}</span></div>`; }).join('')+
@@ -10558,6 +10580,7 @@ function buildSummaryReport(){
         <div class="report-row">Among high-power stakeholders: ${A.pct}% positive - ${A.positive} alliance${A.positive===1?'':'s'}, ${A.negative} friction point${A.negative===1?'':'s'}.</div></div>`;
     }
   }
+  html+=_glossaryHTML('report');
   return html;
 }
 
@@ -10933,7 +10956,7 @@ function buildPrintReport(){
 
   // Key figures
   const avg=I.pool.length?Math.round(I.edgesCount*2/I.pool.length*10)/10:0;
-  const figs=[[noun(I.pool.length),''],[`${I.edgesCount} connections`,''],[`${avg} average connections each`,''],[`${I.compCount} separate cluster${I.compCount===1?'':'s'}`,''],[`${noun(I.isolated)} with no connections`,''],[`${I.linked.length} linked group${I.linked.length===1?'':'s'}`,'']];
+  const figs=[[noun(I.pool.length),''],[`${I.edgesCount} connections`,''],[`${avg} average connections each`,''],[`${I.compCount} separate cluster${I.compCount===1?'':'s'}`,''],[`${noun(I.isolated)} with no connections`,''],[`${I.linked.length} connected network${I.linked.length===1?'':'s'}`,'']];
   h+=sec('Key figures', `<div style="display:flex;flex-wrap:wrap;gap:6px;">${figs.map(f=>`<span style="background:#f4f4f4;border-radius:14px;padding:4px 12px;font-size:11.5px;color:#222;">${esc(f[0])}</span>`).join('')}</div>`);
 
   // Who matters, by type
@@ -10961,9 +10984,9 @@ function buildPrintReport(){
 
   // Groups (not meaningful on a systems map, where everything is one causal web)
   if(MAP_TYPE!=='systems'){
-    let gh=rowline(`${I.linked.length} linked group${I.linked.length===1?'':'s'}`,`${noun(I.alone)} on their own`);
-    gh+=I.linked.slice(0,6).map(g=>rowline(esc(g.best.label),`group of ${g.size}`)).join('');
-    h+=sec('Groups',gh);
+    let gh=rowline(`${I.linked.length} connected network${I.linked.length===1?'':'s'}`,`${noun(I.alone)} on their own`);
+    gh+=I.linked.slice(0,6).map(g=>rowline(esc(g.best.label),`network of ${g.size}`)).join('');
+    h+=sec('Connected networks',gh);
   }
 
   // Categories and connection types
