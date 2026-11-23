@@ -1089,6 +1089,8 @@ body.share-mode #present-exit{display:none !important;}
 #ask-puddl-launcher:hover{transform:translateY(-1px);box-shadow:var(--shadow-xl);}
 #ask-puddl-launcher.listening img{animation:askPuddlListen 1s steps(2,end) infinite;}
 #ask-puddl-widget{display:none;position:fixed;right:78px;bottom:126px;z-index:43;width:350px;max-height:min(650px,calc(100vh - 150px));background:var(--surf);border:1px solid var(--bdr);border-radius:16px;box-shadow:var(--shadow-xl);font-family:'DM Sans',sans-serif;overflow:hidden;flex-direction:column;}
+#ask-puddl-widget .ask-puddl-head{cursor:grab;touch-action:none;user-select:none;}
+#ask-puddl-widget.dragging .ask-puddl-head{cursor:grabbing;}
 #ask-puddl-widget.open{display:flex;animation:askPuddlOpen .16s ease-out;}
 .ask-puddl-head{display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid var(--bdr);background:var(--surf-2);}
 .ask-puddl-head img{width:52px;height:52px;object-fit:cover;border-radius:12px;flex-shrink:0;}
@@ -1235,7 +1237,7 @@ body.share-mode #present-exit{display:none !important;}
     <!-- Insights: calculated from the current search, or the full map -->
     <div class="fsec" style="border-top:1px solid var(--bdr);margin-top:8px;padding-top:8px;">
       <button id="insights-toggle" class="fsec-head" onclick="toggleSec('insights')" aria-expanded="false" style="width:100%;display:flex;justify-content:space-between;align-items:center;height:30px;padding:0 2px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);background:none;border:none;cursor:pointer;">
-        <span>Insights</span><span id="sec-insights-arrow">▸</span>
+        <span>At a glance</span><span id="sec-insights-arrow">▸</span>
       </button>
       <div id="sec-insights-body" style="display:none;margin-top:6px;font-size:12px;color:var(--ink);"></div>
     </div>
@@ -3718,11 +3720,13 @@ function _askedReportHTML(){
   if(!ASK_REPORT_ITEMS.length) return '';
   return `<div class="report-section"><h4>Your selected questions</h4>`+ASK_REPORT_ITEMS.map(x=>`<div class="report-row" style="display:block;border-left:3px solid #2563EB;padding-left:10px;"><div style="font-size:12px;font-weight:700;color:var(--navy);">${escHtml(x.question)}</div><div style="font-size:12px;line-height:1.5;margin-top:2px;">${escHtml(x.answer)}</div>${x.evidence?`<div style="font-size:11px;color:var(--txt-m);margin-top:2px;">${escHtml(x.evidence)}</div>`:''}${x.meaning?`<div style="font-size:11px;line-height:1.45;margin-top:5px;"><strong>${escHtml(x.assessment||'Neutral')} — what this may mean:</strong> ${escHtml(x.meaning)}</div>`:''}${x.highlight?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;"><strong>Highlighted:</strong> ${escHtml(x.highlight)}</div>`:''}${x.from||x.to?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;">${escHtml(x.from||'Start')} to ${escHtml(x.to||'Now')}</div>`:''}</div>`).join('')+`</div>`;
 }
+let _insFull=false;           // false: the short At a glance view; true: the full lists
+function setInsightsFull(on){ _insFull=!!on; renderInsights(); }
 function renderInsights(){
   const body=document.getElementById('sec-insights-body');
   if(!body) return;
   const people=nodes.filter(n=>n.type!=='centre');
-  if(!people.length){ body.innerHTML='<div style="color:var(--ink-h);font-size:11px;">Add some nodes to see insights.</div>'; return; }
+  if(!people.length){ body.innerHTML='<div style="color:var(--ink-h);font-size:11px;">Add some nodes to see the map at a glance.</div>'; return; }
   const I=computeInsights();
   _insCache={pool:I.pool,links:I.criticalLinks||[],pairs:I.gridlockRisks||[],paths:I.influenceBridges||[]};
   const esc=escHtml;
@@ -3776,9 +3780,34 @@ function renderInsights(){
   const pair=(a,b)=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:3px 6px;"><span>${a}</span><span style="color:var(--ink-h);">${b}</span></div>`;
   const bar=pct=>`<div style="height:6px;border-radius:3px;background:var(--ink);opacity:.7;width:${Math.max(2,Math.round(pct))}%;margin:2px 6px 6px;"></div>`;
 
+  if(!_insFull){
+    // ── At a glance: the few things worth seeing before asking anything ──────────
+    const tag=(t,good)=>`<span style="display:inline-block;padding:2px 9px;margin:0 4px 5px 0;border-radius:999px;font-size:11px;${good?'background:#dcfce7;color:#166534;font-weight:600;':'background:var(--surf-3);color:var(--ink);'}">${t}</span>`;
+    const lab=t=>`<div style="font-size:9.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-h);margin:10px 0 3px;">${t}</div>`;
+    const whole=I.linked.length===1&&!I.isolated;
+    let g=`<div style="font-size:11.5px;color:var(--ink-h);">${I.filtered?'<strong>Filtered view</strong> (follows your search and filters)':(DATE_ASAT?'Map as it stood on '+esc(DATE_ASAT):'Full map')}</div>`;
+    g+=_focusBar();
+    g+=`<div style="margin-top:8px;">${tag(noun(I.pool.length))}${tag(plural(I.edgesCount,'connection'))}`+
+       (I.linked.length===1?tag('One connected network',whole):tag(plural(I.linked.length,'connected network')+(I.isolated?`, ${I.isolated} on their own`:''),false))+
+       (I.isolated?tag(`${noun(I.isolated)} with no connection`,false):tag(`Nobody cut off`,true))+`</div>`;
+    const br=(I.bridges||[]).slice().sort((a,b)=>b.cutOff-a.cutOff).slice(0,3);
+    if(br.length) g+=lab('Who the map depends on')+br.map(b=>row(b.node,`cuts off ${b.cutOff}`,'choke')).join('');
+    if(I.betweenness&&I.topBetweenness.length) g+=lab('Biggest go-betweens')+I.topBetweenness.slice(0,3).map(n=>row(n,_bottleneckCell(n,Math.round(I.betweenness.get(n.id)),I.pool.length),'node',true)).join('');
+    if(MAP_TYPE==='systems'&&I.directedEdges){
+      const rC=(I.loopClass||[]).filter(c=>c.type==='R').length, bC=(I.loopClass||[]).filter(c=>c.type==='B').length;
+      g+=lab('Feedback loops')+`<div style="font-size:11.5px;padding:2px 6px;">${rC} reinforcing, ${bC} balancing${I.unassignedPolarityCount?`<div style="color:#B45309;margin-top:2px;">${plural(I.unassignedPolarityCount,'connection')} with no + or &minus;, so some loops cannot be classified.</div>`:''}</div>`;
+    }
+    if(F.list.length) g+=lab('Findings')+F.list.slice(0,3).map((f,i)=>{ const on=_on('finding:'+f.id), col=_FINDING_TAG_COL[f.tag]||'#64748B';
+      return `<div onclick="focusFinding(${i})" title="${_tip(on)}" style="padding:6px 8px;margin:3px 0;border-radius:8px;cursor:pointer;border-left:3px solid ${col};font-size:11.5px;line-height:1.45;${on?'background:var(--surf-3);':''}">${esc(f.text)}</div>`; }).join('');
+    g+=`<button onclick="setInsightsFull(true)" style="margin-top:10px;width:100%;height:28px;font-size:11px;">Show more (the full lists)</button>`;
+    g+=_glossaryHTML('panel');
+    body.innerHTML=g;
+    return;
+  }
   let h = I.filtered
     ? `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;background:var(--surf-3);font-size:11.5px;"><span><strong>Filtered view:</strong> ${plural(I.pool.length,'person')}</span><button onclick="clearSearch()" style="font-size:10.5px;height:24px;padding:0 8px;">Show full map</button></div>`
     : `<div style="font-size:11.5px;color:var(--ink-h);">${DATE_ASAT?'Map as it stood on '+esc(DATE_ASAT)+':':'Full map:'} ${plural(I.pool.length,'person')}. Search or filter to look at part of it.</div>`;
+  h = `<button onclick="setInsightsFull(false)" style="width:100%;height:28px;font-size:11px;margin-bottom:8px;">&larr; Back to At a glance</button>`+h;
   h += _focusBar();
   h += `<div style="font-size:11px;color:var(--ink-h);margin-top:4px;">${plural(I.edgesCount,'connection')} between these ${NOUN[1]}. ${plural(I.isolated,'person')} with none.${MAP_TYPE!=='argument'?` ${I.density}% of possible connections exist.`:''}</div>`;
 
