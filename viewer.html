@@ -1108,7 +1108,7 @@ body.share-mode #present-exit{display:none !important;}
 
 
 /* Viewer chrome */
-#viewer-bar{position:fixed;top:0;left:0;right:0;height:46px;z-index:60;display:flex;
+#viewer-bar{position:fixed;top:0;left:0;right:0;height:46px;z-index:10001;display:flex;
   align-items:center;gap:10px;padding:0 14px;background:var(--surf);
   border-bottom:1px solid var(--bdr);font-family:'DM Sans',sans-serif;}
 #viewer-title{font-size:13px;font-weight:600;color:var(--ink);overflow:hidden;
@@ -6667,6 +6667,85 @@ function renderHoverPanel(n){
 // map looks exactly like the real thing. Nothing that edits, imports, exports
 // or saves is in this file.
 (function(){
+  // The app wires these behaviours with top-level event listeners. The viewer
+  // generator deliberately drops top-level statements, so wire the safe,
+  // read-only subset explicitly here.
+  function wireViewerCanvas(){
+    var c=document.getElementById('bg');
+    if(!c||c.dataset.viewerWired) return;
+    c.dataset.viewerWired='1';
+    var dragging=false,startX=0,startY=0,startPanX=0,startPanY=0,hovered=null;
+
+    c.addEventListener('wheel',function(e){
+      e.preventDefault();
+      var factor=e.deltaY<0?1.1:0.91,oldZoom=zoom;
+      zoom=Math.max(minZoomAllowed(),Math.min(MAX_ZOOM,zoom*factor));
+      panX=e.offsetX-(e.offsetX-panX)*(zoom/oldZoom);
+      panY=e.offsetY-(e.offsetY-panY)*(zoom/oldZoom);
+      draw();
+    },{passive:false});
+
+    c.addEventListener('pointerdown',function(e){
+      if(e.button!==0) return;
+      dragging=true; startX=e.offsetX; startY=e.offsetY; startPanX=panX; startPanY=panY;
+      c.style.cursor='grabbing';
+      try{ c.setPointerCapture(e.pointerId); }catch(_){}
+      e.preventDefault();
+    });
+    c.addEventListener('pointermove',function(e){
+      if(dragging){
+        panX=startPanX+(e.offsetX-startX); panY=startPanY+(e.offsetY-startY); draw();
+        return;
+      }
+      var n=nodeAt(e.offsetX,e.offsetY);
+      if(n){
+        if(hovered!==n.id){ hovered=n.id; showHoverPanel(n.id); }
+      }else if(hovered!==null){
+        hovered=null;
+        try{ highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear(); }catch(_){}
+        var panel=document.getElementById('hover-panel'); if(panel) panel.classList.remove('visible');
+        try{ hoverPanelNodeId=null; }catch(_){}
+        draw();
+      }
+    });
+    function stopPan(e){
+      if(!dragging) return;
+      dragging=false; c.style.cursor='default';
+      try{ c.releasePointerCapture(e.pointerId); }catch(_){}
+    }
+    c.addEventListener('pointerup',stopPan);
+    c.addEventListener('pointercancel',stopPan);
+    c.addEventListener('pointerleave',function(e){ stopPan(e); });
+  }
+
+  function wirePresentationDivider(){
+    var divider=document.getElementById('present-divider');
+    var left=document.getElementById('present-left');
+    var overlay=document.getElementById('present-overlay');
+    if(!divider||!left||!overlay||divider.dataset.viewerWired) return;
+    divider.dataset.viewerWired='1';
+    var dragging=false,startX=0,startW=0;
+    divider.addEventListener('pointerdown',function(e){
+      dragging=true; startX=e.clientX; startW=left.offsetWidth;
+      divider.classList.add('dragging');
+      try{ divider.setPointerCapture(e.pointerId); }catch(_){}
+      e.preventDefault();
+    });
+    divider.addEventListener('pointermove',function(e){
+      if(!dragging) return;
+      var newW=Math.min(Math.max(startW+(e.clientX-startX),220),overlay.clientWidth-220);
+      left.style.width=newW+'px';
+      try{ _presResizeCanvas(); }catch(_){}
+    });
+    function stopDivider(e){
+      if(!dragging) return;
+      dragging=false; divider.classList.remove('dragging');
+      try{ divider.releasePointerCapture(e.pointerId); }catch(_){}
+    }
+    divider.addEventListener('pointerup',stopDivider);
+    divider.addEventListener('pointercancel',stopDivider);
+  }
+
   var raw='';
   try{ raw=(document.getElementById('puddl-viewer-data').textContent||'').trim(); }catch(e){}
 
@@ -6686,6 +6765,9 @@ function renderHoverPanel(n){
 
   try{ restoreSnap(raw); }
   catch(err){ document.getElementById('viewer-title').textContent='This map could not be read'; return; }
+
+  wireViewerCanvas();
+  wirePresentationDivider();
 
   try{ document.getElementById('viewer-title').textContent = (typeof mapTitle!=='undefined' && mapTitle) ? mapTitle : 'Puddle map'; }catch(e){}
 
