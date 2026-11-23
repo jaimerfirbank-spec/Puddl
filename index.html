@@ -6047,16 +6047,16 @@ function computeFindings(I){
   if(grp&&series&&thenRow&&thenRow!==nowRow&&thenRow.measured>=15&&nowRow.measured>=15){
     const a=thenRow.cross/thenRow.measured, b=nowRow.cross/nowRow.measured, pa=Math.round(100*a), pb=Math.round(100*b);
     const focusCross=()=>{ const cr=linkList.filter(([x,y])=>gOf(x)&&gOf(y)&&gOf(x)!==gOf(y)); const ids=new Set(); cr.forEach(([x,y])=>{ ids.add(x); ids.add(y); });
-                           return {label:`Connections that cross ${gw} lines`,ids,pairs:cr.map(([x,y])=>_pk(x,y)),sec:[]}; };
+                           return {label:`Cross-${gw} links`,ids,pairs:cr.map(([x,y])=>_pk(x,y)),sec:[]}; };
     const grew=nowRow.cross>=2*thenRow.cross&&nowRow.cross-thenRow.cross>=5;
     if(b-a>=0.10) add('mixing','Change over time',
-        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections crossed a ${gw} line. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
-        `${thenRow.cross} of ${thenRow.measured} connections then, ${nowRow.cross} of ${nowRow.measured} now. Connections across ${gp} are where joined-up working shows.`,focusCross);
+        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections were cross-${gw} links. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
+        `${thenRow.cross} of ${thenRow.measured} connections then, ${nowRow.cross} of ${nowRow.measured} now. Cross-${gw} links are where joined-up working shows.`,focusCross);
     else if(grew) add('mixing','Change over time',
-        `Connections across ${gp} grew from ${thenRow.cross} to ${nowRow.cross}.`,
+        `Cross-${gw} links grew from ${thenRow.cross} to ${nowRow.cross}.`,
         `${thenRow.cross} of ${thenRow.measured} connections in ${_monthLabel(thenRow.d)}, ${nowRow.cross} of ${nowRow.measured} in ${_monthLabel(nowRow.d)}. The map as a whole grew faster, so their share went from ${pa}% to ${pb}%.`,focusCross);
     else if(a-b>=0.10) add('mixing','Change over time',
-        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections crossed a ${gw} line. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
+        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections were cross-${gw} links. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
         `${thenRow.cross} of ${thenRow.measured} connections then, ${nowRow.cross} of ${nowRow.measured} now. More of the connecting is now happening inside one ${gw}.`,focusCross);
   }
   // 2. Two groups that started to connect, preferring the pair that began by going through one item
@@ -6222,7 +6222,7 @@ function _changeTableHTML(series,grp){
   const row=(label,f)=>`<tr><td style="padding:4px 8px 4px 0;color:var(--txt-m);">${label}</td>${cols.map(c=>`<td style="padding:4px 8px;text-align:right;font-weight:600;color:var(--navy);">${f(c)}</td>`).join('')}</tr>`;
   let h=`<div class="report-section"><h4>How the map changed</h4><div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Worked out from the dates on the map.</div><div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:12px;width:100%;"><thead><tr><th></th>${cols.map(c=>`<th style="padding:4px 8px;text-align:right;font-size:11px;color:var(--txt-h);font-weight:600;">${e(_monthLabel(c.d))}</th>`).join('')}</tr></thead><tbody>`;
   h+=row(`${cap(np)} on the map`,c=>c.n)+row('Connections',c=>c.links)+row('With no connection',c=>c.iso)+row('Separate pieces',c=>c.pieces);
-  if(grp) h+=row(`Cross a ${_groupWord(grp.name)} line`,c=>c.measured?Math.round(100*c.cross/c.measured)+'%':'–');
+  if(grp) h+=row(`Cross-${_groupWord(grp.name)} links`,c=>c.measured?Math.round(100*c.cross/c.measured)+'%':'–');
   return h+`</tbody></table></div></div>`;
 }
 function _groupGridHTML(F){
@@ -6476,7 +6476,7 @@ function _reportChartsHTML(I,F){
         const top=[...(r.pairs||new Map()).entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,c])=>`${lab(k)} (${c})`).join(', ');
         return [`End of ${_monthLabel(r.d)}`,`${Math.round(100*r.cross/r.measured)}% = ${r.cross} of ${r.measured} connections join two different ${gw}s`,top?`Most often: ${top}`:''];
       });
-      cards.push(card(`Connections that cross ${gw} lines`,'Share of all connections, by month',_svgColumns(S.map(r=>r.measured>=10?Math.round(100*r.cross/r.measured):0),dts,'#7C3AED',true,crossTips)));
+      cards.push(card(`Cross-${gw} links`,'Share of all connections, by month',_svgColumns(S.map(r=>r.measured>=10?Math.round(100*r.cross/r.measured):0),dts,'#7C3AED',true,crossTips)));
     }
   }
   const byDeg=[...pool].sort((a,b)=>adj.get(b.id).size-adj.get(a.id).size||String(a.label).localeCompare(String(b.label))).slice(0,8);
