@@ -1081,6 +1081,29 @@ body.share-mode #present-exit{display:none !important;}
 #icon-picker-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;}
 #icon-picker-grid button{width:32px;height:32px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf-2);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:var(--ink);transition:background .1s,border-color .1s,color .1s;}
 #icon-picker-grid button:hover{background:var(--acc,#3B82F6);border-color:transparent;color:#fff;}
+
+/* Ask Puddle: calculated questions presented like a compact chat helper. */
+#ask-puddl-launcher{position:fixed;right:78px;bottom:70px;z-index:42;height:56px;padding:0 17px 0 5px;display:flex;align-items:center;gap:9px;border-radius:28px;background:#e4e4e7;color:#27272a;border:1px solid #c4c4c8;box-shadow:var(--shadow-lg);font-size:12.5px;font-weight:800;cursor:pointer;}
+#ask-puddl-launcher img{width:46px;height:46px;object-fit:cover;border-radius:23px;image-rendering:auto;}
+#ask-puddl-launcher:hover{transform:translateY(-1px);box-shadow:var(--shadow-xl);}
+#ask-puddl-launcher.listening img{animation:askPuddlListen 1s steps(2,end) infinite;}
+#ask-puddl-widget{display:none;position:fixed;right:78px;bottom:126px;z-index:43;width:350px;max-height:min(650px,calc(100vh - 150px));background:var(--surf);border:1px solid var(--bdr);border-radius:16px;box-shadow:var(--shadow-xl);font-family:'DM Sans',sans-serif;overflow:hidden;flex-direction:column;}
+#ask-puddl-widget.open{display:flex;animation:askPuddlOpen .16s ease-out;}
+.ask-puddl-head{display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid var(--bdr);background:var(--surf-2);}
+.ask-puddl-head img{width:52px;height:52px;object-fit:cover;border-radius:12px;flex-shrink:0;}
+.ask-puddl-body{padding:11px 12px;overflow-y:auto;overscroll-behavior:contain;}
+.ask-puddl-bubble{padding:8px 9px;border-radius:10px;background:var(--surf-2);font-size:11.5px;line-height:1.45;color:var(--ink);margin-bottom:8px;}
+.ask-puddl-status{display:inline-flex;align-items:center;border-radius:999px;padding:2px 7px;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px;background:var(--surf-3);color:var(--ink-m);}
+.ask-puddl-row{display:flex;gap:6px;align-items:center;}
+.ask-puddl-row input{flex:1;min-width:0;height:34px;font-size:12px;padding:0 9px;}
+.ask-puddl-mic{width:34px;height:34px;padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.ask-puddl-mic.listening{background:#00AEEF;color:#fff;border-color:#00AEEF;animation:askPuddlPulse 1s ease-in-out infinite;}
+.ask-puddl-suggest{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0;}
+.ask-puddl-suggest button{height:25px;padding:0 8px;font-size:10px;border-radius:13px;}
+@keyframes askPuddlOpen{from{opacity:0;transform:translateY(8px) scale(.98);}to{opacity:1;transform:none;}}
+@keyframes askPuddlPulse{50%{box-shadow:0 0 0 4px rgba(0,174,239,.18);}}
+@keyframes askPuddlListen{50%{transform:translateY(-1px);}}
+@media(max-width:720px){#ask-puddl-widget{right:10px;left:10px;bottom:74px;width:auto;}#ask-puddl-launcher{right:14px;bottom:14px;}}
 </style>
 <!-- Supabase Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1137,6 +1160,7 @@ body.share-mode #present-exit{display:none !important;}
         <button onclick="exportPNGSnapshot();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Export image</button>
       </div>
     </div>
+    <button id="btn-ask-map" onclick="openAskMap()" title="Ask a calculated question about this map" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-m);">Ask the map</button>
     <div id="demo-save-btn" style="display:none;align-items:center;gap:6px;padding:0 14px;height:28px;border-radius:var(--radius);border:1px solid var(--bdr);background:var(--surf-3);color:var(--ink-h);font-size:11px;font-weight:600;cursor:default;" title="Save (inactive in demo)">⬇ Save file</div>
     <button id="btn-open-settings" onclick="openCustomizePanel()" title="Map settings" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-m);">Settings</button>
     <div style="width:1px;height:20px;background:var(--bdr);margin:0 4px;"></div>
@@ -1223,6 +1247,30 @@ body.share-mode #present-exit{display:none !important;}
 <div id="puddl-narration" style="display:none"></div>
 <div id="puddl-share" style="display:none"></div>
 
+<button id="ask-puddl-launcher" onclick="openAskMap()" title="Ask a calculated question about this map" aria-label="Ask Puddle">
+  <img src="assets/ask-puddl-plush.png" alt=""><span>Ask Puddle</span>
+</button>
+<section id="ask-puddl-widget" role="dialog" aria-label="Ask Puddle" aria-modal="false">
+  <div class="ask-puddl-head">
+    <img src="assets/ask-puddl-plush.png" alt="Puddle sheep">
+    <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:800;color:var(--ink);">Ask Puddle</div><div style="font-size:10px;color:var(--ink-h);line-height:1.3;">Calculated from this map · not an AI chatbot</div></div>
+    <button onclick="closeAskMap()" title="Close" aria-label="Close Ask Puddle" style="width:28px;height:28px;padding:0;border:none;background:transparent;font-size:16px;color:var(--ink-h);">×</button>
+  </div>
+  <div class="ask-puddl-body">
+    <div class="ask-puddl-bubble">What would you like to understand about this map?</div>
+    <div id="ask-puddl-answer"></div>
+    <div class="ask-puddl-suggest" id="ask-puddl-suggestions"></div>
+    <div class="ask-puddl-row">
+      <input id="ask-map-input" type="search" name="puddl_question_query" autocomplete="one-time-code" autocapitalize="sentences" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" placeholder="Ask a question…" oninput="askFromTyping()" onkeydown="if(event.key==='Enter'){event.preventDefault();runAskMap();}">
+      <button onclick="runAskMap()" title="Show answer" aria-label="Show answer" style="width:34px;height:34px;padding:0;background:var(--ink);color:var(--surf);border-color:var(--ink);font-size:16px;">→</button>
+    </div>
+    <select id="ask-question-select" onchange="askPickQuestion(this.value)" style="width:100%;height:30px;font-size:11px;margin-top:7px;"></select>
+    <button onclick="clearAskHighlight()" style="width:100%;height:27px;margin-top:7px;font-size:10.5px;">Clear map highlighting</button>
+    <details style="margin-top:7px;"><summary style="font-size:10.5px;font-weight:700;color:var(--ink-h);cursor:pointer;">Choose dates, when relevant</summary><div style="display:flex;gap:5px;margin-top:6px;"><input id="ask-date-from" type="date" style="min-width:0;flex:1;height:28px;font-size:10.5px;padding:0 3px;"><input id="ask-date-to" type="date" style="min-width:0;flex:1;height:28px;font-size:10.5px;padding:0 3px;"></div></details>
+    <div id="ask-puddl-report"></div>
+  </div>
+</section>
+
 <!-- Auth Modal -->
 <div id="auth-modal" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;font-family:'DM Sans',sans-serif;">
   <div style="background:var(--surf);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);padding:40px;width:100%;max-width:400px;margin:20px;">
@@ -1301,7 +1349,7 @@ body.share-mode #present-exit{display:none !important;}
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);margin-bottom:10px;">Filter &amp; Search</div>
     <!-- Search with autocomplete -->
     <div style="position:relative;margin-bottom:8px;">
-      <input type="text" id="search-input" placeholder="Search nodes…" oninput="applyFilters();buildSearchSuggestions()" autocomplete="off" style="width:100%;">
+      <input type="search" id="search-input" name="puddl_node_search" placeholder="Search nodes…" oninput="applyFilters();buildSearchSuggestions()" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" style="width:100%;">
       <div id="search-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius);box-shadow:var(--shadow-md);z-index:100;max-height:180px;overflow-y:auto;margin-top:2px;"></div>
     </div>
     <!-- Category and Area filters removed: nodes carry their own colour, shape and notes. -->
@@ -3138,6 +3186,7 @@ function snap(){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
+    askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
     nodeSizeMode:NODE_SIZE_MODE,
@@ -3214,6 +3263,8 @@ function restoreSnap(s){
   }
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
+  ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
+  _askAnswer=null;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
   if(d.defaultNodeStyle) DEFAULT_NODE_OUTLINE=d.defaultNodeStyle==='outline';
   if(inPresentationEditMode) rebuildPresStopList();
@@ -3647,7 +3698,7 @@ function draw(){
     // Draw stroke — loop arcs use ctx.arc(), others use quadratic Bezier
     if(loopC){
       const antiCW=loopC.dir==='ccw';
-      const as=(7*arrowScale)*lineZoomClamp()/zoom;
+      const as=(10*arrowScale)*lineZoomClamp()/zoom;
       // Stop the arc stroke one arrowhead-length before the tip so the filled triangle sits on top cleanly
       const arcAdjEnd=antiCW ? arcEndAngle+as/loopC.r : arcEndAngle-as/loopC.r;
       ctx.strokeStyle=drawStroke;
@@ -3668,7 +3719,7 @@ function draw(){
       ctx.setLineDash([]);
     } else {
       // Non-loop: compute connected arrow geometry so the stroke ends exactly at the arrowhead base
-      const as=(7*arrowScale)*lineZoomClamp()/zoom;
+      const as=(10*arrowScale)*lineZoomClamp()/zoom;
       const tdx=2*(bp.x-mx),tdy=2*(bp.y-my),tL=Math.sqrt(tdx*tdx+tdy*tdy)||1;
       const tNx=tdx/tL,tNy=tdy/tL,tPx=-tNy,tPy=tNx; // unit tangent + perp at bp (t=1)
       const headT=arrowOf(e)==='forward'||arrowOf(e)==='both';
@@ -3714,8 +3765,8 @@ function draw(){
       if(headT){
         ctx.beginPath();
         ctx.moveTo(bp.x,bp.y);
-        ctx.lineTo(bpS.x+tPx*as*0.45,bpS.y+tPy*as*0.45);
-        ctx.lineTo(bpS.x-tPx*as*0.45,bpS.y-tPy*as*0.45);
+        ctx.lineTo(bpS.x+tPx*as*0.55,bpS.y+tPy*as*0.55);
+        ctx.lineTo(bpS.x-tPx*as*0.55,bpS.y-tPy*as*0.55);
         ctx.closePath();
         ctx.fillStyle=drawStroke;ctx.fill();
       }
@@ -3726,8 +3777,8 @@ function draw(){
         ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
-        ctx.lineTo(apS.x+rPx*as*0.45,apS.y+rPy*as*0.45);
-        ctx.lineTo(apS.x-rPx*as*0.45,apS.y-rPy*as*0.45);
+        ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
+        ctx.lineTo(apS.x-rPx*as*0.55,apS.y-rPy*as*0.55);
         ctx.closePath();
         ctx.fillStyle=drawStroke;ctx.fill();
         ctx.restore();
@@ -3774,7 +3825,7 @@ function draw(){
     }
     // Loop arc arrowhead — placed at the actual arc endpoint on the circle, not at bp
     if(loopC){
-      const as=(7*arrowScale)*lineZoomClamp()/zoom;
+      const as=(10*arrowScale)*lineZoomClamp()/zoom;
       const antiCW=loopC.dir==='ccw';
       // Tip = point on loop circle at arcEndAngle (where the arc actually terminates)
       const arcTipX=loopC.x+loopC.r*Math.cos(arcEndAngle);
@@ -3783,7 +3834,7 @@ function draw(){
       const ty=antiCW?-Math.cos(arcEndAngle): Math.cos(arcEndAngle);
       const ang=Math.atan2(ty,tx);
       ctx.translate(arcTipX,arcTipY);ctx.rotate(ang);
-      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-as,-as*0.45);ctx.lineTo(-as,as*0.45);ctx.closePath();
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-as,-as*0.55);ctx.lineTo(-as,as*0.55);ctx.closePath();
       ctx.fillStyle=drawStroke;ctx.fill();
       ctx.restore();
     }
@@ -5301,12 +5352,254 @@ function insightSummaryLines(I){
 }
 let _insOpen={};
 try{ _insOpen=JSON.parse(localStorage.getItem('puddl-ins-open')||'{}')||{}; }catch(e){ _insOpen={}; }
+let ASK_REPORT_ITEMS=[];
+let _askAnswer=null;
 function toggleInsGroup(k){
   _insOpen[k]=!_insOpen[k];
   try{ localStorage.setItem('puddl-ins-open',JSON.stringify(_insOpen)); }catch(e){}
   const b=document.getElementById('insg-'+k), a=document.getElementById('insa-'+k);
   if(b) b.style.display=_insOpen[k]?'block':'none';
   if(a) a.textContent=_insOpen[k]?'▾':'▸';
+}
+
+function openAskMap(){
+  const w=document.getElementById('ask-puddl-widget'); if(!w) return;
+  w.classList.add('open'); renderAskWidget();
+}
+function closeAskMap(){ const w=document.getElementById('ask-puddl-widget'); if(w) w.classList.remove('open'); }
+function clearAskHighlight(){ clearHighlight(); showStatus('Question highlighting cleared.'); }
+function _askQuestions(){
+  const base=[
+    {cat:'Overview',id:'overview',q:'What are the main findings?'},
+    {cat:'People and structure',id:'holds',q:'Who holds this map together?'},
+    {cat:'People and structure',id:'isolated',q:'Who is isolated?'},
+    {cat:'People and structure',id:'connected',q:'Who is most connected?'},
+    {cat:'People and structure',id:'least',q:'Who has the fewest connections?'},
+    {cat:'People and structure',id:'bottleneck',q:'Who sits on the most routes between others?'},
+    {cat:'Connections',id:'weak',q:'Where are the weak connections?'},
+    {cat:'Connections',id:'strong',q:'Where are the strong connections?'},
+    {cat:'Connections',id:'groups',q:'Which parts of the map do not connect?'},
+    {cat:'Connections',id:'largestgroup',q:'What is the largest connected group?'},
+    {cat:'Connections',id:'density',q:'How connected is the map overall?'},
+    {cat:'Direction',id:'incoming',q:'Who has the most connections coming in?'},
+    {cat:'Direction',id:'outgoing',q:'Who has the most connections going out?'},
+    {cat:'Change over time',id:'change',q:'What changed between two dates?'}
+  ];
+  if(MAP_TYPE==='systems') base.push(
+    {cat:'Systems',id:'reinforcing',q:'Which loops are reinforcing?'},
+    {cat:'Systems',id:'balancing',q:'Which loops are balancing?'},
+    {cat:'Systems',id:'unsigned',q:'Where are connection signs missing?'},
+    {cat:'Systems',id:'roots',q:'What are the likely starting points?'},
+    {cat:'Systems',id:'outcomes',q:'What are the likely end results?'},
+    {cat:'Systems',id:'loops',q:'Which factors appear in several feedback loops?'}
+  );
+  return base;
+}
+// Everyday words and phrases for each question, with how strongly each points at it. A typed question is scored
+// against all of them: a clear winner is answered (and says what it took the question to mean), a close call or a
+// weak match offers the best few to pick from, and nothing is ever answered with a wrong guess in silence.
+const _ASK_WORDS={
+  connected:[['most connected',4],['best connected',4],['most connections',4],['most links',4],['highest number',3],['most amount',3],['biggest hub',4],['busiest',3],['hub',2],['popular',2],['well connected',3],['greatest reach',4]],
+  least:[['fewest',4],['least connected',4],['least connections',4],['lowest number',3],['barely connected',3],['weakly connected',2]],
+  isolated:[['isolated',4],['alone',3],['not connected',4],["isn't connected",4],['isnt connected',4],['no connection',4],['unconnected',4],['disconnected',3],['no links',3],['left out',3],['on their own',3],['nobody',2]],
+  holds:[['holds',3],['together',3],['depend',4],['rely',3],['lean on',3],['critical',3],['essential',3],['key organisation',3],['lose if',4],['would we lose',4],['what if',2],['closed',2],['removed',2],['if it went',2],['single point',3]],
+  bottleneck:[['go-between',5],['go between',5],['bottleneck',5],['between others',4],['routes',3],['route',2],['broker',3],['gatekeeper',4],['bridge',2],['pass through',3],['middle',2]],
+  weak:[['weak',4]],
+  strong:[['strong',4]],
+  groups:[['do not connect',4],["don't connect",4],['separate',3],['islands',3],['clusters',3],['not linked',3],['parts of the map',3]],
+  largestgroup:[['largest',3],['connected network',4],['connected group',4],['biggest network',4]],
+  density:[['how connected',4],['density',4],['overall',2],['how well connected',4]],
+  incoming:[['coming in',5],['incoming',5],['affected by',4],['arrows in',3],['receives',2]],
+  outgoing:[['going out',5],['outgoing',5],['affects the most',4],['drives',3],['arrows out',3]],
+  change:[['change',3],['changed',4],['different',2],['since',2],['over time',4],['between two dates',4],['grew',3],['grown',3]],
+  overview:[['findings',4],['summary',4],['overview',4],['tell me about',3],['what should i know',3],['main',2]],
+  reinforcing:[['reinforc',5],['snowball',4],['vicious',3],['virtuous',3],['amplif',3]],
+  balancing:[['balanc',5],['self-correct',4],['resist',3],['stabil',3]],
+  unsigned:[['missing',3],['unsigned',5],['no sign',5],['plus or minus',3],['sign',2]],
+  roots:[['root cause',5],['starting point',5],['start point',5],['where does it start',4],['origin',3],['source',3]],
+  outcomes:[['end result',5],['outcome',4],['where does it end',4],['sink',3]],
+  loops:[['feedback',4],['loop',4],['several loops',4],['more than one loop',4]]
+};
+function _askRank(text){
+  const s=' '+String(text||'').toLowerCase().replace(/[?.,!]/g,' ').replace(/\s+/g,' ')+' ';
+  const valid=new Set(_askQuestions().map(q=>q.id)), out=[];
+  Object.keys(_ASK_WORDS).forEach(id=>{ if(!valid.has(id)) return; let sc=0; _ASK_WORDS[id].forEach(([w,wt])=>{ if(s.includes(w)) sc+=wt; }); if(sc>0) out.push({id,score:sc}); });
+  return out.sort((a,b)=>b.score-a.score);
+}
+function _askDefaultIds(){ return MAP_TYPE==='systems'?['reinforcing','unsigned','roots']:['holds','isolated','change']; }
+function _askDecide(text){
+  const raw=String(text||'').trim();
+  if(!raw) return {id:'overview',how:'exact',options:[]};
+  const exact=_askQuestions().find(x=>x.q.toLowerCase()===raw.toLowerCase());
+  if(exact) return {id:exact.id,how:'exact',options:[]};
+  const r=_askRank(raw);
+  if(!r.length) return {id:'unknown',how:'none',options:_askDefaultIds()};
+  const top=r[0], second=r[1];
+  if(top.score>=3&&(!second||top.score>=1.5*second.score)) return {id:top.id,how:'guess',options:r.slice(1,4).map(x=>x.id)};
+  return {id:'unknown',how:'close',options:r.slice(0,3).map(x=>x.id)};
+}
+function _askMatch(text){ return _askDecide(text).id; }
+function askPickAndRun(id){
+  const q=_askQuestions().find(x=>x.id===id), input=document.getElementById('ask-map-input');
+  if(input&&q) input.value=q.q;
+  runAskMap();
+}
+function askPickQuestion(id){
+  const q=_askQuestions().find(x=>x.id===id);
+  const input=document.getElementById('ask-map-input'); if(input&&q) input.value=q.q;
+}
+function askFromTyping(){
+  const input=document.getElementById('ask-map-input'), sel=document.getElementById('ask-question-select');
+  if(sel){ const id=_askMatch(input?input.value:''); if(id!=='unknown') sel.value=id; else sel.selectedIndex=-1; }
+}
+function _askEdgeData(predicate){
+  const ids=new Set(getVisibleNodes().map(n=>n.id)), pairs=[], focusIds=new Set();
+  edges.forEach(e=>{ const a=_eEnd(e,'source'),b=_eEnd(e,'target'); if(!ids.has(a)||!ids.has(b)||!predicate(e)) return; pairs.push(_pk(a,b)); focusIds.add(a); focusIds.add(b); });
+  return {pairs,ids:focusIds};
+}
+function _askMeaning(id){
+  const M={
+    overview:['Neutral','This is a summary of the strongest calculated patterns, not a judgement on the map.','The first matching finding is highlighted as an example.'],
+    holds:['Mixed','Holding different parts together can help information travel, but relying on very few connectors can also create fragility.','The connectors that hold sections together are highlighted.'],
+    isolated:['Concern','Items with no recorded connections may be overlooked, newly added, intentionally independent, or simply missing data.','Every item with no connection in the current view is highlighted.'],
+    connected:['Neutral','Being well connected may indicate reach or workload. It does not by itself mean influence or good performance.','The best-connected items and their immediate connections are highlighted.'],
+    least:['Neutral','Having few connections may mean an item is peripheral, specialist, newly added, or missing recorded relationships.','The items with the fewest recorded connections are highlighted.'],
+    bottleneck:['Mixed','A bottleneck can coordinate activity, but it can also slow or interrupt the network if too much depends on it.','The items sitting on the most routes are highlighted.'],
+    weak:['Concern','Weak connections may be early relationships worth developing, or links that no longer need strengthening.','Every connection marked weak, and both of its ends, are highlighted.'],
+    strong:['Neutral','Strong recorded relationships may support coordination, but they can also show where activity is concentrated.','Every connection marked strong, and both of its ends, are highlighted.'],
+    groups:['Concern','Separate parts cannot reach one another through this map. That may be intentional, or it may reveal a gap.','The answer describes the disconnected structure; no single item is selected.'],
+    largestgroup:['Neutral','The largest connected group shows where the greatest concentration of recorded relationships sits.','Every item and connection in the largest group is highlighted.'],
+    density:['Neutral','Density describes how many possible relationships are recorded. More is not automatically better; the right level depends on the system.','The answer describes the whole current view, so nothing specific is highlighted.'],
+    incoming:['Neutral','Many incoming connections can indicate visibility, demand, dependence or influence, depending on what the arrows mean.','The top item and its incoming connections are highlighted.'],
+    outgoing:['Neutral','Many outgoing connections can indicate reach, activity or influence, depending on what the arrows mean.','The top item and its outgoing connections are highlighted.'],
+    change:['Neutral','This shows recorded growth between the chosen dates. It does not prove why the change happened.','Items and connections added during the period are highlighted.'],
+    reinforcing:['Neutral','Reinforcing means change compounds around the loop. It can amplify something helpful or harmful.','The detected reinforcing loops are highlighted.'],
+    balancing:['Neutral','Balancing means the loop pushes against change. It may stabilise the system or resist improvement.','The detected balancing loops are highlighted.'],
+    unsigned:['Uncertain','Without a + or - sign, Puddle cannot reliably classify any loop containing that connection.','Directed connections missing a sign are highlighted.'],
+    roots:['Neutral','These are structural starting points on the map, not proven real-world root causes.','The factors with little or nothing pointing into them are highlighted.'],
+    outcomes:['Neutral','These are structural end results on the map, not guaranteed future outcomes.','The factors with little or nothing flowing out of them are highlighted.'],
+    loops:['Mixed','Appearing in several loops can make a factor important, but the direction and signs determine what that means.','Factors shared by several detected loops are highlighted.']
+  };
+  const x=M[id]||['Uncertain','Puddle could not match this wording to a calculation it knows.','Nothing is highlighted.'];
+  return {assessment:x[0],meaning:x[1],highlight:x[2]};
+}
+function renderAskWidget(){
+  const qs=_askQuestions(), cats=[...new Set(qs.map(x=>x.cat))], sel=document.getElementById('ask-question-select');
+  if(!sel) return;
+  const current=(_askAnswer&&_askAnswer.id!=='unknown')?_askAnswer.id:(sel.value||'');
+  sel.innerHTML=`<option value="">Choose a calculated question…</option>`+cats.map(c=>`<optgroup label="${escHtml(c)}">${qs.filter(x=>x.cat===c).map(x=>`<option value="${x.id}"${x.id===current?' selected':''}>${escHtml(x.q)}</option>`).join('')}</optgroup>`).join('');
+  const sug=document.getElementById('ask-puddl-suggestions'); if(sug){
+    const ids=MAP_TYPE==='systems'?['reinforcing','unsigned','roots']:['holds','isolated','change'];
+    sug.innerHTML=ids.map(id=>{ const q=qs.find(x=>x.id===id); return q?`<button onclick="askPickQuestion('${id}')">${escHtml(q.q)}</button>`:''; }).join('');
+  }
+  const ans=document.getElementById('ask-puddl-answer');
+  if(ans) ans.innerHTML=_askAnswer?`<div class="ask-puddl-bubble"><div class="ask-puddl-status">${escHtml(_askAnswer.assessment||'Neutral')}</div><div style="font-weight:700;">${escHtml(_askAnswer.answer)}</div>${_askAnswer.evidence?`<div style="color:var(--ink-h);font-size:10.5px;margin-top:3px;">${escHtml(_askAnswer.evidence)}</div>`:''}<div style="margin-top:7px;"><strong>What this may mean:</strong> ${escHtml(_askAnswer.meaning||'')}</div><div style="margin-top:4px;color:var(--ink-m);"><strong>Highlighted:</strong> ${escHtml(_askAnswer.highlight||'')}</div>${_askAnswer.saved?`<div style="font-size:10px;color:var(--ink-h);margin-top:5px;">Added to the report.</div>`:`<div style="font-size:10px;color:var(--ink-h);margin-top:5px;">Try one of the suggested questions.</div>`}</div>`:'';
+  if(ans&&_askAnswer){
+    const opts=(_askAnswer.options||[]).map(id=>_askQuestions().find(x=>x.id===id)).filter(Boolean);
+    const btns=opts.map(q=>`<button onclick="askPickAndRun('${q.id}')" style="display:block;width:100%;text-align:left;margin-top:4px;font-size:11px;height:auto;padding:5px 8px;">${escHtml(q.q)}</button>`).join('');
+    if(_askAnswer.how==='guess') ans.insertAdjacentHTML('afterbegin',`<div class="ask-puddl-bubble" style="font-size:11px;"><em>I took "${escHtml(_askAnswer.typed)}" to mean:</em> <strong>${escHtml(_askAnswer.question)}</strong>${btns?`<div style="margin-top:6px;color:var(--ink-m);">Not what you meant? Try:</div>${btns}`:''}</div>`);
+    else if(_askAnswer.how==='close') ans.insertAdjacentHTML('afterbegin',`<div class="ask-puddl-bubble" style="font-size:11px;">I am not sure what you mean by "${escHtml(_askAnswer.typed)}". Did you mean one of these?${btns}</div>`);
+    else if(_askAnswer.how==='none') ans.insertAdjacentHTML('afterbegin',`<div class="ask-puddl-bubble" style="font-size:11px;">I could not match "${escHtml(_askAnswer.typed)}" to anything I can work out from this map. Here are some I can answer, or pick from the list below:${btns}</div>`);
+  }
+  const report=document.getElementById('ask-puddl-report');
+  if(report) report.innerHTML=ASK_REPORT_ITEMS.length?`<details style="margin-top:9px;"><summary style="font-size:10.5px;font-weight:700;color:var(--ink-h);cursor:pointer;">Selected for the report (${ASK_REPORT_ITEMS.length})</summary>`+ASK_REPORT_ITEMS.map((x,i)=>`<div style="display:flex;align-items:center;gap:4px;padding:5px 0;border-top:1px solid var(--bdr);font-size:10.5px;"><span style="flex:1;line-height:1.3;">${escHtml(x.question)}</span><button onclick="askReportMove(${i},-1)" title="Move up" style="width:22px;height:22px;padding:0;"${i===0?' disabled':''}>↑</button><button onclick="askReportMove(${i},1)" title="Move down" style="width:22px;height:22px;padding:0;"${i===ASK_REPORT_ITEMS.length-1?' disabled':''}>↓</button><button onclick="askReportRemove(${i})" title="Remove" style="width:22px;height:22px;padding:0;">×</button></div>`).join('')+`</details>`:'';
+}
+function _askAnswerFor(id,from,to){
+  const I=computeInsights(), F=MAP_TYPE==='argument'?{list:[]}:computeFindings(I), np=mapNounPack()[1];
+  const labels=arr=>arr.slice(0,5).map(n=>n.label).join(', ')+(arr.length>5?` and ${arr.length-5} more`:'');
+  const nodeFocus=(arr,label)=>({label,ids:new Set(arr.map(n=>n.id)),pairs:[],sec:[]});
+  const linkedFocus=(n,label,way)=>{
+    const ids=new Set(n?[n.id]:[]), pairs=new Set(), sec=new Set();
+    if(n) edges.forEach(e=>{
+      const a=_eEnd(e,'source'),b=_eEnd(e,'target'),ar=arrowOf(e); let keep=false;
+      if(!way) keep=a===n.id||b===n.id;
+      else if(way==='in') keep=(b===n.id&&ar!=='backward')||(a===n.id&&ar==='backward')||(ar==='both'&&(a===n.id||b===n.id));
+      else keep=(a===n.id&&ar!=='backward')||(b===n.id&&ar==='backward')||(ar==='both'&&(a===n.id||b===n.id));
+      if(keep){ pairs.add(_pk(a,b)); sec.add(a===n.id?b:a); }
+    });
+    return {label,ids,pairs,sec};
+  };
+  const result=(answer,evidence,focus)=>({answer,evidence:evidence||'',focus:focus||null});
+  if(id==='overview'){
+    const list=F.list.slice(0,5); return result(list.length?list.map(x=>x.text).join(' '):insightSummaryLines(I).slice(0,5).join(' ')||'Nothing stands out yet.',list.map(x=>x.evidence).filter(Boolean).join(' '),list[0]?list[0].focus():null);
+  }
+  if(id==='holds'){
+    const a=I.bridges.map(x=>x.node); if(a.length) return result(`${labels(a)} ${a.length===1?'is':'are'} holding parts of this map together.`,I.bridges.map(x=>`${x.node.label} cuts off ${x.cutOff}.`).join(' '),nodeFocus(a,'Who holds the map together'));
+    return result('No single item holds two parts of this map together.','Every connected part can still be reached another way.');
+  }
+  if(id==='isolated') return result(I.isolated?`${I.isolated} ${I.isolated===1?mapNounPack()[0]:np} ${I.isolated===1?'has':'have'} no connections: ${labels(I.orphanNodes)}.`:'Nobody is isolated in the current view.','Calculated from the connections visible in this view.',nodeFocus(I.orphanNodes,'Isolated items'));
+  if(id==='connected'){
+    const a=I.most.filter(n=>I.total.get(n.id)>0), top=a[0]; return result(top?`${top.label} is best connected with ${I.total.get(top.id)} connections.`:'There are no connections in this view.',a.slice(1).map(n=>`${n.label}: ${I.total.get(n.id)}`).join(' · '),top?linkedFocus(top,'Most connected'):null);
+  }
+  if(id==='least'){
+    const a=I.least||[], min=a.length?I.total.get(a[0].id):0, tied=a.filter(n=>I.total.get(n.id)===min);
+    return result(tied.length?`${labels(tied)} ${tied.length===1?'has':'have'} the fewest connections: ${min}.`:'There are no items in this view.','This includes items with no recorded connections.',nodeFocus(tied,'Fewest connections'));
+  }
+  if(id==='bottleneck'){
+    if(I.betweennessCapped) return result('This map is too large to calculate bottleneck scores all at once.',`Filter it below ${BETWEENNESS_CAP} ${np} and ask again.`);
+    const a=I.topBetweenness; return result(a.length?`${a[0].label} sits on the most routes between other ${np}.`:'No bottleneck stands out in this view.',a.slice(0,5).map(n=>`${n.label}: ${Math.round(I.betweenness.get(n.id))}`).join(' · '),nodeFocus(a,'Bottlenecks'));
+  }
+  if(id==='weak'){
+    const E=_askEdgeData(e=>(e.strength||'moderate')==='weak'); return result(E.pairs.length?`${E.pairs.length} weak connection${E.pairs.length===1?'':'s'} appear in this view.`:'There are no weak connections in this view.','Strength comes from the setting on each connection.',{label:'Weak connections',ids:E.ids,pairs:E.pairs,sec:[]});
+  }
+  if(id==='strong'){
+    const E=_askEdgeData(e=>(e.strength||'moderate')==='strong'); return result(E.pairs.length?`${E.pairs.length} strong connection${E.pairs.length===1?'':'s'} appear in this view.`:'There are no strong connections in this view.','Strength comes from the setting on each connection.',{label:'Strong connections',ids:E.ids,pairs:E.pairs,sec:[]});
+  }
+  if(id==='groups') return result(I.compCount===1?'Everything with a connection belongs to one connected network.':`This view contains ${I.compCount} separate connected networks.`,`The largest contains ${I.compBig} ${I.compBig===1?mapNounPack()[0]:np}.`);
+  if(id==='largestgroup'){
+    const G=_insGraph(I.pool), start=I.groupList&&I.groupList[0]&&I.groupList[0].best, ids=start?_insReach(G.adj,start.id,null,null):new Set(), pairs=_insPairsWithin(G.adj,ids);
+    return result(ids.size?`The largest connected group contains ${ids.size} ${ids.size===1?mapNounPack()[0]:np}.`:'There are no items in this view.','A connected group is a set of items that can reach one another through the recorded connections.',ids.size?{label:'Largest connected group',ids,pairs,sec:[]}:null);
+  }
+  if(id==='density') return result(`This map contains ${I.edgesCount} of ${I.pool.length>1?I.pool.length*(I.pool.length-1)/2:0} possible connections: ${I.density}%.`,'Calculated across the current view. Direction is not counted separately.');
+  if(id==='incoming'||id==='outgoing'){
+    const deg=id==='incoming'?I.inDeg:I.outDeg, a=[...I.pool].sort((x,y)=>(deg.get(y.id)||0)-(deg.get(x.id)||0)||String(x.label).localeCompare(String(y.label))), top=a[0], count=top?(deg.get(top.id)||0):0;
+    return result(top&&count?`${top.label} has the most connections ${id==='incoming'?'coming in':'going out'}: ${count}.`:`There are no directed connections ${id==='incoming'?'coming in':'going out'} in this view.`,a.slice(1,5).filter(n=>(deg.get(n.id)||0)>0).map(n=>`${n.label}: ${deg.get(n.id)}`).join(' · '),top&&count?linkedFocus(top,`Most connections ${id==='incoming'?'coming in':'going out'}`,id==='incoming'?'in':'out'):null);
+  }
+  if(id==='change'){
+    if(!from||!to) return result('Choose both dates to compare the map.','The answer will only use dated nodes and connections.');
+    if(from>to) return result('The first date must be before the second date.','Swap the dates and ask again.');
+    const A=_snapAt(from,null),B=_snapAt(to,null),aIds=new Set(A.ppl.map(n=>n.id));
+    const added=B.ppl.filter(n=>!aIds.has(n.id)), ap=new Set(A.links.map(x=>_pk(x[0],x[1]))), bp=new Set(B.links.map(x=>_pk(x[0],x[1]))), addedPairs=[...bp].filter(x=>!ap.has(x)), am=_metrics(A,null), bm=_metrics(B,null);
+    return result(`Between ${from} and ${to}: ${added.length} ${np} and ${addedPairs.length} connections were added.`,`The map grew from ${A.ppl.length} ${np} and ${A.links.length} connections to ${B.ppl.length} ${np} and ${B.links.length}. Items with no connection changed from ${am.iso} to ${bm.iso}.`,{label:`Changes from ${from} to ${to}`,ids:new Set(added.map(n=>n.id)),pairs:addedPairs,sec:[]});
+  }
+  if(id==='reinforcing'||id==='balancing'){
+    const typ=id==='reinforcing'?'R':'B', idx=I.loopClass.map((x,i)=>x.type===typ?i:-1).filter(i=>i>=0), loops=idx.map(i=>I.loops[i]);
+    const ids=new Set(),pairs=[]; loops.forEach(L=>L.forEach((n,i)=>{ ids.add(n.id); pairs.push(_pk(n.id,L[(i+1)%L.length].id)); }));
+    return result(`${loops.length} ${id} loop${loops.length===1?'':'s'} found.`,loops.slice(0,3).map(L=>L.map(n=>n.label).join(' → ')).join(' · '),{label:`${id[0].toUpperCase()+id.slice(1)} loops`,ids,pairs,sec:[]});
+  }
+  if(id==='unsigned'){
+    const E=_askEdgeData(e=>arrowOf(e)!=='none'&&!e.polarity); return result(E.pairs.length?`${E.pairs.length} directed connection${E.pairs.length===1?' is':'s are'} missing a + or - sign.`:'Every directed connection has a + or - sign.','Loops containing an unsigned connection cannot be classified.',{label:'Connections missing a sign',ids:E.ids,pairs:E.pairs,sec:[]});
+  }
+  if(id==='roots'||id==='outcomes'){
+    const a=id==='roots'?I.rootCauses:I.finalOutcomes, rule=id==='roots'?I.causeRule:I.outcomeRule, title=id==='roots'?'Likely starting points':'Likely end results';
+    return result(a.length?`${title}: ${labels(a)}.`:`No ${title.toLowerCase()} stand out.`,rule==='strict'?'Calculated from factors with arrows only going out or only coming in.':'Every factor is part of a more circular pattern, so this uses the nearest structural matches.',nodeFocus(a,title));
+  }
+  if(id==='loops'){
+    const a=[...I.nodeLoopCount.entries()].filter(x=>x[1]>=2).sort((x,y)=>y[1]-x[1]).map(([nid,count])=>({node:I.pool.find(n=>n.id===nid),count})).filter(x=>x.node);
+    return result(a.length?`${a[0].node.label} appears in the most feedback loops: ${a[0].count}.`:'No factor appears in more than one detected loop.',a.slice(1,5).map(x=>`${x.node.label}: ${x.count}`).join(' · '),nodeFocus(a.map(x=>x.node),'Factors in several loops'));
+  }
+  return result('Puddle cannot answer that question yet.','Choose the closest suggested question.');
+}
+function runAskMap(){
+  const sel=document.getElementById('ask-question-select'), input=document.getElementById('ask-map-input');
+  const typed=String((input&&input.value)||'').trim(), id=typed?_askMatch(typed):((sel&&sel.value)||'overview'), def=_askQuestions().find(x=>x.id===id), question=def?def.q:(typed||'Question Puddle could not match');
+  const from=(document.getElementById('ask-date-from')||{}).value||'', to=(document.getElementById('ask-date-to')||{}).value||'';
+  const _dec=typed?_askDecide(typed):{how:'exact',options:[]};
+  _askAnswer=Object.assign({id,question,from,to,saved:id!=='unknown',typed,how:_dec.how,options:_dec.options},_askAnswerFor(id,from,to),_askMeaning(id));
+  const key=id+'|'+from+'|'+to;
+  if(id!=='unknown'){
+    const saved={key,id,question,answer:_askAnswer.answer,evidence:_askAnswer.evidence,assessment:_askAnswer.assessment,meaning:_askAnswer.meaning,highlight:_askAnswer.highlight,from,to};
+    const at=ASK_REPORT_ITEMS.findIndex(x=>x.key===key); if(at>=0) ASK_REPORT_ITEMS[at]=saved; else ASK_REPORT_ITEMS.push(saved);
+  }
+  clearHighlight();
+  if(_askAnswer.focus) _applyFocus(Object.assign({},_askAnswer.focus,{key:'asked:'+key}));
+  saveState(); markUnsaved(); renderAskWidget(); renderInsights();
+}
+function askReportMove(i,d){ const j=i+d; if(j<0||j>=ASK_REPORT_ITEMS.length) return; const x=ASK_REPORT_ITEMS.splice(i,1)[0]; ASK_REPORT_ITEMS.splice(j,0,x); saveState(); markUnsaved(); renderAskWidget(); renderInsights(); }
+function askReportRemove(i){ const gone=ASK_REPORT_ITEMS[i]; ASK_REPORT_ITEMS.splice(i,1); if(gone&&_insightFocus&&_insightFocus.key==='asked:'+gone.key) clearHighlight(); saveState(); markUnsaved(); renderAskWidget(); renderInsights(); }
+function _askedReportHTML(){
+  if(!ASK_REPORT_ITEMS.length) return '';
+  return `<div class="report-section"><h4>Questions selected from Insights</h4>`+ASK_REPORT_ITEMS.map(x=>`<div class="report-row" style="display:block;border-left:3px solid #2563EB;padding-left:10px;"><div style="font-size:12px;font-weight:700;color:var(--navy);">${escHtml(x.question)}</div><div style="font-size:12px;line-height:1.5;margin-top:2px;">${escHtml(x.answer)}</div>${x.evidence?`<div style="font-size:11px;color:var(--txt-m);margin-top:2px;">${escHtml(x.evidence)}</div>`:''}${x.meaning?`<div style="font-size:11px;line-height:1.45;margin-top:5px;"><strong>${escHtml(x.assessment||'Neutral')} — what this may mean:</strong> ${escHtml(x.meaning)}</div>`:''}${x.highlight?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;"><strong>Highlighted:</strong> ${escHtml(x.highlight)}</div>`:''}${x.from||x.to?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;">${escHtml(x.from||'Start')} to ${escHtml(x.to||'Now')}</div>`:''}</div>`).join('')+`</div>`;
 }
 function renderInsights(){
   const body=document.getElementById('sec-insights-body');
@@ -5349,12 +5642,12 @@ function renderInsights(){
   _findings=F.list;
   const _findingsCard=()=>{
     if(!F.list.length&&!F.hints.length) return '';
-    const showAll=!!_insOpen.findingsAll, shown=showAll?F.list:F.list.slice(0,7);
+    const showAll=!!_insOpen.findingsAll, shown=showAll?F.list:F.list.slice(0,5);
     let inner=shown.map((f,i)=>{
       const on=_on('finding:'+f.id), col=_FINDING_TAG_COL[f.tag]||'#64748B';
       return `<div onclick="focusFinding(${i})" title="${_tip(on)}" style="padding:7px 8px;margin:3px 0;border-radius:8px;cursor:pointer;border-left:3px solid ${col};${on?'background:var(--surf-3);':''}" ${_hoverAttrs(on)}><div style="font-size:9.5px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:${col};">${esc(f.tag)}</div><div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.4;margin-top:1px;">${esc(f.text)}</div>${(f.evidence||f.note)?`<div style="font-size:11px;color:var(--ink-h);line-height:1.4;margin-top:2px;">${esc(f.evidence||'')}${f.note?' '+esc(f.note):''}</div>`:''}</div>`;
     }).join('');
-    if(F.list.length>7) inner+=`<button onclick="toggleFindingsAll()" style="font-size:10.5px;height:24px;padding:0 9px;margin:4px 0 2px;">${showAll?'Show fewer':'Show all '+F.list.length}</button>`;
+    if(F.list.length>5) inner+=`<button onclick="toggleFindingsAll()" style="font-size:10.5px;height:24px;padding:0 9px;margin:4px 0 2px;">${showAll?'Show fewer':'Show all '+F.list.length}</button>`;
     if(F.grp&&F.grp.cands&&F.grp.cands.length>=2) inner+=`<div style="font-size:10.5px;color:var(--ink-h);margin-top:8px;">Comparing groups by <select onchange="setFindingsGroup(this.value)" style="font-size:10.5px;height:22px;max-width:150px;"><option value="">Automatic (${esc(F.grp.name)})</option>${F.grp.cands.map(c=>`<option value="${esc(c.id)}"${FINDINGS_GROUP_FIELD===c.id?' selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`;
     else if(F.grp) inner+=`<div style="font-size:10.5px;color:var(--ink-h);margin-top:8px;">Comparing groups by <strong>${esc(F.grp.name)}</strong></div>`;
     inner+=F.hints.map(t=>`<div style="font-size:10.5px;color:var(--ink-h);margin-top:6px;line-height:1.4;">${esc(t)}</div>`).join('');
@@ -10460,7 +10753,7 @@ function buildSummaryReport(){
 
   {
     const _I=computeInsights(), _F=computeFindings(_I);
-    html+=_selectionBannerHTML()+(MAP_TYPE==='systems'?_systemsReportHTML(_I):'')+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
+    html+=_selectionBannerHTML()+_askedReportHTML()+(MAP_TYPE==='systems'?_systemsReportHTML(_I):'')+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
   }
 
   if(vis.some(n=>n.colourLabel)&&Object.keys(catCounts).length){
@@ -14433,9 +14726,9 @@ function drawLoopPreview(){
   const qy=(1-t)**2*y1+2*(1-t)*t*my+t*t*y2;
   const tdx=2*(1-t)*(mx-x1)+2*t*(x2-mx);
   const tdy=2*(1-t)*(my-y1)+2*t*(y2-my);
-  const as=7*(s.arrowScale||1);
+  const as=10*(s.arrowScale||1);
   ctx.translate(qx,qy); ctx.rotate(Math.atan2(tdy,tdx));
-  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-as,-as*0.45); ctx.lineTo(-as,as*0.45); ctx.closePath();
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-as,-as*0.55); ctx.lineTo(-as,as*0.55); ctx.closePath();
   ctx.fillStyle=col; ctx.fill();
   ctx.restore();
 }
@@ -14496,9 +14789,9 @@ function drawConnPreview(styleId){
   const qy=(1-t)**2*y1+2*(1-t)*t*my+t*t*y2;
   const tdx=2*(1-t)*(mx-x1)+2*t*(x2-mx);
   const tdy=2*(1-t)*(my-y1)+2*t*(y2-my);
-  const as=7*(s.arrowScale||1);
+  const as=10*(s.arrowScale||1);
   ctx.translate(qx,qy); ctx.rotate(Math.atan2(tdy,tdx));
-  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-as,-as*0.45); ctx.lineTo(-as,as*0.45); ctx.closePath();
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-as,-as*0.55); ctx.lineTo(-as,as*0.55); ctx.closePath();
   ctx.fillStyle=col; ctx.fill();
   ctx.restore();
 }
