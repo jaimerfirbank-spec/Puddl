@@ -1586,6 +1586,10 @@ body.share-mode #present-exit{display:none !important;}
     </div>
     <div id="pres-edit-footer">
       <button onclick="capturePresStop()" style="width:100%;font-size:12px;height:34px;background:var(--surf-2);border:1.5px dashed var(--bdr-m);color:var(--ink-m);font-weight:600;" title="Save current pan/zoom as a new stop">+ Capture current view</button>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button id="btn-pres-save" onclick="presSaveDraft()" title="Save this presentation under Saved" style="font-size:12px;height:34px;padding:0 16px;font-weight:600;">Save presentation</button>
+        <span id="pres-save-status" style="font-size:11.5px;font-weight:600;color:var(--ink-m);">Not saved yet.</span>
+      </div>
       <button id="btn-start-presentation" onclick="enterPresentationMode()" disabled style="width:100%;font-size:12px;height:34px;background:var(--ink);border-color:var(--ink);color:var(--on-ink);font-weight:700;">▶ Start Presentation</button>
     </div>
     </div>
@@ -2928,6 +2932,7 @@ let hoverPanelNodeId=null, hoverHideTimer=null, sidePanelNodeId=null;
 // ── Presentation Mode state ───────────────────────────────────────────────────
 let presMapOnly=false;           // hide notes: map fills the screen, controls float
 let presentationStops=[];       // [{id,panX,panY,zoom,header,subheader,body}] — the draft being built
+let presSavedId=null;              // which saved presentation the draft being edited belongs to
 let savedPresentations=[];      // [{id,title,createdAt,stops:[...]}] — published, done drafts
 let presentationCurrentIdx=0;
 let presentationSelectedIdx=0;
@@ -3172,6 +3177,7 @@ function snap(){
     loopConnectionStyle:LOOP_CONNECTION_STYLE,
     connectionStyles:CONNECTION_STYLES,
     presentationStops:presentationStops||[],
+    presSavedId:presSavedId||null,
     savedPresentations:savedPresentations||[],
     presMapOnly:!!presMapOnly,
     fieldDefs:FIELD_DEFS,
@@ -3239,6 +3245,7 @@ function restoreSnap(s){
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
   _retireConnStyles();
   presentationStops=d.presentationStops||[];
+  presSavedId=d.presSavedId||null;
   savedPresentations=Array.isArray(d.savedPresentations)?d.savedPresentations:[];
   presMapOnly=!!d.presMapOnly;
   FIELD_DEFS=Array.isArray(d.fieldDefs)?d.fieldDefs:[];
@@ -11616,6 +11623,33 @@ function _presClearDropMarks(){
   document.querySelectorAll('.pres-stop-item.drop-before,.pres-stop-item.drop-after').forEach(e=>e.classList.remove('drop-before','drop-after'));
 }
 
+// ── Save presentation: a button that says it worked ───────────────────────────
+// The draft always rode along with the map; this files it under Saved and says so.
+// Pressing it again updates the same saved copy, so Saved does not fill with duplicates.
+function presSaveDraft(){
+  if(!presentationStops.length){ showStatus('Add at least one stop before saving.'); return; }
+  const now=new Date().toISOString(), stops=JSON.parse(JSON.stringify(presentationStops));
+  let p=presSavedId?savedPresentations.find(function(x){ return x.id===presSavedId; }):null;
+  if(p){ p.stops=stops; p.updatedAt=now; }
+  else{
+    p={id:'pres_'+Date.now(),title:(mapTitle||'Map')+' \u2014 '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),createdAt:now,updatedAt:now,stops:stops};
+    savedPresentations.push(p); presSavedId=p.id;
+  }
+  saveState(); markUnsaved(); presUpdateSaveStatus();
+  showStatus('Presentation saved.');
+}
+function presUpdateSaveStatus(){
+  const el=document.getElementById('pres-save-status'); if(!el) return;
+  const p=presSavedId?savedPresentations.find(function(x){ return x.id===presSavedId; }):null;
+  if(!presentationStops.length){ el.textContent='Add a stop to save.'; el.style.color='var(--ink-m)'; return; }
+  if(!p){ el.textContent='Not saved yet.'; el.style.color='var(--ink-m)'; return; }
+  const same=JSON.stringify(p.stops)===JSON.stringify(presentationStops);
+  const t=new Date(p.updatedAt||p.createdAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  el.textContent=same?'Saved \u2713 at '+t:'Unsaved changes';
+  el.style.color=same?'#15803D':'#B45309';
+}
+document.addEventListener('input',function(e){ if(e.target&&e.target.closest&&e.target.closest('#pres-main-col')) setTimeout(presUpdateSaveStatus,0); });
+
 // ── Saved presentations: this map's own published drafts ───────────────────
 // One map, several presentations. "New presentation" archives whatever is
 // being built now (if anything) and hands back a blank editor; the archived
@@ -11624,6 +11658,9 @@ function _presClearDropMarks(){
 // no new storage, no cloud schema change.
 function publishCurrentDraft(){
   if(!presentationStops.length) return false;
+  const cur=presSavedId?savedPresentations.find(function(x){ return x.id===presSavedId; }):null;
+  if(cur){ cur.stops=JSON.parse(JSON.stringify(presentationStops)); cur.updatedAt=new Date().toISOString(); return true; }   // already saved: update it, do not file a second copy
+  if(savedPresentations.some(function(x){ return JSON.stringify(x.stops)===JSON.stringify(presentationStops); })) return true;
   savedPresentations.push({
     id:'pres_'+Date.now(),
     title:(mapTitle||'Map')+' — '+new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
@@ -11635,6 +11672,7 @@ function publishCurrentDraft(){
 
 function startNewPresentation(){
   const archived=publishCurrentDraft();
+  presSavedId=null;
   presentationStops=[]; presentationSelectedIdx=0; presMapOnly=false;
   saveState(); markUnsaved();
   clearPresEditor();
@@ -11722,6 +11760,7 @@ function openSavedPresentationIntoEditor(id){
   const p=savedPresentations.find(function(x){ return x.id===id; });
   if(!p) return;
   publishCurrentDraft();
+  presSavedId=p.id;
   presentationStops=JSON.parse(JSON.stringify(p.stops||[]));
   presentationSelectedIdx=0;
   saveState(); markUnsaved();
@@ -11787,6 +11826,7 @@ function rebuildPresStopList(){
     const editor=document.getElementById('pres-editor');
     if(editor) editor.style.display='flex';
   }
+  presUpdateSaveStatus();
 }
 
 // ── Enter/exit presentation viewing mode ──────────────────────────────────────
