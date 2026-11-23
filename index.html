@@ -3699,7 +3699,7 @@ function draw(){
     // Draw stroke — loop arcs use ctx.arc(), others use quadratic Bezier
     if(loopC){
       const antiCW=loopC.dir==='ccw';
-      const as=(7*arrowScale)*lineZoomClamp()/zoom;
+      const as=(10*arrowScale)*lineZoomClamp()/zoom;
       // Stop the arc stroke one arrowhead-length before the tip so the filled triangle sits on top cleanly
       const arcAdjEnd=antiCW ? arcEndAngle+as/loopC.r : arcEndAngle-as/loopC.r;
       ctx.strokeStyle=drawStroke;
@@ -3720,7 +3720,7 @@ function draw(){
       ctx.setLineDash([]);
     } else {
       // Non-loop: compute connected arrow geometry so the stroke ends exactly at the arrowhead base
-      const as=(7*arrowScale)*lineZoomClamp()/zoom;
+      const as=(10*arrowScale)*lineZoomClamp()/zoom;
       const tdx=2*(bp.x-mx),tdy=2*(bp.y-my),tL=Math.sqrt(tdx*tdx+tdy*tdy)||1;
       const tNx=tdx/tL,tNy=tdy/tL,tPx=-tNy,tPy=tNx; // unit tangent + perp at bp (t=1)
       const headT=arrowOf(e)==='forward'||arrowOf(e)==='both';
@@ -3766,8 +3766,8 @@ function draw(){
       if(headT){
         ctx.beginPath();
         ctx.moveTo(bp.x,bp.y);
-        ctx.lineTo(bpS.x+tPx*as*0.45,bpS.y+tPy*as*0.45);
-        ctx.lineTo(bpS.x-tPx*as*0.45,bpS.y-tPy*as*0.45);
+        ctx.lineTo(bpS.x+tPx*as*0.55,bpS.y+tPy*as*0.55);
+        ctx.lineTo(bpS.x-tPx*as*0.55,bpS.y-tPy*as*0.55);
         ctx.closePath();
         ctx.fillStyle=drawStroke;ctx.fill();
       }
@@ -3778,8 +3778,8 @@ function draw(){
         ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
-        ctx.lineTo(apS.x+rPx*as*0.45,apS.y+rPy*as*0.45);
-        ctx.lineTo(apS.x-rPx*as*0.45,apS.y-rPy*as*0.45);
+        ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
+        ctx.lineTo(apS.x-rPx*as*0.55,apS.y-rPy*as*0.55);
         ctx.closePath();
         ctx.fillStyle=drawStroke;ctx.fill();
         ctx.restore();
@@ -3826,7 +3826,7 @@ function draw(){
     }
     // Loop arc arrowhead — placed at the actual arc endpoint on the circle, not at bp
     if(loopC){
-      const as=(7*arrowScale)*lineZoomClamp()/zoom;
+      const as=(10*arrowScale)*lineZoomClamp()/zoom;
       const antiCW=loopC.dir==='ccw';
       // Tip = point on loop circle at arcEndAngle (where the arc actually terminates)
       const arcTipX=loopC.x+loopC.r*Math.cos(arcEndAngle);
@@ -3835,7 +3835,7 @@ function draw(){
       const ty=antiCW?-Math.cos(arcEndAngle): Math.cos(arcEndAngle);
       const ang=Math.atan2(ty,tx);
       ctx.translate(arcTipX,arcTipY);ctx.rotate(ang);
-      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-as,-as*0.45);ctx.lineTo(-as,as*0.45);ctx.closePath();
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-as,-as*0.55);ctx.lineTo(-as,as*0.55);ctx.closePath();
       ctx.fillStyle=drawStroke;ctx.fill();
       ctx.restore();
     }
@@ -14676,9 +14676,9 @@ function drawLoopPreview(){
   const qy=(1-t)**2*y1+2*(1-t)*t*my+t*t*y2;
   const tdx=2*(1-t)*(mx-x1)+2*t*(x2-mx);
   const tdy=2*(1-t)*(my-y1)+2*t*(y2-my);
-  const as=7*(s.arrowScale||1);
+  const as=10*(s.arrowScale||1);
   ctx.translate(qx,qy); ctx.rotate(Math.atan2(tdy,tdx));
-  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-as,-as*0.45); ctx.lineTo(-as,as*0.45); ctx.closePath();
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-as,-as*0.55); ctx.lineTo(-as,as*0.55); ctx.closePath();
   ctx.fillStyle=col; ctx.fill();
   ctx.restore();
 }
@@ -14739,9 +14739,9 @@ function drawConnPreview(styleId){
   const qy=(1-t)**2*y1+2*(1-t)*t*my+t*t*y2;
   const tdx=2*(1-t)*(mx-x1)+2*t*(x2-mx);
   const tdy=2*(1-t)*(my-y1)+2*t*(y2-my);
-  const as=7*(s.arrowScale||1);
+  const as=10*(s.arrowScale||1);
   ctx.translate(qx,qy); ctx.rotate(Math.atan2(tdy,tdx));
-  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-as,-as*0.45); ctx.lineTo(-as,as*0.45); ctx.closePath();
+  ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-as,-as*0.55); ctx.lineTo(-as,as*0.55); ctx.closePath();
   ctx.fillStyle=col; ctx.fill();
   ctx.restore();
 }
