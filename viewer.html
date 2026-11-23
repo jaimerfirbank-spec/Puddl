@@ -3699,6 +3699,13 @@ function insightSummaryLines(I){
 }
 let _insOpen={};
 let ASK_REPORT_ITEMS=[];
+let REPORT_SELECTED_ONLY=true;
+function setReportMode(selectedOnly){ REPORT_SELECTED_ONLY=!!selectedOnly; renderReportTab('summary'); }
+function _reportModeBar(){
+  if(!ASK_REPORT_ITEMS.length) return '';
+  const on='background:var(--ink);color:var(--surf);border-color:var(--ink);';
+  return `<div style="display:flex;gap:6px;align-items:center;margin-bottom:10px;"><button onclick="setReportMode(true)" style="font-size:11.5px;height:28px;padding:0 12px;${REPORT_SELECTED_ONLY?on:''}">Selected questions (${ASK_REPORT_ITEMS.length})</button><button onclick="setReportMode(false)" style="font-size:11.5px;height:28px;padding:0 12px;${REPORT_SELECTED_ONLY?'':on}">Full report</button></div>`;
+}
 let _askAnswer=null;
 function toggleInsGroup(k){
   _insOpen[k]=!_insOpen[k];
@@ -3709,7 +3716,7 @@ function toggleInsGroup(k){
 }
 function _askedReportHTML(){
   if(!ASK_REPORT_ITEMS.length) return '';
-  return `<div class="report-section"><h4>Questions selected from Insights</h4>`+ASK_REPORT_ITEMS.map(x=>`<div class="report-row" style="display:block;border-left:3px solid #2563EB;padding-left:10px;"><div style="font-size:12px;font-weight:700;color:var(--navy);">${escHtml(x.question)}</div><div style="font-size:12px;line-height:1.5;margin-top:2px;">${escHtml(x.answer)}</div>${x.evidence?`<div style="font-size:11px;color:var(--txt-m);margin-top:2px;">${escHtml(x.evidence)}</div>`:''}${x.meaning?`<div style="font-size:11px;line-height:1.45;margin-top:5px;"><strong>${escHtml(x.assessment||'Neutral')} — what this may mean:</strong> ${escHtml(x.meaning)}</div>`:''}${x.highlight?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;"><strong>Highlighted:</strong> ${escHtml(x.highlight)}</div>`:''}${x.from||x.to?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;">${escHtml(x.from||'Start')} to ${escHtml(x.to||'Now')}</div>`:''}</div>`).join('')+`</div>`;
+  return `<div class="report-section"><h4>Your selected questions</h4>`+ASK_REPORT_ITEMS.map(x=>`<div class="report-row" style="display:block;border-left:3px solid #2563EB;padding-left:10px;"><div style="font-size:12px;font-weight:700;color:var(--navy);">${escHtml(x.question)}</div><div style="font-size:12px;line-height:1.5;margin-top:2px;">${escHtml(x.answer)}</div>${x.evidence?`<div style="font-size:11px;color:var(--txt-m);margin-top:2px;">${escHtml(x.evidence)}</div>`:''}${x.meaning?`<div style="font-size:11px;line-height:1.45;margin-top:5px;"><strong>${escHtml(x.assessment||'Neutral')} — what this may mean:</strong> ${escHtml(x.meaning)}</div>`:''}${x.highlight?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;"><strong>Highlighted:</strong> ${escHtml(x.highlight)}</div>`:''}${x.from||x.to?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;">${escHtml(x.from||'Start')} to ${escHtml(x.to||'Now')}</div>`:''}</div>`).join('')+`</div>`;
 }
 function renderInsights(){
   const body=document.getElementById('sec-insights-body');
@@ -4859,7 +4866,7 @@ function _reportChartsHTML(I,F){
   const bk=[['1',1,1,'#D97706'],['2',2,2,'#64748B'],['3',3,3,'#64748B'],['4–5',4,5,'#2563EB'],['6–9',6,9,'#2563EB'],['10+',10,1e9,'#2563EB']];
   const hist=bk.map(([l,lo,hi,c])=>{ const mem=pool.filter(n=>{ const d=adj.get(n.id).size; return d>=lo&&d<=hi; }); return {label:l,value:mem.length,colour:c,tip:[`${noun(mem.length)} with ${l} connection${l==='1'?'':'s'}`,mem.length?_nameList(mem.map(n=>n.id),nById,10):'None']}; });
   cards.push(card('How many connections each has',`${cap(np)} with this many (amber: hanging by one)`,_barRows(hist)));
-  return `<div class="report-section"><h4>At a glance</h4><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">${cards.join('')}</div></div>`;
+  return `<div class="report-section"><h4>Key charts</h4><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;">${cards.join('')}</div></div>`;
 }
 function _strengthDonutHTML(visEdges){
   const cnt={strong:0,moderate:0,weak:0};
@@ -5347,9 +5354,13 @@ function buildSummaryReport(){
     <div class="report-row"><strong>Mode:</strong> ${currentMapMode.charAt(0).toUpperCase()+currentMapMode.slice(1)} map</div>
   </div>`;
 
+  if(ASK_REPORT_ITEMS.length&&REPORT_SELECTED_ONLY){
+    // Only what was chosen, then the plain-words key. The full report is one click away.
+    return _reportModeBar()+html+_selectionBannerHTML()+_askedReportHTML()+_glossaryHTML('report');
+  }
   {
     const _I=computeInsights(), _F=computeFindings(_I);
-    html+=_selectionBannerHTML()+_askedReportHTML()+(MAP_TYPE==='systems'?_systemsReportHTML(_I):'')+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
+    html+=_reportModeBar()+_selectionBannerHTML()+_askedReportHTML()+(MAP_TYPE==='systems'?_systemsReportHTML(_I):'')+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
   }
 
   if(vis.some(n=>n.colourLabel)&&Object.keys(catCounts).length){
