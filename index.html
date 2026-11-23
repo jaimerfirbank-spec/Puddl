@@ -5427,16 +5427,24 @@ function _askRank(text){
   return out.sort((a,b)=>b.score-a.score);
 }
 function _askDefaultIds(){ return MAP_TYPE==='systems'?['reinforcing','unsigned','roots']:['holds','isolated','change']; }
+// Questions on the list that share a word with what was typed ("connections" finds every question about connections)
+function _askTextMatches(raw){
+  const stop=new Set(['what','who','which','where','that','this','with','have','does','from','about','there','their','are','the','and','how','map','show','tell','give','list']);
+  const stems=[...new Set(String(raw||'').toLowerCase().split(/[^a-z']+/).filter(w=>w.length>=4&&!stop.has(w)).map(w=>w.replace(/(ions|ion|ing|ed|es|s)$/,'')).map(w=>({link:'connect',linke:'connect',relationship:'connect',partnership:'connect'}[w]||w)).filter(w=>w.length>=4))];
+  if(!stems.length) return [];
+  return _askQuestions().map(q=>({id:q.id,n:stems.filter(w=>q.q.toLowerCase().includes(w)).length})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n).map(x=>x.id);
+}
 function _askDecide(text){
   const raw=String(text||'').trim();
   if(!raw) return {id:'overview',how:'exact',options:[]};
   const exact=_askQuestions().find(x=>x.q.toLowerCase()===raw.toLowerCase());
   if(exact) return {id:exact.id,how:'exact',options:[]};
   const r=_askRank(raw);
-  if(!r.length) return {id:'unknown',how:'none',options:_askDefaultIds()};
+  const tm=_askTextMatches(raw);
+  if(!r.length) return tm.length?{id:'unknown',how:'list',options:tm}:{id:'unknown',how:'none',options:_askDefaultIds()};
   const top=r[0], second=r[1];
   if(top.score>=3&&(!second||top.score>=1.5*second.score)) return {id:top.id,how:'guess',options:r.slice(1,4).map(x=>x.id)};
-  return {id:'unknown',how:'close',options:r.slice(0,3).map(x=>x.id)};
+  return {id:'unknown',how:'close',options:[...new Set([...r.slice(0,3).map(x=>x.id),...tm])].slice(0,8)};
 }
 function _askMatch(text){ return _askDecide(text).id; }
 function askPickAndRun(id){
@@ -5498,6 +5506,7 @@ function renderAskWidget(){
     const opts=(_askAnswer.options||[]).map(id=>_askQuestions().find(x=>x.id===id)).filter(Boolean);
     const btns=opts.map(q=>`<button onclick="askPickAndRun('${q.id}')" style="display:block;width:100%;text-align:left;margin-top:4px;font-size:11px;height:auto;padding:5px 8px;">${escHtml(q.q)}</button>`).join('');
     if(_askAnswer.how==='guess') ans.insertAdjacentHTML('afterbegin',`<div class="ask-puddl-bubble" style="font-size:11px;"><em>I took "${escHtml(_askAnswer.typed)}" to mean:</em> <strong>${escHtml(_askAnswer.question)}</strong>${btns?`<div style="margin-top:6px;color:var(--ink-m);">Not what you meant? Try:</div>${btns}`:''}</div>`);
+    else if(_askAnswer.how==='list') ans.innerHTML=`<div class="ask-puddl-bubble" style="font-size:11px;">These questions mention "${escHtml(_askAnswer.typed)}". Pick one, or choose from the list below ("Choose a calculated question").${btns}</div>`;
     else if(_askAnswer.how==='close') ans.insertAdjacentHTML('afterbegin',`<div class="ask-puddl-bubble" style="font-size:11px;">I am not sure what you mean by "${escHtml(_askAnswer.typed)}". Did you mean one of these?${btns}</div>`);
     else if(_askAnswer.how==='none') ans.insertAdjacentHTML('afterbegin',`<div class="ask-puddl-bubble" style="font-size:11px;">I could not match "${escHtml(_askAnswer.typed)}" to anything I can work out from this map. Here are some I can answer, or pick from the list below:${btns}</div>`);
   }
