@@ -5405,7 +5405,7 @@ function _askMatch(text){
     [/weak/,'weak'],[/bottleneck|route|gatekeeper/,'bottleneck'],[/hold|critical|together/,'holds'],
     [/fewest|least connected/,'least'],[/strong/,'strong'],[/largest.*group|biggest.*group/,'largestgroup'],
     [/how connected|density|overall connection/,'density'],[/coming in|incoming|affected by the most/,'incoming'],[/going out|outgoing|affects the most/,'outgoing'],
-    [/most connected|best connected|greatest reach/,'connected'],[/cluster|part.*not connect|separate/,'groups']
+    [/most\s+(?:amount|number)?\s*(?:of\s+)?connect|highest\s+(?:amount|number)?\s*(?:of\s+)?connect|best connected|greatest reach/,'connected'],[/cluster|part.*not connect|separate/,'groups']
   ];
   for(const [re,id] of rules) if(re.test(s)) return id;
   const exact=_askQuestions().find(x=>x.q.toLowerCase()===s.trim());
