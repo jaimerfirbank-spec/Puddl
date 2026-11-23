@@ -1083,6 +1083,29 @@ body.share-mode #present-exit{display:none !important;}
 #icon-picker-grid button{width:32px;height:32px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf-2);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;color:var(--ink);transition:background .1s,border-color .1s,color .1s;}
 #icon-picker-grid button:hover{background:var(--acc,#3B82F6);border-color:transparent;color:#fff;}
 
+/* Ask Puddle: calculated questions presented like a compact chat helper. */
+#ask-puddl-launcher{position:fixed;right:78px;bottom:70px;z-index:42;height:56px;padding:0 17px 0 5px;display:flex;align-items:center;gap:9px;border-radius:28px;background:#e4e4e7;color:#27272a;border:1px solid #c4c4c8;box-shadow:var(--shadow-lg);font-size:12.5px;font-weight:800;cursor:pointer;}
+#ask-puddl-launcher img{width:46px;height:46px;object-fit:cover;border-radius:23px;image-rendering:auto;}
+#ask-puddl-launcher:hover{transform:translateY(-1px);box-shadow:var(--shadow-xl);}
+#ask-puddl-launcher.listening img{animation:askPuddlListen 1s steps(2,end) infinite;}
+#ask-puddl-widget{display:none;position:fixed;right:78px;bottom:126px;z-index:43;width:350px;max-height:min(650px,calc(100vh - 150px));background:var(--surf);border:1px solid var(--bdr);border-radius:16px;box-shadow:var(--shadow-xl);font-family:'DM Sans',sans-serif;overflow:hidden;flex-direction:column;}
+#ask-puddl-widget.open{display:flex;animation:askPuddlOpen .16s ease-out;}
+.ask-puddl-head{display:flex;align-items:center;gap:9px;padding:10px 12px;border-bottom:1px solid var(--bdr);background:var(--surf-2);}
+.ask-puddl-head img{width:52px;height:52px;object-fit:cover;border-radius:12px;flex-shrink:0;}
+.ask-puddl-body{padding:11px 12px;overflow-y:auto;overscroll-behavior:contain;}
+.ask-puddl-bubble{padding:8px 9px;border-radius:10px;background:var(--surf-2);font-size:11.5px;line-height:1.45;color:var(--ink);margin-bottom:8px;}
+.ask-puddl-status{display:inline-flex;align-items:center;border-radius:999px;padding:2px 7px;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px;background:var(--surf-3);color:var(--ink-m);}
+.ask-puddl-row{display:flex;gap:6px;align-items:center;}
+.ask-puddl-row input{flex:1;min-width:0;height:34px;font-size:12px;padding:0 9px;}
+.ask-puddl-mic{width:34px;height:34px;padding:0;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;}
+.ask-puddl-mic.listening{background:#00AEEF;color:#fff;border-color:#00AEEF;animation:askPuddlPulse 1s ease-in-out infinite;}
+.ask-puddl-suggest{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0;}
+.ask-puddl-suggest button{height:25px;padding:0 8px;font-size:10px;border-radius:13px;}
+@keyframes askPuddlOpen{from{opacity:0;transform:translateY(8px) scale(.98);}to{opacity:1;transform:none;}}
+@keyframes askPuddlPulse{50%{box-shadow:0 0 0 4px rgba(0,174,239,.18);}}
+@keyframes askPuddlListen{50%{transform:translateY(-1px);}}
+@media(max-width:720px){#ask-puddl-widget{right:10px;left:10px;bottom:74px;width:auto;}#ask-puddl-launcher{right:14px;bottom:14px;}}
+
 
 /* Viewer chrome */
 #viewer-bar{position:fixed;top:0;left:0;right:0;height:46px;z-index:10001;display:flex;
@@ -1152,7 +1175,7 @@ body.share-mode #present-exit{display:none !important;}
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);margin-bottom:10px;">Filter &amp; Search</div>
     <!-- Search with autocomplete -->
     <div style="position:relative;margin-bottom:8px;">
-      <input type="text" id="search-input" placeholder="Search nodes…" oninput="applyFilters();buildSearchSuggestions()" autocomplete="off" style="width:100%;">
+      <input type="search" id="search-input" name="puddl_node_search" placeholder="Search nodes…" oninput="applyFilters();buildSearchSuggestions()" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" data-1p-ignore="true" data-lpignore="true" data-bwignore="true" style="width:100%;">
       <div id="search-suggestions" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius);box-shadow:var(--shadow-md);z-index:100;max-height:180px;overflow-y:auto;margin-top:2px;"></div>
     </div>
     <!-- Category and Area filters removed: nodes carry their own colour, shape and notes. -->
@@ -1731,6 +1754,7 @@ function snap(){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
+    askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
     nodeSizeMode:NODE_SIZE_MODE,
@@ -1799,6 +1823,8 @@ function restoreSnap(s){
   }
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
+  ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
+  _askAnswer=null;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
   if(d.defaultNodeStyle) DEFAULT_NODE_OUTLINE=d.defaultNodeStyle==='outline';
   if(inPresentationEditMode) rebuildPresStopList();
@@ -2190,7 +2216,7 @@ function draw(){
     // Draw stroke — loop arcs use ctx.arc(), others use quadratic Bezier
     if(loopC){
       const antiCW=loopC.dir==='ccw';
-      const as=(7*arrowScale)*lineZoomClamp()/zoom;
+      const as=(10*arrowScale)*lineZoomClamp()/zoom;
       // Stop the arc stroke one arrowhead-length before the tip so the filled triangle sits on top cleanly
       const arcAdjEnd=antiCW ? arcEndAngle+as/loopC.r : arcEndAngle-as/loopC.r;
       ctx.strokeStyle=drawStroke;
@@ -2211,7 +2237,7 @@ function draw(){
       ctx.setLineDash([]);
     } else {
       // Non-loop: compute connected arrow geometry so the stroke ends exactly at the arrowhead base
-      const as=(7*arrowScale)*lineZoomClamp()/zoom;
+      const as=(10*arrowScale)*lineZoomClamp()/zoom;
       const tdx=2*(bp.x-mx),tdy=2*(bp.y-my),tL=Math.sqrt(tdx*tdx+tdy*tdy)||1;
       const tNx=tdx/tL,tNy=tdy/tL,tPx=-tNy,tPy=tNx; // unit tangent + perp at bp (t=1)
       const headT=arrowOf(e)==='forward'||arrowOf(e)==='both';
@@ -2257,8 +2283,8 @@ function draw(){
       if(headT){
         ctx.beginPath();
         ctx.moveTo(bp.x,bp.y);
-        ctx.lineTo(bpS.x+tPx*as*0.45,bpS.y+tPy*as*0.45);
-        ctx.lineTo(bpS.x-tPx*as*0.45,bpS.y-tPy*as*0.45);
+        ctx.lineTo(bpS.x+tPx*as*0.55,bpS.y+tPy*as*0.55);
+        ctx.lineTo(bpS.x-tPx*as*0.55,bpS.y-tPy*as*0.55);
         ctx.closePath();
         ctx.fillStyle=drawStroke;ctx.fill();
       }
@@ -2269,8 +2295,8 @@ function draw(){
         ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
-        ctx.lineTo(apS.x+rPx*as*0.45,apS.y+rPy*as*0.45);
-        ctx.lineTo(apS.x-rPx*as*0.45,apS.y-rPy*as*0.45);
+        ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
+        ctx.lineTo(apS.x-rPx*as*0.55,apS.y-rPy*as*0.55);
         ctx.closePath();
         ctx.fillStyle=drawStroke;ctx.fill();
         ctx.restore();
@@ -2317,7 +2343,7 @@ function draw(){
     }
     // Loop arc arrowhead — placed at the actual arc endpoint on the circle, not at bp
     if(loopC){
-      const as=(7*arrowScale)*lineZoomClamp()/zoom;
+      const as=(10*arrowScale)*lineZoomClamp()/zoom;
       const antiCW=loopC.dir==='ccw';
       // Tip = point on loop circle at arcEndAngle (where the arc actually terminates)
       const arcTipX=loopC.x+loopC.r*Math.cos(arcEndAngle);
@@ -2326,7 +2352,7 @@ function draw(){
       const ty=antiCW?-Math.cos(arcEndAngle): Math.cos(arcEndAngle);
       const ang=Math.atan2(ty,tx);
       ctx.translate(arcTipX,arcTipY);ctx.rotate(ang);
-      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-as,-as*0.45);ctx.lineTo(-as,as*0.45);ctx.closePath();
+      ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-as,-as*0.55);ctx.lineTo(-as,as*0.55);ctx.closePath();
       ctx.fillStyle=drawStroke;ctx.fill();
       ctx.restore();
     }
@@ -3669,12 +3695,18 @@ function insightSummaryLines(I){
   return S;
 }
 let _insOpen={};
+let ASK_REPORT_ITEMS=[];
+let _askAnswer=null;
 function toggleInsGroup(k){
   _insOpen[k]=!_insOpen[k];
   try{ localStorage.setItem('puddl-ins-open',JSON.stringify(_insOpen)); }catch(e){}
   const b=document.getElementById('insg-'+k), a=document.getElementById('insa-'+k);
   if(b) b.style.display=_insOpen[k]?'block':'none';
   if(a) a.textContent=_insOpen[k]?'▾':'▸';
+}
+function _askedReportHTML(){
+  if(!ASK_REPORT_ITEMS.length) return '';
+  return `<div class="report-section"><h4>Questions selected from Insights</h4>`+ASK_REPORT_ITEMS.map(x=>`<div class="report-row" style="display:block;border-left:3px solid #2563EB;padding-left:10px;"><div style="font-size:12px;font-weight:700;color:var(--navy);">${escHtml(x.question)}</div><div style="font-size:12px;line-height:1.5;margin-top:2px;">${escHtml(x.answer)}</div>${x.evidence?`<div style="font-size:11px;color:var(--txt-m);margin-top:2px;">${escHtml(x.evidence)}</div>`:''}${x.meaning?`<div style="font-size:11px;line-height:1.45;margin-top:5px;"><strong>${escHtml(x.assessment||'Neutral')} — what this may mean:</strong> ${escHtml(x.meaning)}</div>`:''}${x.highlight?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;"><strong>Highlighted:</strong> ${escHtml(x.highlight)}</div>`:''}${x.from||x.to?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;">${escHtml(x.from||'Start')} to ${escHtml(x.to||'Now')}</div>`:''}</div>`).join('')+`</div>`;
 }
 function renderInsights(){
   const body=document.getElementById('sec-insights-body');
@@ -3717,12 +3749,12 @@ function renderInsights(){
   _findings=F.list;
   const _findingsCard=()=>{
     if(!F.list.length&&!F.hints.length) return '';
-    const showAll=!!_insOpen.findingsAll, shown=showAll?F.list:F.list.slice(0,7);
+    const showAll=!!_insOpen.findingsAll, shown=showAll?F.list:F.list.slice(0,5);
     let inner=shown.map((f,i)=>{
       const on=_on('finding:'+f.id), col=_FINDING_TAG_COL[f.tag]||'#64748B';
       return `<div onclick="focusFinding(${i})" title="${_tip(on)}" style="padding:7px 8px;margin:3px 0;border-radius:8px;cursor:pointer;border-left:3px solid ${col};${on?'background:var(--surf-3);':''}" ${_hoverAttrs(on)}><div style="font-size:9.5px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:${col};">${esc(f.tag)}</div><div style="font-size:12px;font-weight:600;color:var(--ink);line-height:1.4;margin-top:1px;">${esc(f.text)}</div>${(f.evidence||f.note)?`<div style="font-size:11px;color:var(--ink-h);line-height:1.4;margin-top:2px;">${esc(f.evidence||'')}${f.note?' '+esc(f.note):''}</div>`:''}</div>`;
     }).join('');
-    if(F.list.length>7) inner+=`<button onclick="toggleFindingsAll()" style="font-size:10.5px;height:24px;padding:0 9px;margin:4px 0 2px;">${showAll?'Show fewer':'Show all '+F.list.length}</button>`;
+    if(F.list.length>5) inner+=`<button onclick="toggleFindingsAll()" style="font-size:10.5px;height:24px;padding:0 9px;margin:4px 0 2px;">${showAll?'Show fewer':'Show all '+F.list.length}</button>`;
     if(F.grp&&F.grp.cands&&F.grp.cands.length>=2) inner+=`<div style="font-size:10.5px;color:var(--ink-h);margin-top:8px;">Comparing groups by <select onchange="setFindingsGroup(this.value)" style="font-size:10.5px;height:22px;max-width:150px;"><option value="">Automatic (${esc(F.grp.name)})</option>${F.grp.cands.map(c=>`<option value="${esc(c.id)}"${FINDINGS_GROUP_FIELD===c.id?' selected':''}>${esc(c.name)}</option>`).join('')}</select></div>`;
     else if(F.grp) inner+=`<div style="font-size:10.5px;color:var(--ink-h);margin-top:8px;">Comparing groups by <strong>${esc(F.grp.name)}</strong></div>`;
     inner+=F.hints.map(t=>`<div style="font-size:10.5px;color:var(--ink-h);margin-top:6px;line-height:1.4;">${esc(t)}</div>`).join('');
@@ -4021,11 +4053,11 @@ function renderInsights(){
     }
 
     if(I.betweennessCapped){
-      h += skipped('bottleneck','Bottleneck score',`This map has ${plural(I.pool.length,'person')}. Working out who sits between everyone else takes too long above ${BETWEENNESS_CAP}, so it was not attempted. Filter the map down to see it.`);
+      h += skipped('bottleneck','Go-between score (bottleneck)',`This map has ${plural(I.pool.length,'person')}. Working out who sits between everyone else takes too long above ${BETWEENNESS_CAP}, so it was not attempted. Filter the map down to see it.`);
     } else if(structureWhy){
-      h += skipped('bottleneck','Bottleneck score',structureWhy);
+      h += skipped('bottleneck','Go-between score (bottleneck)',structureWhy);
     } else {
-      h += grp('bottleneck','Bottleneck score',null,
+      h += grp('bottleneck','Go-between score (bottleneck)',null,
         `<div style="font-size:10.5px;color:var(--ink-h);padding:0 6px 4px;">${MAP_TYPE==='systems'?'Sits on the most paths between the other factors - influence has to pass through it.':MAP_TYPE==='stakeholder'?'Sits on the most routes between the other stakeholders - a gatekeeper even without being the most connected.':'Sits on the most paths between everyone else - a pinch point even without being the most connected.'}</div>`+_bottleneckExplainHTML(mapNounPack()[1])+
         (I.topBetweenness.length ? I.topBetweenness.map(n=>row(n,_bottleneckCell(n,Math.round(I.betweenness.get(n.id)),I.pool.length),'node',true)).join('') : none('No node sits between others on a path.')));
     }
@@ -4037,8 +4069,8 @@ function renderInsights(){
     }
   }
 
-  h += grp('groups','Groups',I.linked.length,
-    pair(plural(I.linked.length,'linked group'), plural(I.alone,'person')+' on their own') + I.linked.slice(0,5).map(g=>row(g.best,`group of ${g.size}`,'group')).join(''));
+  h += grp('groups','Connected networks',I.linked.length,
+    pair(plural(I.linked.length,'connected network'), plural(I.alone,'person')+' on their own') + I.linked.slice(0,5).map(g=>row(g.best,`network of ${g.size}`,'group')).join(''));
 
   {
     const mergedNodes=I.pool.filter(n=>n.merged);
@@ -4083,6 +4115,7 @@ function renderInsights(){
   // repeated under fourteen cards in a 300px column it becomes wallpaper.
   h += `<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bdr);font-size:10.5px;color:var(--ink-h);line-height:1.45;">These figures describe what is drawn on this map, not necessarily what is true on the ground. A ${NOUN[0]} nobody has added, or a connection nobody drew, cannot show up here.</div>`;
   h += `<div style="margin-top:10px;display:flex;justify-content:space-between;gap:6px;"><button onclick="renderInsights()" style="font-size:11px;height:26px;padding:0 10px;">Refresh</button><button onclick="openReport()" title="The matrix, strength and version views" style="font-size:11px;height:26px;padding:0 10px;">Full report</button></div>`;
+  h += _glossaryHTML('panel');
   body.innerHTML=h;
 }
 let _insightLoops=[];
@@ -4206,7 +4239,7 @@ function _focusFor(kind,ref,Gin){
   } else if(kind==='group'){
     const v=nodeId(); if(v===null) return;
     const ids=_insReach(adj,v,null,null);
-    f={key:`group:${v}`,label:`The group of ${ids.size} around ${lab(v)}`,ids,pairs:_insPairsWithin(adj,ids),sec:new Set()};
+    f={key:`group:${v}`,label:`The network of ${ids.size} around ${lab(v)}`,ids,pairs:_insPairsWithin(adj,ids),sec:new Set()};
   } else if(kind==='pair'){
     const c=_insCache.pairs[ref]; if(!c) return;
     const a=c.a.id, b=c.b.id, ids=new Set([a,b]);
@@ -4387,16 +4420,16 @@ function computeFindings(I){
   if(grp&&series&&thenRow&&thenRow!==nowRow&&thenRow.measured>=15&&nowRow.measured>=15){
     const a=thenRow.cross/thenRow.measured, b=nowRow.cross/nowRow.measured, pa=Math.round(100*a), pb=Math.round(100*b);
     const focusCross=()=>{ const cr=linkList.filter(([x,y])=>gOf(x)&&gOf(y)&&gOf(x)!==gOf(y)); const ids=new Set(); cr.forEach(([x,y])=>{ ids.add(x); ids.add(y); });
-                           return {label:`Connections that cross ${gw} lines`,ids,pairs:cr.map(([x,y])=>_pk(x,y)),sec:[]}; };
+                           return {label:`Cross-${gw} links`,ids,pairs:cr.map(([x,y])=>_pk(x,y)),sec:[]}; };
     const grew=nowRow.cross>=2*thenRow.cross&&nowRow.cross-thenRow.cross>=5;
     if(b-a>=0.10) add('mixing','Change over time',
-        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections crossed a ${gw} line. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
-        `${thenRow.cross} of ${thenRow.measured} connections then, ${nowRow.cross} of ${nowRow.measured} now. Connections across ${gp} are where joined-up working shows.`,focusCross);
+        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections were cross-${gw} links. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
+        `${thenRow.cross} of ${thenRow.measured} connections then, ${nowRow.cross} of ${nowRow.measured} now. Cross-${gw} links are where joined-up working shows.`,focusCross);
     else if(grew) add('mixing','Change over time',
-        `Connections across ${gp} grew from ${thenRow.cross} to ${nowRow.cross}.`,
+        `Cross-${gw} links grew from ${thenRow.cross} to ${nowRow.cross}.`,
         `${thenRow.cross} of ${thenRow.measured} connections in ${_monthLabel(thenRow.d)}, ${nowRow.cross} of ${nowRow.measured} in ${_monthLabel(nowRow.d)}. The map as a whole grew faster, so their share went from ${pa}% to ${pb}%.`,focusCross);
     else if(a-b>=0.10) add('mixing','Change over time',
-        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections crossed a ${gw} line. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
+        `In ${_monthLabel(thenRow.d)}, ${pa}% of connections were cross-${gw} links. By ${_monthLabel(nowRow.d)} it is ${pb}%.`,
         `${thenRow.cross} of ${thenRow.measured} connections then, ${nowRow.cross} of ${nowRow.measured} now. More of the connecting is now happening inside one ${gw}.`,focusCross);
   }
   // 2. Two groups that started to connect, preferring the pair that began by going through one item
@@ -4440,7 +4473,7 @@ function computeFindings(I){
     const top=br[0], f0=_focusFor('choke',top.node.id,G);
     if(f0){
       const cut=[...f0.ids].filter(x=>x!==top.node.id);
-      add('single','Who holds it together',
+      add('single','Who the map depends on',
         `${top.node.label} is the only thing holding ${noun(top.cutOff)} to the rest.`,
         `Take it out and ${names(cut,3)} ${cut.length===1?'is':'are'} cut off.`,
         ()=>f0);
@@ -4453,7 +4486,7 @@ function computeFindings(I){
   const p2=Math.round(100*touching(top2)/L), p5=Math.round(100*touching(top5)/L);
   if(L>=20&&(p2>=15||p5>=30)){
     const use2=p2>=15, set=use2?top2:top5;
-    add('concentration','Who holds it together',
+    add('concentration','Who the map depends on',
       use2?`${lab(byDeg[0].id)} and ${lab(byDeg[1].id)} are in ${p2}% of all connections.`:`The five best connected are in ${p5}% of all connections.`,
       use2?`The five best connected are in ${p5}%.`:names(set,5)+'.',
       ()=>{ const pairs=[], sec=new Set(); set.forEach(v=>adj.get(v).forEach(x=>{ pairs.push(_pk(v,x)); if(!set.has(x)) sec.add(x); }));
@@ -4510,7 +4543,7 @@ function computeFindings(I){
     const r=[...reach.entries()].sort((a,b)=>b[1]-a[1]);
     if(r.length>1&&r[0][1]>=3&&r[0][1]>r[1][1]&&(r[0][1]===grp.k||r[0][1]>=r[1][1]+2)){
       const [lid,r1]=r[0], r2=r[1][1];
-      add('reach','Who holds it together',
+      add('reach','Who the map depends on',
         r1===grp.k?`${lab(lid)} is the only ${ns} that reaches all ${grp.k} ${gp}.`:`${lab(lid)} reaches ${r1} of the ${grp.k} ${gp}.`,
         `No other ${ns} reaches more than ${r2}.`,
         ()=>({label:lab(lid),ids:[lid],pairs:edgesOf(lid,adj.get(lid)),sec:[...adj.get(lid)]}));
@@ -4562,7 +4595,7 @@ function _changeTableHTML(series,grp){
   const row=(label,f)=>`<tr><td style="padding:4px 8px 4px 0;color:var(--txt-m);">${label}</td>${cols.map(c=>`<td style="padding:4px 8px;text-align:right;font-weight:600;color:var(--navy);">${f(c)}</td>`).join('')}</tr>`;
   let h=`<div class="report-section"><h4>How the map changed</h4><div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Worked out from the dates on the map.</div><div style="overflow-x:auto;"><table style="border-collapse:collapse;font-size:12px;width:100%;"><thead><tr><th></th>${cols.map(c=>`<th style="padding:4px 8px;text-align:right;font-size:11px;color:var(--txt-h);font-weight:600;">${e(_monthLabel(c.d))}</th>`).join('')}</tr></thead><tbody>`;
   h+=row(`${cap(np)} on the map`,c=>c.n)+row('Connections',c=>c.links)+row('With no connection',c=>c.iso)+row('Separate pieces',c=>c.pieces);
-  if(grp) h+=row(`Cross a ${_groupWord(grp.name)} line`,c=>c.measured?Math.round(100*c.cross/c.measured)+'%':'–');
+  if(grp) h+=row(`Cross-${_groupWord(grp.name)} links`,c=>c.measured?Math.round(100*c.cross/c.measured)+'%':'–');
   return h+`</tbody></table></div></div>`;
 }
 function _groupGridHTML(F){
@@ -4585,7 +4618,7 @@ function _groupGridHTML(F){
 function _changeFromDatesHTML(){ const F=computeFindings(computeInsights()); return _changeTableHTML(F.series,F.grp); }
 
 // ── Small charts for the report: inline SVG and plain bars, no libraries ──────────
-const _FINDING_TAG_COL={'Change over time':'#2563EB','Who holds it together':'#7C3AED','Gaps':'#D97706'};
+const _FINDING_TAG_COL={'Change over time':'#2563EB','Who the map depends on':'#7C3AED','Gaps':'#D97706'};
 const _CHART_PALETTE=['#2563EB','#059669','#EA580C','#7C3AED','#0891B2','#DB2777','#CA8A04','#64748B'];
 function _groupColours(grp,pool){
   const out={}, used=new Set();
@@ -4602,6 +4635,26 @@ function _tipA(lines){ return ` data-tip="${escHtml((Array.isArray(lines)?lines:
 function _nameList(ids,nById,max){
   const ns=ids.map(id=>(nById.get?nById.get(id):nById[id])).filter(Boolean).map(n=>n.label).sort((a,b)=>String(a).localeCompare(String(b)));
   max=max||8; return ns.slice(0,max).join(', ')+(ns.length>max?`, and ${ns.length-max} more`:'');
+}
+function _glossaryHTML(kind){
+  const items=[
+    ['Go-between score (bottleneck score)','betweenness centrality','How many pairs of other items have their shortest route through this one.'],
+    ['Critical node','cut vertex, or articulation point','An item that, if removed, leaves others with no route to the rest.'],
+    ['Critical link','bridge','A single connection that, if broken, splits the map.'],
+    ['Connected network (group)','connected component','Everything joined to each other by some chain of links.'],
+    ['Most connected','degree centrality','How many connections an item has.'],
+    ['Who the map depends on','concentration of connections','The share of all connections that touch the top few. It describes the shape of the map, not what people do.'],
+    ['Cross-sector link','bridging or between-group tie','A connection between two items in different sectors.'],
+    ['Density','network density','The share of all possible connections that actually exist.'],
+    ['Reinforcing and balancing loops','positive and negative feedback loops','Reinforcing loops amplify a change; balancing loops resist it.'],
+    ['Root cause and final outcome','source and sink','Nothing points into a root cause; nothing follows from a final outcome.']
+  ];
+  const e=escHtml, small=kind==='panel';
+  const rows=items.map(([a,b,c])=>`<div style="margin:${small?'5px':'7px'} 0;"><div style="font-weight:700;color:var(--ink);">${e(a)} <span style="font-weight:500;color:var(--ink-m);">is called ${e(b)}</span></div><div style="color:var(--ink-m);">${e(c)}</div></div>`).join('');
+  const foot='<div style="margin-top:8px;font-style:italic;color:var(--ink-h);">Terms follow standard network analysis. Plain names are used on screen; the technical names are given here.</div>';
+  const sum='cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink-h);';
+  if(small) return `<details style="margin-top:10px;padding-top:8px;border-top:1px solid var(--bdr);font-size:10.5px;line-height:1.45;"><summary style="${sum}">Plain words, and what they are called</summary>${rows}${foot}</details>`;
+  return `<details class="report-section" style="font-size:12px;line-height:1.5;"><summary style="${sum}margin-bottom:8px;">Plain words, and what they are called</summary>${rows}${foot}</details>`;
 }
 function _bottleneckShare(score,poolSize){ const m=poolSize-1, pairs=m*(m-1)/2; return pairs>0?Math.max(0,Math.min(100,Math.round(100*score/pairs))):0; }
 function _bottleneckCell(n,score,poolSize){
@@ -4793,7 +4846,7 @@ function _reportChartsHTML(I,F){
         const top=[...(r.pairs||new Map()).entries()].sort((a,b)=>b[1]-a[1]).slice(0,3).map(([k,c])=>`${lab(k)} (${c})`).join(', ');
         return [`End of ${_monthLabel(r.d)}`,`${Math.round(100*r.cross/r.measured)}% = ${r.cross} of ${r.measured} connections join two different ${gw}s`,top?`Most often: ${top}`:''];
       });
-      cards.push(card(`Connections that cross ${gw} lines`,'Share of all connections, by month',_svgColumns(S.map(r=>r.measured>=10?Math.round(100*r.cross/r.measured):0),dts,'#7C3AED',true,crossTips)));
+      cards.push(card(`Cross-${gw} links`,'Share of all connections, by month',_svgColumns(S.map(r=>r.measured>=10?Math.round(100*r.cross/r.measured):0),dts,'#7C3AED',true,crossTips)));
     }
   }
   const byDeg=[...pool].sort((a,b)=>adj.get(b.id).size-adj.get(a.id).size||String(a.label).localeCompare(String(b.label))).slice(0,8);
@@ -5293,7 +5346,7 @@ function buildSummaryReport(){
 
   {
     const _I=computeInsights(), _F=computeFindings(_I);
-    html+=_selectionBannerHTML()+(MAP_TYPE==='systems'?_systemsReportHTML(_I):'')+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
+    html+=_selectionBannerHTML()+_askedReportHTML()+(MAP_TYPE==='systems'?_systemsReportHTML(_I):'')+_reportChartsHTML(_I,_F)+_findingsReportHTML(_F)+_groupGridHTML(_F)+_changeTableHTML(_F.series,_F.grp);
   }
 
   if(vis.some(n=>n.colourLabel)&&Object.keys(catCounts).length){
@@ -5368,9 +5421,9 @@ function buildSummaryReport(){
         NI.criticalLinks.map(c=>`<div class="report-row">${escHtml(c.a.label)} — ${escHtml(c.b.label)} <span class="report-stat">cuts off ${c.cutOff}</span></div>`).join('')+`</details>`;
     }
     if(NI.betweennessCapped){
-      html+=`<div class="report-section"><h4>Bottleneck score</h4><div class="report-row" style="color:var(--txt-m);">Skipped: map has more than 200 nodes.</div></div>`;
+      html+=`<div class="report-section"><h4>Go-between score (bottleneck)</h4><div class="report-row" style="color:var(--txt-m);">Skipped: map has more than 200 nodes.</div></div>`;
     } else if(NI.topBetweenness.length){
-      html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Bottleneck score: the top ${NI.topBetweenness.length}, in full</summary>
+      html+=`<details class="report-section"><summary style="cursor:pointer;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--txt-h);margin-bottom:8px;">Go-between score (bottleneck): the top ${NI.topBetweenness.length}, in full</summary>
         <div style="font-size:11px;color:var(--txt-m);margin-bottom:6px;">Sits on the most paths between everyone else. The first number is roughly how many pairs of the others have their shortest route through it. The percentage is that as a share of all pairs. Hover for a short explanation.</div>`+
         NI.topBetweenness.map(n=>{ const sc=Math.round(NI.betweenness.get(n.id));
           return `<div class="report-row">${escHtml(n.label)} <span class="report-stat">${_bottleneckCell(n,sc,NI.pool.length)}</span></div>`; }).join('')+
@@ -5413,6 +5466,7 @@ function buildSummaryReport(){
         <div class="report-row">Among high-power stakeholders: ${A.pct}% positive - ${A.positive} alliance${A.positive===1?'':'s'}, ${A.negative} friction point${A.negative===1?'':'s'}.</div></div>`;
     }
   }
+  html+=_glossaryHTML('report');
   return html;
 }
 function buildMatrixReport(){

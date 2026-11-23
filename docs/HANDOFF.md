@@ -141,6 +141,14 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
 - Vercel: `main` deploys to production; every branch gets a preview address; the previous production build
   can be promoted back from the Vercel dashboard.
 
+## Naming and wording
+
+- The product is spelled **Puddle** in everything people see. "Puddl" survives only in the repository name, the
+  web address (puddl.vercel.app) and some older notes. Do not change the app text to "Puddl".
+- On-screen terms are plain; `_glossaryHTML` (Insights panel and report) lists each next to its standard name:
+  go-between score (betweenness centrality), critical node (cut vertex), critical link (bridge), connected
+  network (connected component). Keep the glossary in step if a term changes.
+
 ## Systems maps and the + / - (detail)
 
 - Demo file: `demo/systems-service-demand.csv`. Known answer: 7 loops listed (2 reinforcing, 4 balancing, 1
