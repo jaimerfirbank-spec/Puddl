@@ -1590,6 +1590,7 @@ let sim=null;
 let hoverPanelNodeId=null, hoverHideTimer=null, sidePanelNodeId=null;
 let presMapOnly=false;           // hide notes: map fills the screen, controls float
 let presentationStops=[];       // [{id,panX,panY,zoom,header,subheader,body}] — the draft being built
+let presSavedId=null;              // which saved presentation the draft being edited belongs to
 let savedPresentations=[];      // [{id,title,createdAt,stops:[...]}] — published, done drafts
 let presentationCurrentIdx=0;
 let presentationSelectedIdx=0;
@@ -1740,6 +1741,7 @@ function snap(){
     loopConnectionStyle:LOOP_CONNECTION_STYLE,
     connectionStyles:CONNECTION_STYLES,
     presentationStops:presentationStops||[],
+    presSavedId:presSavedId||null,
     savedPresentations:savedPresentations||[],
     presMapOnly:!!presMapOnly,
     fieldDefs:FIELD_DEFS,
@@ -1799,6 +1801,7 @@ function restoreSnap(s){
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
   _retireConnStyles();
   presentationStops=d.presentationStops||[];
+  presSavedId=d.presSavedId||null;
   savedPresentations=Array.isArray(d.savedPresentations)?d.savedPresentations:[];
   presMapOnly=!!d.presMapOnly;
   FIELD_DEFS=Array.isArray(d.fieldDefs)?d.fieldDefs:[];
@@ -5780,6 +5783,16 @@ function movePresStopTo(from,to){   // to = final index after the move
 function _presClearDropMarks(){
   document.querySelectorAll('.pres-stop-item.drop-before,.pres-stop-item.drop-after').forEach(e=>e.classList.remove('drop-before','drop-after'));
 }
+function presUpdateSaveStatus(){
+  const el=document.getElementById('pres-save-status'); if(!el) return;
+  const p=presSavedId?savedPresentations.find(function(x){ return x.id===presSavedId; }):null;
+  if(!presentationStops.length){ el.textContent='Add a stop to save.'; el.style.color='var(--ink-m)'; return; }
+  if(!p){ el.textContent='Not saved yet.'; el.style.color='var(--ink-m)'; return; }
+  const same=JSON.stringify(p.stops)===JSON.stringify(presentationStops);
+  const t=new Date(p.updatedAt||p.createdAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  el.textContent=same?'Saved \u2713 at '+t:'Unsaved changes';
+  el.style.color=same?'#15803D':'#B45309';
+}
 function rebuildPresStopList(){
   const list=document.getElementById('pres-stop-list');
   if(!list) return;
@@ -5834,6 +5847,7 @@ function rebuildPresStopList(){
     const editor=document.getElementById('pres-editor');
     if(editor) editor.style.display='flex';
   }
+  presUpdateSaveStatus();
 }
 function presApplyMapOnly(){
   const ov=document.getElementById('present-overlay'); if(!ov) return;
