@@ -10,4 +10,7 @@ $P -f tests/sql/00-supabase-stub.sql
 $P -f supabase/schema.sql 2>&1 | grep -v NOTICE || true
 $P -f supabase/migrations/20261117_reliable_map_limits.sql
 $P -f supabase/migrations/20261124_share_maps.sql
-$P -f tests/sql/shared-maps.test.sql 2>&1 | sed 's/^psql:[^ ]* //' | grep -E 'PASS|FAIL|ALL SQL' || { echo "database checks failed"; exit 1; }
+$P -f supabase/migrations/20261125_team_roles.sql
+for t in shared-maps team-roles; do
+  $P -f tests/sql/$t.test.sql 2>&1 | sed 's/^psql:[^ ]* //' | grep -E 'PASS|FAIL|ALL SQL' || { echo "database checks failed in $t"; exit 1; }
+done

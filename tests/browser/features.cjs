@@ -126,4 +126,43 @@ test('shared maps list: badges, who sees Share, Make private and Delete, and a f
   assert.deepEqual(r.calls.slice(0,2),[['share_map','m1'],['unshare_map','m2']]);
   assert.match(r.count,/1 of 25 private, plus shared/);
 });
+
+test('view-only member: no editing buttons, nothing saved, and a plain notice; the team list works for owner and member',async({page})=>{
+  await loadMap(page,CARRFIELD);
+  const r=await page.evaluate(async()=>{
+    const rows=[{id:'m3',title:'Shared by Ann',kind:'general',updated_at:'2026-11-24T10:00:00Z',scope:'team',owner_id:'ann'}];
+    const calls=[];let writes=0;
+    const roster=[{user_id:'ann',email:'ann@x',role:'owner'},{user_id:'me',email:'me@x',role:'viewer'},{user_id:'ben',email:'ben@x',role:'member'}];
+    supabaseClient={from(){writes++;return {select(){return this},order(){return Promise.resolve({data:rows,error:null})},upsert(){writes++;return Promise.resolve({})},update(){writes++;return this},insert(){writes++;return this}};},
+      rpc(name,args){calls.push([name,args.p_user||'',args.p_role||'']);return Promise.resolve(name==='team_roster'?{data:roster,error:null}:{error:null});}};
+    _authUser={id:'me'};_cloudReady=true;window.confirm=()=>true;
+    _cloudTeam={team_id:'t',name:'Team One',role:'viewer',seats:5,maps_per_user:25};cloudShowViewOnly();
+    await openMyMaps();
+    const buttons=[...document.querySelectorAll('#cloud-maps-list button')].map(b=>b.textContent);
+    const newBtnHidden=document.getElementById('cloud-newmap-btn').style.display==='none';
+    const pill=(document.getElementById('viewonly-pill')||{}).textContent||'';
+    hasUnsavedChanges=false; const before=writes; markUnsaved(); const saved=await cloudSaveCurrent(); const unsaved=hasUnsavedChanges; const wrote=writes-before;
+    await openTeamPanel(); await new Promise(r=>setTimeout(r,50));
+    const viewerRows=[...document.querySelectorAll('#team-list > div')].map(d=>({text:d.textContent,select:!!d.querySelector('select'),remove:!!d.querySelector('button')}));
+    const viewerSeats=document.getElementById('team-seats').textContent;
+    _cloudTeam.role='owner'; cloudShowViewOnly(); const pillGone=!document.getElementById('viewonly-pill');
+    await openTeamPanel(); await new Promise(r=>setTimeout(r,50));
+    const ownerRows=[...document.querySelectorAll('#team-list > div')].map(d=>({text:d.textContent,select:!!d.querySelector('select'),remove:!!d.querySelector('button')}));
+    const benRow=[...document.querySelectorAll('#team-list > div')].find(d=>d.textContent.includes('ben@x'));
+    benRow.querySelector('select').value='viewer'; benRow.querySelector('select').onchange(); await new Promise(r=>setTimeout(r,50));
+    const benRow2=[...document.querySelectorAll('#team-list > div')].find(d=>d.textContent.includes('ben@x'));
+    benRow2.querySelector('button').onclick(); await new Promise(r=>setTimeout(r,50));
+    return {buttons,newBtnHidden,pill,saved,unsaved,wrote,viewerRows,viewerSeats,pillGone,ownerRows,calls};
+  });
+  assert.deepEqual(r.buttons,['Open']);
+  assert.ok(r.newBtnHidden);
+  assert.match(r.pill,/View only/);
+  assert.equal(r.saved,true);assert.equal(r.unsaved,false);assert.equal(r.wrote,0);
+  assert.ok(r.viewerRows.every(x=>!x.select&&!x.remove));
+  assert.match(r.viewerRows.find(x=>x.text.includes('me@x')).text,/\(you\).*View only/);
+  assert.match(r.viewerSeats,/3 of 5 places used/);
+  assert.ok(r.pillGone);
+  assert.deepEqual(r.ownerRows.map(x=>[x.select,x.remove]),[[false,false],[true,true],[true,true]]);
+  assert.deepEqual(r.calls.filter(c=>c[0]!=='team_roster'),[['set_member_role','ben','viewer'],['remove_team_member','ben','']]);
+});
 module.exports={tests};
