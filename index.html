@@ -2296,6 +2296,13 @@ function selectConnColour(col){
           <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv,.tsv" style="display:none;" onchange="handleImportFile(this.files[0])">
         </label>
         <div style="margin-top:8px;font-size:11px;color:var(--ink-h);">No spreadsheet yet? <a href="#" onclick="event.preventDefault();downloadImportTemplate()" style="color:var(--ink);font-weight:600;">Download a blank template</a> with example rows showing the layout.</div>
+        <div style="margin-top:12px;">
+          <div style="font-size:11px;color:var(--ink-h);margin-bottom:5px;">Or use a Google Sheet. Share it as &ldquo;Anyone with the link&rdquo; (Viewer), then paste the link.</div>
+          <div style="display:flex;gap:6px;">
+            <input id="import-gsheet-url" type="text" placeholder="https://docs.google.com/spreadsheets/d/..." autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();loadGoogleSheet();}" style="flex:1;min-width:0;height:32px;font-size:12px;">
+            <button onclick="loadGoogleSheet()" style="height:32px;padding:0 14px;font-size:12px;">Read sheet</button>
+          </div>
+        </div>
         <div id="import-file-name" style="display:none;margin-top:8px;font-size:12px;color:var(--ink-m);padding:6px 10px;background:var(--surf-3);border-radius:var(--radius);"></div>
         <!-- Import mode toggle -->
         <div id="import-mode-row" style="margin-top:12px;display:flex;gap:8px;">
@@ -7699,7 +7706,8 @@ function setImportMode(mode){
 }
 function resetImportModal(){
   importWorkbook=null;importRawRows=[];importHeaders=[];importRows=[];
-  importPlan=null;_importCurrentMapping={};_importStep='mapper';_dupeReviewIdx=0;
+  importPlan=null;_importCurrentMapping={};_importStep='mapper';_dupeReviewIdx=0;_importSource=null;
+  { const g=document.getElementById('import-gsheet-url'); if(g) g.value=''; }
   ['import-step-sheet','import-step-mapper','import-step-dupes','import-step-summary','import-step-preview',
    'import-template-banner','import-template-picker','import-save-template-row'].forEach(id=>{
     const el=document.getElementById(id);if(el) el.style.display='none';
@@ -7732,7 +7740,7 @@ document.getElementById('import-drop-zone').addEventListener('click',()=>{
 let _importFileName='';
 function handleImportFile(file){
   if(!file) return;
-  _importFileName=file.name||'';
+  _importFileName=file.name||''; _importSource=null;
   const fn=document.getElementById('import-file-name');
   fn.textContent='📄 '+file.name;fn.style.display='block';
   document.getElementById('import-status-text').textContent='Reading file…';
@@ -8623,6 +8631,11 @@ function _refreshModalText(on){
 async function startSheetRefresh(){
   if(!nodes.length){ showStatus('Import a spreadsheet first. Refresh then keeps this map in step with it.'); return; }
   _refreshMode=true; _refreshHandle=null;
+  if(LINKED_SHEET&&LINKED_SHEET.url){
+    openImportModal(); setImportMode('add'); _refreshModalText(true);
+    await loadGoogleSheet(LINKED_SHEET.url);
+    return;
+  }
   let file=null;
   if(LINKED_SHEET){
     const h=await _sheetHandleGet(LINKED_SHEET.key);
@@ -8656,6 +8669,53 @@ function _refreshApplyMapping(){
   if(fresh.length){ if(st) st.textContent='New column'+(fresh.length>1?'s':'')+' since last time: '+fresh.slice(0,4).join(', ')+'. Check what '+(fresh.length>1?'they are':'it is')+', then continue.'; return; }
   setTimeout(()=>{ if(_refreshMode&&_importStep==='mapper') runImportMapper(); },0);
 }
+// ── Google Sheet as the source ───────────────────────────────────────────────
+// Reads a sheet that is shared as "Anyone with the link" (or published to the web) as CSV, then hands
+// it to the same importer as a file. Nothing is sent to Google except the request for the sheet.
+let _importSource=null;       // {type:'gsheet',url} when the rows came from a Google Sheet
+function _gsheetUrls(input){
+  const t=String(input||'').trim(); let m;
+  const g=t.match(/[?&#]gid=(\d+)/), gid=g?g[1]:'';
+  if((m=t.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/e\/([A-Za-z0-9_-]+)/)))
+    return ['https://docs.google.com/spreadsheets/d/e/'+m[1]+'/pub?output=csv'+(gid?'&gid='+gid:'')+'&single=true'];
+  if((m=t.match(/^https:\/\/docs\.google\.com\/spreadsheets\/d\/([A-Za-z0-9_-]+)/)))
+    return ['https://docs.google.com/spreadsheets/d/'+m[1]+'/gviz/tq?tqx=out:csv'+(gid?'&gid='+gid:''),
+            'https://docs.google.com/spreadsheets/d/'+m[1]+'/export?format=csv'+(gid?'&gid='+gid:'')];
+  return null;
+}
+async function loadGoogleSheet(url){
+  const inp=document.getElementById('import-gsheet-url');
+  const link=String(url||(inp&&inp.value)||'').trim();
+  const st=document.getElementById('import-status-text');
+  const urls=_gsheetUrls(link);
+  if(!urls){ st.textContent='That does not look like a Google Sheet link. It should start with https://docs.google.com/spreadsheets/'; return; }
+  st.textContent='Reading the Google Sheet…';
+  let text='', err='';
+  for(const u of urls){
+    try{
+      const r=await fetch(u,{credentials:'omit'});
+      if(!r.ok){ err='private'; continue; }
+      const t=await r.text();
+      if(/^\s*<(!doctype|html)/i.test(t)||/accounts\.google\.com/.test(t.slice(0,2000))){ err='private'; continue; }
+      text=t; break;
+    }catch(e){ err='blocked'; }
+  }
+  if(!text){
+    st.textContent=err==='private'
+      ? 'Google would not share that sheet. In Google Sheets choose Share, set it to "Anyone with the link" as Viewer, and try again.'
+      : 'Could not read that Google Sheet from here. Check it is shared as "Anyone with the link" (Viewer). If it is, download it as Excel or CSV and use that instead.';
+    return;
+  }
+  _importSource={type:'gsheet',url:link}; _importFileName='Google Sheet';
+  const fn=document.getElementById('import-file-name'); if(fn){ fn.textContent='📊 Google Sheet'; fn.style.display='block'; }
+  parseCSVImport(text);
+}
+function sheetUnlink(){
+  if(!LINKED_SHEET) return;
+  LINKED_SHEET=null; saveState(); markUnsaved(); renderSheetLink(true);
+  showStatus('Unlinked. The map keeps everything; the next refresh will ask for a spreadsheet again.');
+}
+
 // What would change, worked out from the plan the importer has already built.
 function _refreshDiff(plan){
   const changes=[]; let same=0; const matched=new Set();
@@ -8711,7 +8771,7 @@ function renderSheetLink(force){
   let h='';
   if(LINKED_SHEET){
     const when=new Date(LINKED_SHEET.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
-    h+=`Linked to ${escHtml(LINKED_SHEET.name||'a spreadsheet')}. Last refreshed ${when}.`;
+    h+=`Linked to ${LINKED_SHEET.url?'a Google Sheet':escHtml(LINKED_SHEET.name||'a spreadsheet')}. Last refreshed ${when}. <a href="#" onclick="event.preventDefault();sheetUnlink()" style="color:var(--ink-h);">Unlink</a>`;
   } else h+='Nothing linked yet. Refresh asks for the spreadsheet and remembers how its columns match.';
   if(miss.length){
     h+=`<div style="margin-top:8px;font-weight:700;color:#B45309;">${miss.length} not in the spreadsheet</div>`+
@@ -9259,6 +9319,7 @@ function confirmImport(){
   const _key=_linkNow?(_keepKey||('sh_'+Date.now().toString(36))):'';
   const _linkCols=(_importCurrentMapping.cols||[]).map((c,i)=>({header:String(importHeaders[i]||'').trim()||('Column '+(i+1)),role:c.role,fname:c.fname||''}));
   const _linkName=_importFileName||(LINKED_SHEET&&LINKED_SHEET.name)||'';
+  const _linkUrl=(_importSource&&_importSource.url)||'';
   const _hnd=_refreshHandle;
   let changedCount=0,missingCount=0,backCount=0;
   const catList=typeof currentMapMode!=='undefined'&&currentMapMode==='personal'?PERSONAL_CATEGORIES:CATEGORIES;
@@ -9399,7 +9460,7 @@ function confirmImport(){
   }
   closeImportModal();
   if(_linkNow){
-    LINKED_SHEET={key:_key,name:_linkName,cols:_linkCols,at:Date.now()};
+    LINKED_SHEET={key:_key,name:_linkName,cols:_linkCols,at:Date.now(),url:_linkUrl};
     if(_hnd) _sheetHandlePut(_key,_hnd);
   }
   const parts=[];
@@ -13183,6 +13244,8 @@ async function saveFile(share){
   // into a real data URL in THIS EXPORTED COPY ONLY; the live map on screen
   // keeps its lightweight storage ref untouched.
   const snapObj=JSON.parse(snap());
+  // The address of a Google Sheet, and the name of the spreadsheet file, stay with the owner's copy
+  if(snapObj.linkedSheet){ if(share===true) snapObj.linkedSheet=null; else snapObj.linkedSheet.url=''; }
   const photoNodes=(snapObj.nodes||[]).filter(n=>nodeImgIsStorageRef(n.nodeImg));
   if(photoNodes.length){
     showStatus('Fetching photos for the file ('+photoNodes.length+')...');
