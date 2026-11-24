@@ -13825,7 +13825,13 @@ function renderRecoveryCopies(list){
   });
 }
 
+let _viewOnlyWarnedAt=0;
 function markUnsaved(){
+  if(typeof cloudIsViewer==='function'&&cloudIsViewer()){
+    // View-only member: nothing is kept, so do not queue a save or an "unsaved changes" warning.
+    if(Date.now()-_viewOnlyWarnedAt>20000){ _viewOnlyWarnedAt=Date.now(); showStatus('You have view-only access, so changes here are not saved.'); }
+    return;
+  }
   hasUnsavedChanges=true;
   _cloudNeedsSave=true; _editRevision++;
   // Debounce auto-save: save 3 seconds after last change
@@ -17438,7 +17444,7 @@ async function logout() {
     await supabaseClient.auth.signOut();
     _executeReset();
     _authUser = null;
-    _cloudReady = false; _cloudTeam = null; _cloudMapId = null; _cloudNotice = false;
+    _cloudReady = false; _cloudTeam = null; _cloudMapId = null; _cloudNotice = false; cloudShowViewOnly();
     cloudCloseModal();
     showAuthPane('signin');
     showAuthModal();
@@ -17479,8 +17485,20 @@ function cloudLocalOnly(why){
   }
 }
 
+function cloudIsViewer(){ return !!(_cloudReady && _cloudTeam && _cloudTeam.role === 'viewer'); }
+function cloudShowViewOnly(){
+  let el = document.getElementById('viewonly-pill');
+  if (!cloudIsViewer()) { if (el) el.remove(); return; }
+  if (el) return;
+  el = document.createElement('div');
+  el.id = 'viewonly-pill';
+  el.textContent = 'View only. You can look around, but changes are not saved.';
+  el.style.cssText = 'position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:9000;background:var(--surf);color:var(--ink);border:1px solid var(--bdr);border-radius:999px;box-shadow:var(--shadow-lg);padding:7px 14px;font:500 12px \'DM Sans\',sans-serif;pointer-events:none;';
+  document.body.appendChild(el);
+}
+
 async function cloudInit(){
-  _cloudReady = false; _cloudMapId = null; _cloudTeam = null; _cloudNotice = false;
+  _cloudReady = false; _cloudMapId = null; _cloudTeam = null; _cloudNotice = false; cloudShowViewOnly();
   if (!supabaseClient || !_authUser || IS_SHARE_VIEW) return false;
   try {
     const { data, error } = await supabaseClient
@@ -17502,9 +17520,11 @@ async function cloudInit(){
       role: row.role || 'member',
       name: row.teams ? row.teams.name : '',
       maps_per_user: row.teams ? row.teams.maps_per_user : 25,
+      seats: row.teams ? row.teams.seats : null,
       subscription_ends_at: row.teams ? row.teams.subscription_ends_at : null
     };
     _cloudReady = true;
+    cloudShowViewOnly();
     return true;
   } catch (err) {
     cloudLocalOnly('Could not reach your saved maps.');
@@ -17533,6 +17553,7 @@ async function cloudSaveCurrent(){
     return true;
   }
   if (!_cloudReady || IS_SHARE_VIEW || inDemoMode) return false;
+  if (_cloudTeam && _cloudTeam.role === 'viewer') return true;   // view-only members never save; the database would refuse anyway
   const generation=_cloudGeneration;
   const owner=_authUser.id;
   const revision=_editRevision;
@@ -17772,10 +17793,86 @@ function cloudEnsureModal(){
       '<div id="cloud-maps-list" style="overflow-y:auto;flex:1;min-height:60px;"></div>' +
       '<div style="display:flex;gap:10px;margin-top:18px;">' +
         '<button type="button" id="cloud-newmap-btn" onclick="cloudNewMap()" style="flex:1;padding:10px;background:var(--accent-2);color:#fff;border:none;border-radius:var(--radius);font-family:inherit;font-weight:600;cursor:pointer;font-size:14px;">Start a new map</button>' +
+        '<button type="button" id="cloud-team-btn" onclick="openTeamPanel()" style="padding:10px 16px;background:none;color:var(--ink);border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;cursor:pointer;font-size:14px;">Team</button>' +
         '<button type="button" onclick="cloudCloseModal()" style="padding:10px 16px;background:none;color:var(--ink-m);border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;cursor:pointer;font-size:14px;">Close</button>' +
       '</div>' +
     '</div>';
   document.body.appendChild(wrap);
+}
+
+// ── Team panel: who is in the team, and what each person can do ───────────
+// Adding people is done for the customer, by hand. The owner can switch someone between "can edit" and "view only",
+// and remove them. The database does the checking. Needs supabase/migrations/20261125_team_roles.sql.
+const _TEAM_ROLE_LABEL = { owner:'Owner', member:'Can edit', viewer:'View only' };
+async function openTeamPanel(){
+  if (!_cloudReady || !_cloudTeam) return;
+  let bg = document.getElementById('team-bg');
+  if (!bg) {
+    bg = document.createElement('div');
+    bg.id = 'team-bg';
+    bg.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-family:\'DM Sans\',sans-serif;';
+    bg.innerHTML = '<div style="background:var(--surf);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);padding:28px;width:100%;max-width:520px;margin:20px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;"><h2 id="team-title" style="font-size:20px;font-weight:600;color:var(--ink);margin:0;">Your team</h2><span id="team-seats" style="font-size:12px;color:var(--ink-m);"></span></div>' +
+      '<p id="team-note" style="color:var(--ink-m);margin:6px 0 16px 0;font-size:13px;"></p>' +
+      '<div id="team-list" style="overflow-y:auto;flex:1;min-height:60px;"></div>' +
+      '<div style="display:flex;justify-content:flex-end;margin-top:18px;"><button type="button" onclick="document.getElementById(\'team-bg\').style.display=\'none\'" style="padding:10px 16px;background:none;color:var(--ink-m);border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;cursor:pointer;font-size:14px;">Close</button></div></div>';
+    document.body.appendChild(bg);
+  }
+  bg.style.display = 'flex';
+  const list = document.getElementById('team-list');
+  const isOwner = _cloudTeam.role === 'owner';
+  document.getElementById('team-title').textContent = _cloudTeam.name || 'Your team';
+  document.getElementById('team-note').textContent = isOwner
+    ? 'You can switch someone between can edit and view only, or remove them. To add someone, contact us and we will set them up.'
+    : 'Everyone here can open the maps you share. Only the owner can change who is in the team.';
+  list.innerHTML = '<div style="color:var(--ink-m);font-size:13px;padding:8px 0;">Loading...</div>';
+  const { data, error } = await supabaseClient.rpc('team_roster', { p_team: _cloudTeam.team_id });
+  if (error) {
+    const missing = /function|schema cache|does not exist/i.test(error.message || '');
+    list.innerHTML = '';
+    const msg = document.createElement('div');
+    msg.style.cssText = 'color:var(--ink-m);font-size:13px;padding:8px 0;';
+    msg.textContent = missing ? 'The team list needs a database update that has not been applied yet.' : 'Could not load the team list.';
+    list.appendChild(msg);
+    return;
+  }
+  document.getElementById('team-seats').textContent = data.length + (_cloudTeam.seats ? ' of ' + _cloudTeam.seats : '') + ' places used';
+  list.innerHTML = '';
+  data.forEach(function(p){
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--bdr);border-radius:var(--radius);margin-bottom:8px;';
+    const who = document.createElement('div');
+    who.style.cssText = 'flex:1;min-width:0;font-size:14px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    who.textContent = p.email + (p.user_id === _authUser.id ? ' (you)' : '');
+    row.appendChild(who);
+    if (isOwner && p.role !== 'owner') {
+      const sel = document.createElement('select');
+      sel.style.cssText = 'padding:6px;border:1px solid var(--bdr);border-radius:var(--radius);background:var(--surf);color:var(--ink);font-family:inherit;font-size:12px;';
+      [['member','Can edit'],['viewer','View only']].forEach(function(o){ const op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; if (o[0] === p.role) op.selected = true; sel.appendChild(op); });
+      sel.onchange = async function(){
+        const { error: e2 } = await supabaseClient.rpc('set_member_role', { p_team: _cloudTeam.team_id, p_user: p.user_id, p_role: sel.value });
+        showStatus(e2 ? 'Could not change that role.' : (p.email + ' is now ' + _TEAM_ROLE_LABEL[sel.value].toLowerCase() + '.'));
+        openTeamPanel();
+      };
+      row.appendChild(sel);
+      const rm = document.createElement('button');
+      rm.type = 'button'; rm.textContent = 'Remove';
+      rm.style.cssText = 'padding:6px 10px;background:none;border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;font-size:12px;color:var(--ink);cursor:pointer;flex-shrink:0;';
+      rm.onclick = async function(){
+        if (!window.confirm('Remove ' + p.email + ' from the team?\n\nThey will no longer see any of the team\'s maps. Maps they shared stay with the team. Their private maps are kept, but nobody on the team can see them.')) return;
+        const { error: e3 } = await supabaseClient.rpc('remove_team_member', { p_team: _cloudTeam.team_id, p_user: p.user_id });
+        showStatus(e3 ? 'Could not remove them.' : (p.email + ' has been removed.'));
+        openTeamPanel();
+      };
+      row.appendChild(rm);
+    } else {
+      const tag = document.createElement('span');
+      tag.style.cssText = 'font-size:12px;color:var(--ink-m);flex-shrink:0;';
+      tag.textContent = _TEAM_ROLE_LABEL[p.role] || p.role;
+      row.appendChild(tag);
+    }
+    list.appendChild(row);
+  });
 }
 
 function cloudCloseModal(){
@@ -17789,7 +17886,9 @@ async function openMyMaps(){
   const bg = document.getElementById('cloud-maps-bg');
   const list = document.getElementById('cloud-maps-list');
   const newBtn = document.getElementById('cloud-newmap-btn');
-  if (newBtn) { const sp = document.getElementById('who-modal-bg'); newBtn.style.display = (sp && getComputedStyle(sp).display !== 'none') ? 'none' : ''; }
+  if (newBtn) { const sp = document.getElementById('who-modal-bg'); newBtn.style.display = ((sp && getComputedStyle(sp).display !== 'none') || cloudIsViewer()) ? 'none' : ''; }
+  const teamBtn = document.getElementById('cloud-team-btn');
+  if (teamBtn) teamBtn.style.display = (_cloudTeam && _cloudTeam.team_id) ? '' : 'none';
   list.innerHTML = '<div style="color:var(--ink-m);font-size:13px;padding:8px 0;">Loading...</div>';
   bg.style.display = 'flex';
 
@@ -17816,7 +17915,7 @@ async function openMyMaps(){
     const sub = document.createElement('div');
     sub.style.cssText = 'font-size:11px;color:var(--ink-m);margin-top:2px;';
     const kindLbl = (typeof MAP_TYPE_LABELS!=='undefined' && MAP_TYPE_LABELS[m.kind]) || 'General map';
-    sub.textContent = (isOpen ? 'Open now - ' : '') + kindLbl + (m.scope==='team' ? ' \u00b7 Shared with your team' + (m.mine ? ' (you made it)' : '') : '') + ' \u00b7 last saved ' + when;
+    sub.textContent = (isOpen ? 'Open now - ' : '') + kindLbl + (m.scope==='team' ? ' \u00b7 Shared with your team' + (m.mine ? ' (you made it)' : '') + (cloudIsViewer() ? ' \u00b7 view only' : '') : '') + ' \u00b7 last saved ' + when;
     name.appendChild(t); name.appendChild(sub);
     row.appendChild(name);
 
@@ -17831,7 +17930,7 @@ async function openMyMaps(){
       const ok = await cloudOpenMap(m.id);
       if (ok) { cloudCloseModal(); if (typeof showStatus === 'function') showStatus('Opened "' + (m.title||'Untitled map') + '".'); }
     }));
-    row.appendChild(mk('Rename', 'Rename this map', async function(){
+    if (!cloudIsViewer()) row.appendChild(mk('Rename', 'Rename this map', async function(){
       const next = window.prompt('New name for this map:', m.title || 'Untitled map');
       if (next === null) return;
       const clean = next.trim();
@@ -17846,11 +17945,12 @@ async function openMyMaps(){
       }
     }));
     const teamName = (_cloudTeam && _cloudTeam.name) || 'your team';
-    if (m.scope === 'personal' && m.mine) row.appendChild(mk('Share', 'Let everyone in ' + teamName + ' open and edit this map', async function(){
+    const viewer = cloudIsViewer();
+    if (m.scope === 'personal' && m.mine && !viewer) row.appendChild(mk('Share', 'Let everyone in ' + teamName + ' open and edit this map', async function(){
       if (!window.confirm('Share "' + (m.title||'Untitled map') + '" with ' + teamName + '?\n\nEveryone in the team will be able to open it and change it. You can make it private again later.')) return;
       if (await cloudShareMap(m.id, true)) openMyMaps();
     }));
-    if (m.scope === 'team' && (m.mine || (_cloudTeam && _cloudTeam.role === 'owner'))) row.appendChild(mk('Make private', 'Take this map back from the team', async function(){
+    if (m.scope === 'team' && !viewer && (m.mine || (_cloudTeam && _cloudTeam.role === 'owner'))) row.appendChild(mk('Make private', 'Take this map back from the team', async function(){
       if (!window.confirm('Make "' + (m.title||'Untitled map') + '" private again?\n\nOnly its maker will see it' + (m.mine ? '' : ', and it will disappear from your list') + '.')) return;
       if (await cloudShareMap(m.id, false)) openMyMaps();
     }));

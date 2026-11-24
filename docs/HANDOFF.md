@@ -176,8 +176,11 @@ plain question and then appears in Ask, At a glance and the report. It is not in
 4. **Data side:** a kind-of-relationship field with a filter, filter by any field, a data table inside the app, one
    Excel table of figures per organisation, saved views.
 5. **Shared workspace for a team** (Jaime said yes to starting; invites for the first customer will be sent by hand, Supabase plan
-   is Basic for now). Slice 1 done (PR #72). Next: 2 view/edit roles and removing a member (members added by hand in the Supabase
-   SQL editor), 3 "last edited by" and a friendlier conflict message, 4 history and restore, 5 comments. The team and owner
+   is Basic for now). Slices 1 (PR #72) and 2 done. Slice 2: roles owner / member (can edit) / viewer (read only), enforced by
+   the database (`supabase/migrations/20261125_team_roles.sql`, NOT applied, needs 20261117 and 20261124 first). Owner can switch
+   someone between can edit and view only, and remove them, from a Team button in Your maps; any member sees the team list.
+   Viewers get a "View only" notice and nothing they do is saved. People are still added by hand in the Supabase SQL editor
+   (use `viewer` as the role for view-only). Removing someone keeps their private maps in the database, unseen. Next: 3 "last edited by" and a friendlier conflict message, 4 history and restore, 5 comments. The team and owner
    may not exist in the live database yet; check first (read-only queries). Keep customer names out of the repo.
 6. Smaller: a bottleneck infographic (100-dot grid); the "Connection matrix" tab repeats the sector grid on maps over
    60 nodes; accessibility (the map is a canvas; offer the table as the accessible version).
