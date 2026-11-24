@@ -290,7 +290,6 @@ select{
 #splash-mouth::before{content:'';position:absolute;inset:1px;border:1px dashed rgba(113,113,122,.65);}
 #splash-mouth::after{content:'';position:absolute;left:3px;bottom:0;width:10px;height:7px;border-radius:0;background:linear-gradient(135deg,#ffb3c7 0 45%,#e8799a 46% 100%);box-shadow:inset 1px 1px 0 #ffd0dc,inset -1px -1px 0 #be5677;}
 .puddle-pixel{position:absolute;z-index:4;width:8px;height:5px;background:#16c7eb;box-shadow:inset 1px 1px 0 #67e8f9,inset -1px -1px 0 #0891b2;opacity:0;}
-.puddle-pixel.dark{background:#18181b;box-shadow:inset 1px 1px 0 #3f3f46,inset -1px -1px 0 #09090b;}
 .puddle-pixel.p1{left:14%;bottom:14%}.puddle-pixel.p2{left:23%;bottom:9%}.puddle-pixel.p3{left:34%;bottom:15%}.puddle-pixel.p4{left:47%;bottom:8%}.puddle-pixel.p5{left:61%;bottom:13%}.puddle-pixel.p6{left:75%;bottom:9%}.puddle-pixel.p7{left:84%;bottom:15%}.puddle-pixel.p8{left:53%;bottom:17%}
 #splash-mascot-scene.play #splash-sheep-wrap{animation:plushSheepAppear .65s ease-out both;}
 #splash-mascot-scene.play .puddle-pixel{animation:plushPixelRipple 1.4s ease-in-out infinite;}
@@ -298,7 +297,7 @@ select{
 #splash-mascot-scene.play .puddle-pixel:nth-of-type(3n){animation-delay:.55s;}
 #splash-mascot-scene.play #splash-mouth{animation:plushMouth .72s 1.22s steps(3,end) both;}
 @keyframes plushSheepAppear{0%{opacity:0;transform:scale(.96)}100%{opacity:1;transform:scale(1)}}
-@keyframes plushPixelRipple{0%,100%{opacity:0;transform:translateX(-4px) scaleX(.65)}35%,65%{opacity:.9;transform:translateX(4px) scaleX(1.35)}}
+@keyframes plushPixelRipple{0%,100%{opacity:.2;transform:translateX(-3px) scaleX(.8)}35%,65%{opacity:.85;transform:translateX(3px) scaleX(1.2)}}
 @keyframes plushMouth{0%,100%{opacity:0;transform:scaleY(.12)}25%,75%{opacity:1;transform:scaleY(1)}}
 @media(prefers-reduced-motion:reduce){#splash-mascot-scene{opacity:1}#splash-sheep-wrap{animation:none!important}.puddle-pixel,#splash-mouth{display:none!important}}
 
