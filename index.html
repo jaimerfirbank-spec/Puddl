@@ -17845,6 +17845,61 @@ function cloudEnsureModal(){
   document.body.appendChild(wrap);
 }
 
+// ── History of a shared map: earlier versions, and a way back ─────────────
+// The database keeps a version when a shared map is saved over, at most every 15 minutes, newest 20.
+// Needs supabase/migrations/20261127_map_history.sql. Going back keeps the current version first, so it can be undone.
+async function openMapHistory(m){
+  let bg = document.getElementById('history-bg');
+  if (!bg) {
+    bg = document.createElement('div');
+    bg.id = 'history-bg';
+    bg.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-family:\'DM Sans\',sans-serif;';
+    bg.innerHTML = '<div style="background:var(--surf);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);padding:28px;width:100%;max-width:520px;margin:20px;max-height:80vh;display:flex;flex-direction:column;">' +
+      '<h2 id="history-title" style="font-size:20px;font-weight:600;color:var(--ink);margin:0;">History</h2>' +
+      '<p id="history-note" style="color:var(--ink-m);margin:6px 0 16px 0;font-size:13px;"></p>' +
+      '<div id="history-list" style="overflow-y:auto;flex:1;min-height:60px;"></div>' +
+      '<div style="display:flex;justify-content:flex-end;margin-top:18px;"><button type="button" onclick="document.getElementById(\'history-bg\').style.display=\'none\'" style="padding:10px 16px;background:none;color:var(--ink-m);border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;cursor:pointer;font-size:14px;">Close</button></div></div>';
+    document.body.appendChild(bg);
+  }
+  bg.style.display = 'flex';
+  const list = document.getElementById('history-list');
+  const canRestore = !cloudIsViewer();
+  document.getElementById('history-title').textContent = 'History: ' + (m.title || 'Untitled map');
+  document.getElementById('history-note').textContent = 'Earlier versions are kept automatically, at most one every 15 minutes, the newest 20.' + (canRestore ? ' Going back keeps the current version here too, so you can undo it.' : '');
+  list.innerHTML = '<div style="color:var(--ink-m);font-size:13px;padding:8px 0;">Loading...</div>';
+  const { data, error } = await supabaseClient.from('map_versions').select('id, saved_at, saved_by').eq('map_id', m.id).order('saved_at', { ascending: false });
+  const note = function(t){ list.innerHTML = ''; const d = document.createElement('div'); d.style.cssText = 'color:var(--ink-m);font-size:13px;padding:8px 0;'; d.textContent = t; list.appendChild(d); };
+  if (error) { note(/relation|does not exist|schema cache/i.test(error.message || '') ? 'History needs a database update that has not been applied yet.' : 'Could not load the history.'); return; }
+  if (!data || !data.length) { note('No earlier versions yet. One is kept the first time someone saves a change after the map is shared.'); return; }
+  const names = await cloudTeamNames();
+  list.innerHTML = '';
+  data.forEach(function(v){
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--bdr);border-radius:var(--radius);margin-bottom:8px;';
+    const when = new Date(v.saved_at).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const txt = document.createElement('div');
+    txt.style.cssText = 'flex:1;min-width:0;font-size:14px;color:var(--ink);';
+    txt.textContent = when + (v.saved_by ? ', saved by ' + cloudWhoName(v.saved_by, names) : '');
+    row.appendChild(txt);
+    if (canRestore) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.textContent = 'Go back to this';
+      b.style.cssText = 'padding:6px 10px;background:none;border:1px solid var(--bdr);border-radius:var(--radius);font-family:inherit;font-size:12px;color:var(--ink);cursor:pointer;flex-shrink:0;';
+      b.onclick = async function(){
+        if (!window.confirm('Go back to the version from ' + when + '?\n\nThe version as it is now is kept in this list, so you can undo it.')) return;
+        if (m.id === _cloudMapId && !await saveBeforeMapChange()) return;
+        const { error: e2 } = await supabaseClient.rpc('restore_map_version', { p_version: v.id });
+        if (e2) { showStatus('Could not go back to that version.'); return; }
+        document.getElementById('history-bg').style.display = 'none';
+        showStatus('Gone back to the version from ' + when + '.');
+        if (await cloudOpenMap(m.id)) cloudCloseModal(); else openMyMaps();
+      };
+      row.appendChild(b);
+    }
+    list.appendChild(row);
+  });
+}
+
 // ── Team panel: who is in the team, and what each person can do ───────────
 // Adding people is done for the customer, by hand. The owner can switch someone between "can edit" and "view only",
 // and remove them. The database does the checking. Needs supabase/migrations/20261125_team_roles.sql.
@@ -18000,6 +18055,7 @@ async function openMyMaps(){
       if (!window.confirm('Make "' + (m.title||'Untitled map') + '" private again?\n\nOnly its maker will see it' + (m.mine ? '' : ', and it will disappear from your list') + '.')) return;
       if (await cloudShareMap(m.id, false)) openMyMaps();
     }));
+    if (m.scope === 'team') row.appendChild(mk('History', 'See earlier versions of this map' + (cloudIsViewer() ? '' : ' and go back to one'), function(){ openMapHistory(m); }));
     const canDelete = (m.scope === 'personal' && m.mine) || (m.scope === 'team' && _cloudTeam && _cloudTeam.role === 'owner');
     if (canDelete) row.appendChild(mk('Delete', 'Delete this map for good', async function(){
       if (!window.confirm('Delete "' + (m.title||'Untitled map') + '"?\n\nThis cannot be undone.')) return;

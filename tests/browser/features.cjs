@@ -117,11 +117,11 @@ test('shared maps list: badges, who sees Share, Make private and Delete, and a f
     return {asMember,asOwner,ok,ok2,bad,calls,count:document.getElementById('cloud-maps-count').textContent};
   });
   const by=(list,t)=>list.find(x=>x.title===t);
-  assert.deepEqual(by(r.asMember,'My private').buttons.filter(b=>b!=='Open'&&b!=='Rename'),['Share','Delete']);
-  assert.deepEqual(by(r.asMember,'I shared this').buttons.filter(b=>b!=='Open'&&b!=='Rename'),['Make private']);
-  assert.deepEqual(by(r.asMember,'A colleague shared this').buttons.filter(b=>b!=='Open'&&b!=='Rename'),[]);
+  assert.deepEqual(by(r.asMember,'My private').buttons.filter(b=>b!=='Open'&&b!=='Rename'&&b!=='History'),['Share','Delete']);
+  assert.deepEqual(by(r.asMember,'I shared this').buttons.filter(b=>b!=='Open'&&b!=='Rename'&&b!=='History'),['Make private']);
+  assert.deepEqual(by(r.asMember,'A colleague shared this').buttons.filter(b=>b!=='Open'&&b!=='Rename'&&b!=='History'),[]);
   assert.match(by(r.asMember,'I shared this').sub,/Shared with your team \(you made it\)/);
-  assert.deepEqual(by(r.asOwner,'A colleague shared this').buttons.filter(b=>b!=='Open'&&b!=='Rename'),['Make private','Delete']);
+  assert.deepEqual(by(r.asOwner,'A colleague shared this').buttons.filter(b=>b!=='Open'&&b!=='Rename'&&b!=='History'),['Make private','Delete']);
   assert.equal(r.ok,true);assert.equal(r.ok2,true);assert.equal(r.bad,false);
   assert.deepEqual(r.calls.slice(0,2),[['share_map','m1'],['unshare_map','m2']]);
   assert.match(r.count,/1 of 25 private, plus shared/);
@@ -154,7 +154,7 @@ test('view-only member: no editing buttons, nothing saved, and a plain notice; t
     benRow2.querySelector('button').onclick(); await new Promise(r=>setTimeout(r,50));
     return {buttons,newBtnHidden,pill,saved,unsaved,wrote,viewerRows,viewerSeats,pillGone,ownerRows,calls};
   });
-  assert.deepEqual(r.buttons,['Open']);
+  assert.deepEqual(r.buttons,['Open','History']);
   assert.ok(r.newBtnHidden);
   assert.match(r.pill,/View only/);
   assert.equal(r.saved,true);assert.equal(r.unsaved,false);assert.equal(r.wrote,0);
@@ -198,5 +198,36 @@ test('last saved by: shown on shared maps, and a clash says who saved first and 
   assert.equal(r.asked.length,1,'asks once, not on every retry');
   assert.match(r.asked[0],/ben@x saved changes to this map at \d\d:\d\d, after you opened it/);
   assert.equal(r.saved,1);
+});
+
+test('history: lists earlier versions with who and when, viewers cannot go back, a member can and the map reopens',async({page})=>{
+  await loadMap(page,CARRFIELD);
+  const r=await page.evaluate(async()=>{
+    const maps=[{id:'m2',title:'Shared',kind:'general',updated_at:'2026-11-24T10:00:00Z',scope:'team',owner_id:'ann',updated_by:'ben'}];
+    const versions=[{id:'v2',saved_at:'2026-11-24T14:32:00Z',saved_by:'ben'},{id:'v1',saved_at:'2026-11-24T09:05:00Z',saved_by:'gone'}];
+    const calls=[];let missing=false;
+    const roster=[{user_id:'ann',email:'ann@x',role:'owner'},{user_id:'ben',email:'ben@x',role:'member'}];
+    supabaseClient={from(t){const q={select(){return q},order(){return t==='maps'?Promise.resolve({data:maps,error:null}):Promise.resolve(missing?{data:null,error:{message:'relation "map_versions" does not exist'}}:{data:versions,error:null})},eq(){return q},single(){return Promise.resolve({data:{data:{nodes:[{id:1,x:0,y:0,label:'A'}],edges:[]},title:'Shared',updated_at:'v9'},error:null})}};return q;},
+      rpc(name,args){calls.push([name,args.p_version||'']);return Promise.resolve(name==='team_roster'?{data:roster,error:null}:{error:null});}};
+    _authUser={id:'me'};_cloudReady=true;window.confirm=()=>true;
+    const texts=()=>[...document.querySelectorAll('#history-list > div')].map(d=>({t:d.textContent,btn:!!d.querySelector('button')}));
+    const pause=()=>new Promise(r=>setTimeout(r,80));
+    _cloudTeam={team_id:'t',name:'T',role:'viewer',maps_per_user:25};
+    await openMyMaps(); const rowBtns=[...document.querySelectorAll('#cloud-maps-list button')].map(b=>b.textContent);
+    await openMapHistory(maps[0]); await pause(); const asViewer=texts();
+    _cloudTeam.role='member'; await openMapHistory(maps[0]); await pause(); const asMember=texts();
+    hasUnsavedChanges=false;_cloudNeedsSave=false;
+    [...document.querySelectorAll('#history-list button')][0].onclick(); await pause(); await pause();
+    const hidden=document.getElementById('history-bg').style.display==='none';
+    missing=true; await openMapHistory(maps[0]); await pause(); const noDb=texts();
+    return {rowBtns,asViewer,asMember,calls:calls.filter(c=>c[0]!=='team_roster'),hidden,noDb,opened:_cloudMapId};
+  });
+  assert.ok(r.rowBtns.includes('History'));
+  assert.ok(r.asViewer.length===2&&r.asViewer.every(x=>!x.btn),'a viewer sees the list but has no way back');
+  assert.match(r.asViewer[0].t,/saved by ben@x/);assert.match(r.asViewer[1].t,/saved by someone no longer in the team/);
+  assert.ok(r.asMember.every(x=>x.btn));
+  assert.deepEqual(r.calls,[['restore_map_version','v2']]);
+  assert.ok(r.hidden);assert.equal(r.opened,'m2','the map is reopened after going back');
+  assert.match(r.noDb[0].t,/database update that has not been applied/);
 });
 module.exports={tests};
