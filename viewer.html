@@ -1510,6 +1510,8 @@ function ensureArgStyles(){
    {id:'opposes', label:'Opposes', colour:'#DC2626',lineWidth:2.4,dashPattern:[7,4],arrowScale:1.1}]
   .forEach(st=>{ if(!CONNECTION_STYLES.find(x=>x.id===st.id)) CONNECTION_STYLES.push(st); });
 }
+let ARROW_SIZE=1;                // multiplier on every arrowhead, on top of each strength's own size
+let EDGE_GRADIENT=false;         // fade each plain line from one end's colour to the other
 let EDGE_CURVE=0.2;              // how much a connection bows, as a share of its length (Kumu-style arcs: longer lines sweep more)
 let EDGE_OPACITY=0.8;            // how solid ordinary connections are; lit-up ones are always full
 function _curveOffset(dist){ return MAP_TYPE==='argument'?0:dist*EDGE_CURVE; }
@@ -1851,7 +1853,7 @@ function snap(includeVersions=true){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
-    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,linkedSheet:LINKED_SHEET||null,labelThin:LABEL_THIN,
+    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,arrowSize:ARROW_SIZE,edgeGradient:EDGE_GRADIENT,nodeSpacing:NODE_BREATHING,linkedSheet:LINKED_SHEET||null,labelThin:LABEL_THIN,
     askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
@@ -1955,6 +1957,7 @@ function restoreSnap(s,keepVersions){
   LINKED_SHEET=d.linkedSheet||null;
   LABEL_THIN=d.labelThin!==false; { const lt=document.getElementById('settings-label-thin'); if(lt) lt.checked=LABEL_THIN; }
   EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
+  ARROW_SIZE=typeof d.arrowSize==='number'&&d.arrowSize>0?d.arrowSize:1; EDGE_GRADIENT=d.edgeGradient===true;
   if(typeof d.nodeSpacing==='number') NODE_BREATHING=d.nodeSpacing;
   ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
   _askAnswer=null;
@@ -2302,7 +2305,7 @@ function draw(){
     // Line weight + dash pattern by type
     const lw = (thinLinesOn()? thinWidth(style) : style.lineWidth) * lineZoomClamp();
     // Arrow size by type
-    const arrowScale = style.arrowScale;
+    const arrowScale = style.arrowScale*ARROW_SIZE;
 
     // In circle view, links between neighbours on the circle bow outward along the circle, not inward
     let _arc=null;
@@ -2388,6 +2391,13 @@ function draw(){
         rPx=-rNy;rPy=rNx; // perp at ap (t=0)
         apS={x:ap.x+as*rNx,y:ap.y+as*rNy}; // stroke start = reverse arrowhead base
       }
+      // Optional fade from one end's colour to the other, for ordinary lines only: lit-up and loop lines keep their own colour
+      let _gStroke=null,_gHeadT=null,_gHeadS=null;
+      if(EDGE_GRADIENT&&!isHl&&!dimmed&&!_pcs&&!_typeCol&&!isSecondaryEdge&&!style.isDouble){
+        const ca=nodeFill(a), cb=nodeFill(b), da=_dark?adaptColourForDark(ca):ca, db=_dark?adaptColourForDark(cb):cb;
+        _gStroke=ctx.createLinearGradient(apS.x,apS.y,bpS.x,bpS.y); _gStroke.addColorStop(0,da); _gStroke.addColorStop(1,db);
+        _gHeadT=db; _gHeadS=da;
+      }
       if(_pcs){
         // One strand per loop, side by side, each in its loop's colour (dashed after the first ten colours)
         const gap=3.4/zoom, n=_pcs.length;
@@ -2412,7 +2422,7 @@ function draw(){
         ctx.beginPath();
         ctx.moveTo(apS.x,apS.y);
         ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y);
-        ctx.strokeStyle=drawStroke;ctx.lineWidth=(isHl?lw+(thinLinesOn()?0.6:1):lw)/zoom;
+        ctx.strokeStyle=_gStroke||drawStroke;ctx.lineWidth=(isHl?lw+(thinLinesOn()?0.6:1):lw)/zoom;
         if(style.dashPattern){ctx.setLineDash(style.dashPattern.map(d=>d/zoom));}
         else{ctx.setLineDash([]);}
         ctx.stroke();ctx.setLineDash([]);
@@ -2424,7 +2434,7 @@ function draw(){
         ctx.lineTo(bpS.x+tPx*as*0.55,bpS.y+tPy*as*0.55);
         ctx.lineTo(bpS.x-tPx*as*0.55,bpS.y-tPy*as*0.55);
         ctx.closePath();
-        ctx.fillStyle=drawStroke;ctx.fill();
+        ctx.fillStyle=_gHeadT||drawStroke;ctx.fill();
       }
       ctx.restore();
       // Arrowhead at source (backward or both)
@@ -2436,7 +2446,7 @@ function draw(){
         ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
         ctx.lineTo(apS.x-rPx*as*0.55,apS.y-rPy*as*0.55);
         ctx.closePath();
-        ctx.fillStyle=drawStroke;ctx.fill();
+        ctx.fillStyle=_gHeadS||drawStroke;ctx.fill();
         ctx.restore();
       }
       // Polarity badge near the arrowhead: cause/effect on a systems map,
