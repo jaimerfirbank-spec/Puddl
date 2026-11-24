@@ -1083,10 +1083,6 @@ body.share-mode #present-exit{display:none !important;}
 #icon-picker-grid button:hover{background:var(--acc,#3B82F6);border-color:transparent;color:#fff;}
 
 /* Ask Puddle: calculated questions presented like a compact chat helper. */
-#ask-puddl-launcher{position:fixed;right:78px;bottom:70px;z-index:42;height:56px;padding:0 17px 0 5px;display:flex;align-items:center;gap:9px;border-radius:28px;background:#e4e4e7;color:#27272a;border:1px solid #c4c4c8;box-shadow:var(--shadow-lg);font-size:12.5px;font-weight:800;cursor:pointer;}
-#ask-puddl-launcher img{width:46px;height:46px;object-fit:cover;border-radius:23px;image-rendering:auto;}
-#ask-puddl-launcher:hover{transform:translateY(-1px);box-shadow:var(--shadow-xl);}
-#ask-puddl-launcher.listening img{animation:askPuddlListen 1s steps(2,end) infinite;}
 #ask-puddl-widget{display:none;position:fixed;right:78px;bottom:126px;z-index:43;width:350px;max-height:min(650px,calc(100vh - 150px));background:var(--surf);border:1px solid var(--bdr);border-radius:16px;box-shadow:var(--shadow-xl);font-family:'DM Sans',sans-serif;overflow:hidden;flex-direction:column;}
 #ask-puddl-widget .ask-puddl-head{cursor:grab;touch-action:none;user-select:none;}
 #ask-puddl-widget.dragging .ask-puddl-head{cursor:grabbing;}
@@ -1105,7 +1101,7 @@ body.share-mode #present-exit{display:none !important;}
 @keyframes askPuddlOpen{from{opacity:0;transform:translateY(8px) scale(.98);}to{opacity:1;transform:none;}}
 @keyframes askPuddlPulse{50%{box-shadow:0 0 0 4px rgba(0,174,239,.18);}}
 @keyframes askPuddlListen{50%{transform:translateY(-1px);}}
-@media(max-width:720px){#ask-puddl-widget{right:10px;left:10px;bottom:74px;width:auto;}#ask-puddl-launcher{right:14px;bottom:14px;}}
+@media(max-width:720px){#ask-puddl-widget{right:10px;left:10px;bottom:74px;width:auto;}}
 
 /* ── Side panel: At a glance / Ask / Filter / Report, docked left of the map ── */
 #workspace{flex:1;display:flex;min-height:0;min-width:0;position:relative;}
@@ -1280,9 +1276,6 @@ body.share-mode #present-exit{display:none !important;}
 <div id="puddl-narration" style="display:none"></div>
 <div id="puddl-share" style="display:none"></div>
 
-<button id="ask-puddl-launcher" onclick="openAskMap()" title="Ask a calculated question about this map" aria-label="Ask Puddle">
-  <img src="assets/ask-puddl-plush.png" alt=""><span>Ask Puddle</span>
-</button>
 <section id="ask-puddl-widget" role="dialog" aria-label="Ask Puddle" aria-modal="false">
   <div class="ask-puddl-head">
     <img src="assets/ask-puddl-plush.png" alt="Puddle sheep">
@@ -1464,7 +1457,7 @@ body.share-mode #present-exit{display:none !important;}
     </div>
   </div>
 
-  <div id="knock-banner" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:16;align-items:center;gap:6px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:7px 12px;font-size:12px;color:var(--ink);max-width:min(620px,calc(100% - 240px));"></div>
+  <div id="knock-banner" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:16;align-items:center;gap:6px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:7px 12px;font-size:12px;color:var(--ink);max-width:min(660px,calc(100% - 240px));line-height:1.35;"></div>
   <div id="timeline-year" style="display:none;position:absolute;top:12px;left:50%;transform:translateX(-50%);font-size:44px;font-weight:800;letter-spacing:-0.02em;color:var(--ink);opacity:0.16;pointer-events:none;z-index:5;font-variant-numeric:tabular-nums;"></div>
   <div id="timeline-bar" style="display:none;position:absolute;left:50%;transform:translateX(-50%);bottom:32px;z-index:15;align-items:center;gap:8px;background:var(--surf);border:1px solid var(--bdr);border-radius:9px;box-shadow:var(--shadow-lg);padding:3px 10px;width:min(640px,calc(100% - 200px));">
     <button id="timeline-play" onclick="timelinePlay()" title="Play the map changing over time" style="width:24px;height:20px;padding:0;font-size:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1;">▶</button>
@@ -2068,6 +2061,13 @@ window.addEventListener('load',()=>{ setTimeout(startSplash,60); });
         <button data-arrow="both" onclick="setNewConnArrow('both')" title="Arrows both ways" style="width:34px;height:28px;font-size:14px;padding:0;">↔</button>
       </div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <span style="font-size:12px;color:var(--ink);flex:1;">Line</span>
+      <div id="conn-dot-btns" style="display:flex;gap:4px;">
+        <button data-dotted="0" onclick="setNewConnDotted(false)" title="A solid line" style="width:64px;height:28px;font-size:12px;padding:0;">Solid</button>
+        <button data-dotted="1" onclick="setNewConnDotted(true)" title="A dotted line, for an informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">Dotted</button>
+      </div>
+    </div>
     <div id="conn-pol-row" style="display:none;align-items:center;gap:8px;margin-bottom:12px;">
       <span id="conn-pol-label" style="font-size:12px;color:var(--ink);flex:1;">Polarity</span>
       <div id="conn-pol-btns" style="display:flex;gap:4px;">
@@ -2268,6 +2268,13 @@ function selectConnColour(col){
       <button data-arrow="forward" onclick="setEdgeArrow('forward')" title="Arrow to the other person" style="width:32px;height:28px;font-size:14px;padding:0;">→</button>
       <button data-arrow="backward" onclick="setEdgeArrow('backward')" title="Arrow back to this person" style="width:32px;height:28px;font-size:14px;padding:0;">←</button>
       <button data-arrow="both" onclick="setEdgeArrow('both')" title="Arrows both ways" style="width:32px;height:28px;font-size:14px;padding:0;">↔</button>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-top:8px;border-top:1px solid var(--bdr);">
+    <span style="font-size:12px;color:var(--ink);flex:1;">Line</span>
+    <div id="edge-dot-btns" style="display:flex;gap:4px;">
+      <button data-dotted="0" onclick="setEdgeDotted(false)" title="A solid line" style="width:64px;height:28px;font-size:12px;padding:0;">Solid</button>
+      <button data-dotted="1" onclick="setEdgeDotted(true)" title="A dotted line, for an informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">Dotted</button>
     </div>
   </div>
   <!-- Edge polarity (+/-). Meaning changes by map type: cause/effect direction
@@ -3345,7 +3352,7 @@ function snap(includeVersions=true){
   }
   return JSON.stringify({
     nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,mergedFrom:n.mergedFrom||[],fromSheet:n.fromSheet||false,sheetKey:n.sheetKey||'',missingSince:n.missingSince||0,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
-    edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false})),
+    edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false,dotted:e.dotted||false})),
     bgImageData:document.getElementById('bg-image-data')?.textContent||'',
     namedVersions:includeVersions?namedVersions:[],
     colourLegendMap,
@@ -3441,7 +3448,8 @@ function restoreSnap(s,keepVersions){
       arrow: e.arrow||null,
       twoWay: e.twoWay||false,      date: e.date||'',
       polarity: e.polarity||null,   // 'positive' | 'negative' | null (unassigned) — Causal Loop Diagram polarity, systems maps
-      hasDelay: e.hasDelay||false   // CLD delay mark (//) between cause and effect
+      hasDelay: e.hasDelay||false,  // CLD delay mark (//) between cause and effect
+      dotted: e.dotted||false       // drawn as a dotted line (informal, planned or unconfirmed)
     };
   });
   colourLegendMap=d.colourLegendMap||{};
@@ -4007,9 +4015,10 @@ function draw(){
         ctx.moveTo(apS.x,apS.y);
         ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y);
         ctx.strokeStyle=_gStroke||drawStroke;ctx.lineWidth=(isHl?lw+(thinLinesOn()?0.6:1):lw)/zoom;
-        if(style.dashPattern){ctx.setLineDash(style.dashPattern.map(d=>d/zoom));}
+        if(e.dotted){ctx.setLineDash([0.1/zoom,5.5/zoom]);ctx.lineCap='round';ctx.lineWidth=Math.max(ctx.lineWidth,2.2/zoom);}
+        else if(style.dashPattern){ctx.setLineDash(style.dashPattern.map(d=>d/zoom));}
         else{ctx.setLineDash([]);}
-        ctx.stroke();ctx.setLineDash([]);
+        ctx.stroke();ctx.setLineDash([]);ctx.lineCap='butt';
       }
       // Arrowhead at target: filled triangle — tip=bp, base=bpS, no translate/rotate needed
       if(headT){
@@ -4899,7 +4908,6 @@ function _dockApply(){
   DOCK_TABS.forEach(t=>{ const b=$('dock-tab-'+t), p=$('dock-pane-'+t), on=t===_dock.tab; if(b){ b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); } if(p) p.classList.toggle('on',on); });
   const pop=$('dock-popout'); if(pop) pop.style.display=(_dock.tab==='ask'&&!_dock.popped)?'':'none';
   const away=$('dock-ask-away'); if(away) away.style.display=_dock.popped?'block':'none';
-  const lau=$('ask-puddl-launcher'); if(lau) lau.style.display=(open&&!_dock.popped)?'none':'';   // the panel has Ask in it, so the floating button is only for when the panel is folded away
   const ins=$('sec-insights-body'), showGlance=open&&_dock.tab==='glance';
   if(ins){ ins.style.display=showGlance?'block':'none'; if(showGlance) renderInsights(); }
   if(open&&_dock.tab==='filter'){ syncDateFilterUI(); renderSheetLink(true); }
@@ -10166,7 +10174,7 @@ function openEdgeEditPopup(idx, sx, sy){
 
   // Render style buttons with current style highlighted
   _connShowAll=false; renderEdgeStyleList(e.strength||'moderate');
-  renderEdgeArrowBtns(arrowOf(e));
+  renderEdgeArrowBtns(arrowOf(e)); renderEdgeDotBtns(!!e.dotted);
   const cldRow=document.getElementById('edge-cld-row');
   if(cldRow){
     const isStake=MAP_TYPE==='stakeholder', isSys=MAP_TYPE==='systems';
@@ -10234,6 +10242,19 @@ function renderEdgeArrowBtns(v){
     b.style.borderRadius='6px';
     b.style.cursor='pointer';
   });
+}
+function renderEdgeDotBtns(on){
+  document.querySelectorAll('#edge-dot-btns button').forEach(b=>{
+    const yes=(b.dataset.dotted==='1')===!!on;
+    b.style.background=yes?'var(--ink)':'transparent'; b.style.color=yes?'var(--on-ink)':'var(--ink)';
+    b.style.border='1px solid '+(yes?'var(--ink)':'var(--bdr-m)'); b.style.borderRadius='6px'; b.style.cursor='pointer';
+  });
+}
+function setEdgeDotted(on){
+  if(edgeEditIdx===null) return;
+  edges[edgeEditIdx].dotted=!!on;
+  renderEdgeDotBtns(!!on);
+  draw(); saveState(); markUnsaved();
 }
 function setEdgeArrow(val){
   if(edgeEditIdx===null) return;
@@ -11731,13 +11752,15 @@ function renderConnectionStyleIcon(style) {
 
 
 // Arrow direction and +/- for a connection being added. Chosen before a style is clicked, because clicking a style adds it.
-let _newConnArrow='none', _newConnPolarity='';
+let _newConnArrow='none', _newConnPolarity='', _newConnDotted=false;
 function _renderNewConnBtns(){
   const on=(b,yes)=>{ b.style.background=yes?'var(--ink)':'transparent'; b.style.color=yes?'var(--on-ink)':'var(--ink)'; b.style.border='1px solid '+(yes?'var(--ink)':'var(--bdr-m)'); b.style.borderRadius='6px'; b.style.cursor='pointer'; };
   document.querySelectorAll('#conn-arrow-btns button').forEach(b=>on(b,b.dataset.arrow===_newConnArrow));
   document.querySelectorAll('#conn-pol-btns button').forEach(b=>on(b,b.dataset.polarity===_newConnPolarity));
+  document.querySelectorAll('#conn-dot-btns button').forEach(b=>on(b,(b.dataset.dotted==='1')===_newConnDotted));
 }
 function setNewConnArrow(v){ _newConnArrow=v; _renderNewConnBtns(); }
+function setNewConnDotted(v){ _newConnDotted=!!v; _renderNewConnBtns(); }
 // On a systems map a +/- only means something with a direction, so choosing one on a plain line gives it the direction drawn in
 // (the same rule as editing a connection). A stakeholder alliance or friction sign is not forced to have a direction.
 function setNewConnPolarity(v){
@@ -11747,7 +11770,7 @@ function setNewConnPolarity(v){
 }
 function openConnModal(){
   _connShowAll=false;
-  _newConnArrow='none'; _newConnPolarity='';
+  _newConnArrow='none'; _newConnPolarity=''; _newConnDotted=false;
   { const isArg=MAP_TYPE==='argument', isStake=MAP_TYPE==='stakeholder', isSys=MAP_TYPE==='systems';
     const arrowRow=document.getElementById('conn-arrow-btns'); if(arrowRow&&arrowRow.parentElement) arrowRow.parentElement.style.display=isArg?'none':'flex';
     const polRow=document.getElementById('conn-pol-row'); if(polRow) polRow.style.display=(isSys||isStake)?'flex':'none';
@@ -11788,6 +11811,7 @@ function confirmConnectionFull(forceStrength){
   }
   const _e={source:from,target:to,strength:s,colour:selectedConnColour,arrow:_arrow,twoWay:_arrow==='both',date:todayISO()};
   if(_pol) _e.polarity=_pol;
+  if(_newConnDotted&&MAP_TYPE!=='argument') _e.dotted=true;
   edges.push(_e);
   const na=nodes.find(n=>n.id===from),nb=nodes.find(n=>n.id===to);
   addLog(`connected "${na?na.label:from}" → "${nb?nb.label:to}" (${s})`);
@@ -14319,23 +14343,25 @@ function showKnockBanner(){
   if(!el||!KNOCK) return;
   const name=escHtml(KNOCK.label);
   const T=KNOCK.totals||{up:0,down:0,mixed:0,unknown:0,all:0};
-  let body;
+  const things=k=>k===1?'1 thing':k+' things';
+  let body, help='';
   if(!KNOCK.directed){
     // The old version followed arrow-less links both ways and called the result
     // a ripple. Saying nothing is the honest answer when nothing has a direction.
-    body=`<strong>Nothing to follow from ${name}.</strong> No connection on this map has an arrow, so there is no way to tell what affects what.`;
+    body=`<strong>Nothing to follow from ${name}.</strong> No connection on this map has an arrow, so there is no way to tell what affects what. Give the connections arrows first.`;
   } else if(!T.all){
     body=`<strong>${name}</strong> has no arrows leading out, so nothing downstream of it is recorded.`;
   } else {
     const bits=[];
-    if(T.up) bits.push(`${T.up} pushed up`);
-    if(T.down) bits.push(`${T.down} pushed down`);
-    if(T.mixed) bits.push(`${T.mixed} mixed`);
-    if(T.unknown) bits.push(`${T.unknown} direction only`);
-    body=`<strong>If ${name} rises:</strong>&nbsp;${bits.join(' &middot; ')}`
-       +`<span style="color:var(--ink-h);">&nbsp;within ${KNOCK_MAX_STEPS} steps</span>`;
+    if(T.up) bits.push(`${things(T.up)} ${T.up===1?'goes':'go'} up`);
+    if(T.down) bits.push(`${things(T.down)} ${T.down===1?'goes':'go'} down`);
+    if(T.mixed) bits.push(`${things(T.mixed)} ${T.mixed===1?'is':'are'} pushed both ways, because different routes disagree`);
+    if(T.unknown) bits.push(`${things(T.unknown)} ${T.unknown===1?'is':'are'} reached, but a link on the way has no + or &minus; sign, so the map cannot say which way`);
+    body=`<strong>If ${name} goes up:</strong> ${bits.join('; ')}.`;
+    help=`Follows the arrows up to ${KNOCK_MAX_STEPS} steps out. A + link passes the push on the same way and a &minus; link turns it round. Brighter lines are closer to ${name}.`;
   }
-  el.innerHTML=`<span>${body}</span><span style="color:var(--ink-h);margin-left:4px;">Esc clears</span>`;
+  el.title='A ripple follows the arrows out from one item to show what a change in it could reach, and which way. Nothing on the map is changed.';
+  el.innerHTML=`<div><div>${body}</div>`+(help?`<div style="color:var(--ink-h);font-size:11px;margin-top:2px;">${help}</div>`:'')+`</div><span style="color:var(--ink-h);margin-left:8px;white-space:nowrap;align-self:flex-start;">Esc clears</span>`;
   el.style.display='flex';
 }
 function clearKnock(){

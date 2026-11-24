@@ -235,22 +235,22 @@ test('history: lists earlier versions with who and when, viewers cannot go back,
   assert.match(r.noDb[0].t,/database update that has not been applied/);
 });
 
-test('one panel: Explore opens by default, no separate Ask button in the toolbar, floating Ask only when folded away',async({page})=>{
+test('one panel: Explore opens by default, and there is no separate Ask button, in the toolbar or floating',async({page})=>{
   await loadMap(page,CARRFIELD);
   const r=await page.evaluate(async()=>{
     const q=id=>document.getElementById(id);
     const askBtn=!!q('btn-ask-map'), label=q('search-btn-label').textContent;
     const glanceLen=q('sec-insights-body').innerHTML.length, glanceShown=q('sec-insights-body').style.display;
-    const openAtStart=q('side-dock').classList.contains('open'), launcherOpen=getComputedStyle(q('ask-puddl-launcher')).display;
-    dockFold(); const launcherFolded=getComputedStyle(q('ask-puddl-launcher')).display;
+    const openAtStart=q('side-dock').classList.contains('open'), launcherGone=!q('ask-puddl-launcher');
+    dockFold(); const launcherFolded=!q('ask-puddl-launcher');
     openAskMap(); const tab=_dock.tab, openAfterAsk=q('side-dock').classList.contains('open');
     const cs=getComputedStyle(document.querySelector('#side-dock .dock-pane')), tabs=getComputedStyle(document.querySelector('#side-dock .dock-tabs')), dock=getComputedStyle(q('side-dock'));
-    return {glanceLen,glanceShown,askBtn,label,openAtStart,launcherOpen,launcherFolded,tab,openAfterAsk,padL:parseFloat(cs.paddingLeft),tabsL:parseFloat(tabs.paddingLeft),border:dock.borderLeftWidth};
+    return {glanceLen,glanceShown,askBtn,label,openAtStart,launcherGone,launcherFolded,tab,openAfterAsk,padL:parseFloat(cs.paddingLeft),tabsL:parseFloat(tabs.paddingLeft),border:dock.borderLeftWidth};
   });
   assert.equal(r.askBtn,false);assert.equal(r.label,'Explore');
   assert.equal(r.openAtStart,true,'open the first time on a wide screen');
   assert.ok(r.glanceShown==='block'&&r.glanceLen>1000,'At a glance is filled in when a map arrives with the panel already open');
-  assert.equal(r.launcherOpen,'none');assert.notEqual(r.launcherFolded,'none');
+  assert.ok(r.launcherGone&&r.launcherFolded,'no floating Ask Puddle button, open or folded');
   assert.equal(r.tab,'ask');assert.equal(r.openAfterAsk,true);
   assert.ok(r.padL>=24&&r.tabsL>=12&&r.border==='1px','the panel has room on the left and a visible edge');
 });
@@ -312,5 +312,29 @@ test('ripple and Focus: only one top bar at a time, and the Focus bar sits at th
   assert.ok(r.focusTop<=16,'Focus bar is at the top ('+r.focusTop+'px)');
   assert.deepEqual(r.rippleOnly,{focus:false,ripple:true,focusView:null,knock:true});
   assert.deepEqual(r.focusAgain,{focus:true,ripple:false,knock:null,lit:0});
+});
+
+test('ripple wording is plain, and a dotted line can be chosen for a connection and is kept',async({page})=>{
+  await loadMap(page,SYSTEMS,'systems');
+  const r=await page.evaluate(()=>{
+    const q=id=>document.getElementById(id);
+    ctxMenuNodeId=nodes[0].id; ctxKnockOn(); const text=q('knock-banner').textContent, title=q('knock-banner').title;
+    const t=KNOCK.totals;
+    clearKnock();
+    const a=nodes[0].id,b=nodes[1].id; pendingConnection={from:a,to:b}; openConnModal();
+    const dottedBtns=[...document.querySelectorAll('#conn-dot-btns button')].map(x=>x.textContent);
+    setNewConnDotted(true); confirmConnectionFull('moderate'); const e=edges[edges.length-1];
+    pendingConnection={from:a,to:b}; openConnModal(); confirmConnectionFull('moderate'); const plain=edges[edges.length-1];
+    const kept=JSON.parse(snap()).edges.filter(x=>x.dotted).length;
+    const idx=edges.indexOf(e); openEdgeEditPopup(idx,100,100); setEdgeDotted(false); const off=!edges[idx].dotted; setEdgeDotted(true);
+    draw();
+    return {text,title,t,dottedBtns,dotted:e.dotted,plainDotted:!!plain.dotted,kept,off,on:edges[idx].dotted};
+  });
+  assert.match(r.text,/If .+ goes up:/);
+  assert.doesNotMatch(r.text,/pushed up|direction only/,'the old wording is gone');
+  assert.match(r.text,/go up|goes up/);assert.match(r.text,/Follows the arrows up to 5 steps out/);assert.match(r.text,/Esc clears/);
+  assert.match(r.title,/Nothing on the map is changed/);
+  assert.deepEqual(r.dottedBtns,['Solid','Dotted']);
+  assert.equal(r.dotted,true);assert.equal(r.plainDotted,false);assert.equal(r.kept,1);assert.equal(r.off,true);assert.equal(r.on,true);
 });
 module.exports={tests};
