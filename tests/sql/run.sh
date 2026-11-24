@@ -12,6 +12,7 @@ $P -f supabase/migrations/20261117_reliable_map_limits.sql
 $P -f supabase/migrations/20261124_share_maps.sql
 $P -f supabase/migrations/20261125_team_roles.sql
 $P -f supabase/migrations/20261126_edited_by.sql
-for t in shared-maps team-roles edited-by; do
+$P -f supabase/migrations/20261127_map_history.sql
+for t in shared-maps team-roles edited-by history; do
   $P -f tests/sql/$t.test.sql 2>&1 | sed 's/^psql:[^ ]* //' | grep -E 'PASS|FAIL|ALL SQL' || { echo "database checks failed in $t"; exit 1; }
 done
