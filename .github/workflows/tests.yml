@@ -1,0 +1,33 @@
+name: Checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install a browser
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Saving and imported-data checks
+        run: node --test tests/reliability.test.cjs
+      - name: Shared viewer is up to date
+        run: |
+          python3 tools/build-viewer.py
+          git diff --exit-code viewer.html || (echo "viewer.html is out of date: run python3 tools/build-viewer.py and commit it" && exit 1)
+      - name: Ask answers have not changed
+        run: node tests/ask-golden.cjs
+      - name: Ask matching
+        run: node tests/ask-phrases.cjs
+      - name: Feature checks in a browser
+        run: node tests/run-browser.cjs
