@@ -1444,6 +1444,8 @@ body.share-mode #present-exit{display:none !important;}
       </button>
       <div id="sec-insights-body" style="display:none;margin-top:6px;font-size:12px;color:var(--ink);"></div>
     </div>
+    <button id="btn-sheet-refresh" onclick="startSheetRefresh()" title="Update this map from the spreadsheet it came from" style="width:100%;height:32px;font-size:12px;margin-top:12px;">Refresh from spreadsheet</button>
+    <div id="sheet-link-status" style="font-size:10.5px;color:var(--ink-h);line-height:1.5;margin-top:6px;"></div>
     <!-- Hidden selects for compatibility with existing applyFilters() logic -->
     <select id="cat-filter" style="display:none;"></select>
     <select id="area-filter" style="display:none;"></select>
@@ -2275,8 +2277,8 @@ function selectConnColour(col){
     <!-- Header -->
     <div style="padding:18px 22px 14px;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
       <div>
-        <div style="font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-0.02em;">📥 Import from spreadsheet</div>
-        <div style="font-size:11px;color:var(--ink-h);margin-top:2px;">Upload an Excel or CSV file. One node per row, any column names.</div>
+        <div id="import-modal-title" style="font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-0.02em;">📥 Import from spreadsheet</div>
+        <div id="import-modal-sub" style="font-size:11px;color:var(--ink-h);margin-top:2px;">Upload an Excel or CSV file. One node per row, any column names.</div>
       </div>
       <button onclick="closeImportModal()" style="font-size:18px;line-height:1;padding:2px 8px;border:none;background:none;color:var(--ink-m);cursor:pointer;">✕</button>
     </div>
@@ -3236,7 +3238,7 @@ function snap(){
     };
   }
   return JSON.stringify({
-    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,mergedFrom:n.mergedFrom||[],outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
+    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,mergedFrom:n.mergedFrom||[],fromSheet:n.fromSheet||false,sheetKey:n.sheetKey||'',missingSince:n.missingSince||0,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
     edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false})),
     colourLegendMap,
     categories:CATEGORIES,
@@ -3264,7 +3266,7 @@ function snap(){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
-    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,
+    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,linkedSheet:LINKED_SHEET||null,
     askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
@@ -3343,6 +3345,7 @@ function restoreSnap(s){
   }
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
+  LINKED_SHEET=d.linkedSheet||null;
   EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
   if(typeof d.nodeSpacing==='number') NODE_BREATHING=d.nodeSpacing;
   ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
@@ -4294,6 +4297,14 @@ function draw(){
       ctx.fillText(n.owners.length,bx,by);
     }
 
+    // Not in the spreadsheet on the last refresh: a dashed amber ring
+    if(n.missingSince&&n.type!=='centre'){
+      ctx.save();
+      ctx.beginPath();ctx.arc(n.x,n.y,r+5/zoom,0,Math.PI*2);
+      ctx.setLineDash([5/zoom,4/zoom]);ctx.lineWidth=2/zoom;ctx.strokeStyle='#D97706';ctx.stroke();
+      ctx.restore();
+    }
+
     // Merged node indicator: two overlapping small circles at bottom-right
     if(n.merged&&SHOW_MERGE_MARKS){
       ctx.save();
@@ -4656,7 +4667,7 @@ function _dockApply(){
   const away=$('dock-ask-away'); if(away) away.style.display=_dock.popped?'block':'none';
   const ins=$('sec-insights-body'), showGlance=open&&_dock.tab==='glance';
   if(ins){ ins.style.display=showGlance?'block':'none'; if(showGlance) renderInsights(); }
-  if(open&&_dock.tab==='filter') syncDateFilterUI();
+  if(open&&_dock.tab==='filter'){ syncDateFilterUI(); renderSheetLink(true); }
   const btn=$('btn-search-toggle');
   if(btn){ btn.style.background=open?'var(--ink)':'var(--surf)'; btn.style.color=open?'var(--on-ink)':'var(--ink-m)'; btn.style.borderColor=open?'var(--ink)':'var(--bdr)'; }
   _dockBadge();
@@ -4701,6 +4712,7 @@ function dockBringBackAsk(){
   });
   window.addEventListener('resize',function(){ if(_dock.open&&!_dock.suspended){ const dock=document.getElementById('side-dock'), ws=document.getElementById('workspace'); if(dock&&ws){ dock.style.width=Math.max(300,Math.min(Math.round(ws.clientWidth*_dock.frac),Math.round(ws.clientWidth*0.6)))+'px'; resize(); draw(); } } });
   document.addEventListener('puddl-presedit',function(e){ dockSuspend(!!(e.detail)); });
+  setInterval(function(){ if(_dock.open&&!_dock.suspended&&_dock.tab==='filter') renderSheetLink(); },1500);
   setTimeout(function(){ try{ if(document.getElementById('side-dock')){ _dockBuild(); _dockApply(); } }catch(e){ console.error(e); } },0);
 })();
 
@@ -5918,7 +5930,8 @@ function renderInsights(){
     g+=_focusBar();
     g+=`<div style="margin-top:8px;">${tag(noun(I.pool.length))}${tag(plural(I.edgesCount,'connection'))}`+
        (I.linked.length===1?tag('One connected network',whole):tag(plural(I.linked.length,'connected network')+(I.isolated?`, ${I.isolated} on their own`:''),false))+
-       (I.isolated?tag(`${noun(I.isolated)} with no connection`,false):tag(`Nobody cut off`,true))+`</div>`;
+       (I.isolated?tag(`${noun(I.isolated)} with no connection`,false):tag(`Nobody cut off`,true))+
+       (I.pool.some(n=>n.missingSince)?tag(`${I.pool.filter(n=>n.missingSince).length} not in the spreadsheet`,false):'')+`</div>`;
     const br=(I.bridges||[]).slice().sort((a,b)=>b.cutOff-a.cutOff).slice(0,3);
     if(br.length) g+=lab('Who the map depends on')+br.map(b=>row(b.node,`cuts off ${b.cutOff}`,'choke')).join('');
     if(I.betweenness&&I.topBetweenness.length) g+=lab('Biggest go-betweens')+I.topBetweenness.slice(0,3).map(n=>row(n,_bottleneckCell(n,Math.round(I.betweenness.get(n.id)),I.pool.length),'node',true)).join('');
@@ -7183,7 +7196,7 @@ function clearSearch(){
   _insOpen={}; try{ localStorage.setItem('puddl-ins-open','{}'); }catch(e){}
 }
 // A different or brand-new map should not inherit the last one's open dropdowns or filters
-function freshMapPanels(){ try{ clearSearch(); }catch(e){} }
+function freshMapPanels(){ try{ clearSearch(); }catch(e){} LINKED_SHEET=null; }
 function clearHighlight(){
   clearKnock();
   if(typeof revertLoopCircle==='function') revertLoopCircle();
@@ -7665,6 +7678,7 @@ function openImportModal(){
 function closeImportModal(){
   document.getElementById('import-modal-bg').classList.add('hidden');
   resetImportModal();
+  if(_refreshMode){ _refreshMode=false; _refreshHandle=null; _refreshModalText(false); }
 }
 function setImportMode(mode){
   _importMode=mode;
@@ -7715,8 +7729,10 @@ document.getElementById('import-drop-zone').addEventListener('click',()=>{
   document.getElementById('import-file-input').click();
 });
 
+let _importFileName='';
 function handleImportFile(file){
   if(!file) return;
+  _importFileName=file.name||'';
   const fn=document.getElementById('import-file-name');
   fn.textContent='📄 '+file.name;fn.style.display='block';
   document.getElementById('import-status-text').textContent='Reading file…';
@@ -7928,6 +7944,7 @@ function buildColumnMapper(resetOnly=false){
   if(!dlist){ dlist=document.createElement('datalist'); dlist.id='imp-field-names'; document.body.appendChild(dlist); }
   dlist.innerHTML=FIELD_DEFS.map(f=>'<option value="'+escHtml(f.name)+'">').join('');
   importHeaders.forEach((_,i)=>_importRefreshRow(i));
+  if(_refreshMode) _refreshApplyMapping();
 
   // Main node suggestions from the name column
   const nameIdx=importHeaders.findIndex((_,i)=>_importRowState(i).role==='name');
@@ -8455,6 +8472,9 @@ function _showImportSummaryScreen(plan){
     </div>`;
 
   let html='';
+  if(_refreshMode) _refreshDiff(plan); else plan._refresh=null;
+  if(plan._refresh&&plan._refresh.suspicious)
+    html+=row('⚠️','This file does not look like the one this map came from',plan._refresh.suspicious);
   if(plan.toAdd.length)
     html+=row('✨',`${plan.toAdd.length} new node${plan.toAdd.length!==1?'s':''} will be added`,
       plan.toAdd.slice(0,5).map(r=>r.name).join(', ')+(plan.toAdd.length>5?`, +${plan.toAdd.length-5} more`:''));
@@ -8474,11 +8494,24 @@ function _showImportSummaryScreen(plan){
   if(mergeCount)
     html+=row('🟣',`${mergeCount} node${mergeCount!==1?'s':''} confirmed as same — will be merged`,
       'All connections from both will be combined. Node gets a merge indicator.');
-  if(updateCount)
+  if(updateCount&&!plan._refresh)
     html+=row('🔄',`${updateCount} existing node${updateCount!==1?'s':''} will be updated`,
       'Empty fields and notes will be filled in from the file');
+  if(plan._refresh) html+=_refreshSummaryRows(plan,row);
   const unm=new Set(plan.unmatched||[]);
-  const normalEdgeCount=plan.toAddEdges.filter(e=>!e.isMainConn&&!unm.has(e)).length;
+  let normalEdgeCount=plan.toAddEdges.filter(e=>!e.isMainConn&&!unm.has(e)).length;
+  if(plan._refresh){
+    // On a refresh most links are already on the map: count only the ones that are not
+    const byLabel=new Map(nodes.map(n=>[String(n.label||'').trim().toLowerCase(),n.id]));
+    const have=new Set(edges.map(e=>{ const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target; return a<b?a+'|'+b:b+'|'+a; }));
+    normalEdgeCount=plan.toAddEdges.filter(e=>{
+      if(e.isMainConn||unm.has(e)) return false;
+      const a=byLabel.get(String(e.fromName).trim().toLowerCase()), b=byLabel.get(String(e.toName).trim().toLowerCase());
+      if(a===undefined||b===undefined) return true;
+      return !have.has(a<b?a+'|'+b:b+'|'+a);
+    }).length;
+    if(normalEdgeCount) html+=row('🔗',`${normalEdgeCount} new connection${normalEdgeCount!==1?'s':''}`,'Connections that are no longer in the spreadsheet are left on the map.');
+  } else
   if(normalEdgeCount)
     html+=row('🔗',`Up to ${normalEdgeCount} connection${normalEdgeCount!==1?'s':''} will be added`,
       'Duplicate connections are skipped');
@@ -8520,7 +8553,7 @@ function _showImportSummaryScreen(plan){
         ? `Not recognised: ${escHtml((plan.polarityUnreadableSamples||[]).map(s=>'"'+s+'"').join(', '))}. Use + or -, or the words positive/negative. Set these by hand after importing.`
         : 'Use + or -, or the words positive/negative. Set these by hand after importing.');
   const fieldCols=(_importCurrentMapping.cols||[]).filter(c=>c.role==='field');
-  if(fieldCols.length){
+  if(fieldCols.length&&!(plan._refresh&&!fieldCols.some(c=>!findFieldByName(c.fname)))){
     const newF=fieldCols.filter(c=>!findFieldByName(c.fname)).map(c=>c.fname);
     const oldF=fieldCols.filter(c=>findFieldByName(c.fname)).map(c=>findFieldByName(c.fname).name);
     html+=row('🏷️',`${fieldCols.length} field${fieldCols.length!==1?'s':''} will be filled in`,
@@ -8535,9 +8568,12 @@ function _showImportSummaryScreen(plan){
     html+=row('⚠️',`${plan.skipped} row${plan.skipped!==1?'s':''} skipped`,'No node name found');
   if(!plan.toAdd.length&&!plan.toUpdate.length)
     html+=row('ℹ️','Nothing new to import','All nodes from the file already exist on the map');
+  if(plan._refresh&&!plan.toAdd.length&&!plan._refresh.changes.length&&!plan._refresh.missing.length&&!plan._refresh.back.length&&!normalEdgeCount)
+    html+=row('✅','Nothing has changed','The map already matches the spreadsheet.');
 
   body.innerHTML=html||'<div style="font-size:12px;color:var(--ink-h);">Nothing to import.</div>';
-  document.getElementById('import-status-text').textContent='Review and click Import to proceed.';
+  document.getElementById('import-status-text').textContent=_refreshMode?'Review, then click Apply refresh.':'Review and click Import to proceed.';
+  { const cb=document.getElementById('btn-confirm-import'); if(cb) cb.textContent=_refreshMode?'Apply refresh':'Import'; }
 
   // Show save-template row if any field was meaningfully mapped (not all ignore)
   const hasNonIgnore=false; // saved mapping templates retired: map fields + Download template do this job
@@ -8561,6 +8597,138 @@ function resolveIconId(text){
   if(/^place$|^venue$|community centre/.test(t)) return 'home';
   const icon=PUDDL_ICONS.find(ic=>ic.label.toLowerCase()===t||ic.id===t);
   return icon?icon.id:null;
+}
+
+
+// ── Refresh from spreadsheet ─────────────────────────────────────────────────
+// Keeps a map in step with the spreadsheet it came from. It reuses the importer: the file is read the
+// same way, the columns are matched the way they were last time, and the summary screen says what is
+// new, what changed and what has disappeared before anything is applied. Nothing is ever deleted: an
+// organisation that is no longer in the file is marked on the map as not in the spreadsheet.
+let LINKED_SHEET=null;        // {key,name,cols:[{header,role,fname}],at}
+let _refreshMode=false;
+let _refreshHandle=null;      // file handle, where the browser allows keeping one (Chrome, Edge)
+function _isSheetNode(n){ return !!(n.fromSheet||(n.history||[]).some(h=>h&&h.text==='Imported from spreadsheet')); }
+function _sheetDb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('puddle-sheet-links',1); r.onupgradeneeded=()=>r.result.createObjectStore('h'); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function _sheetHandlePut(k,h){ try{ const db=await _sheetDb(); db.transaction('h','readwrite').objectStore('h').put(h,k); }catch(e){} }
+async function _sheetHandleGet(k){ try{ const db=await _sheetDb(); return await new Promise(res=>{ const q=db.transaction('h').objectStore('h').get(k); q.onsuccess=()=>res(q.result||null); q.onerror=()=>res(null); }); }catch(e){ return null; } }
+function _refreshModalText(on){
+  const t=document.getElementById('import-modal-title'), u=document.getElementById('import-modal-sub'), m=document.getElementById('import-mode-row'), d=document.getElementById('import-mode-desc');
+  if(t) t.textContent=on?'🔄 Refresh from spreadsheet':'📥 Import from spreadsheet';
+  if(u) u.textContent=on?'Pick the spreadsheet this map came from. Nothing changes until you have seen what will happen.':'Upload an Excel or CSV file. One node per row, any column names.';
+  if(m) m.style.display=on?'none':'flex';
+  if(d) d.style.display=on?'none':'';
+  const cb=document.getElementById('btn-confirm-import'); if(cb&&!on) cb.textContent='Import';
+}
+async function startSheetRefresh(){
+  if(!nodes.length){ showStatus('Import a spreadsheet first. Refresh then keeps this map in step with it.'); return; }
+  _refreshMode=true; _refreshHandle=null;
+  let file=null;
+  if(LINKED_SHEET){
+    const h=await _sheetHandleGet(LINKED_SHEET.key);
+    if(h){ try{ let p=await h.queryPermission({mode:'read'}); if(p!=='granted') p=await h.requestPermission({mode:'read'}); if(p==='granted'){ file=await h.getFile(); _refreshHandle=h; } }catch(e){} }
+  }
+  if(!file&&window.showOpenFilePicker){
+    try{
+      const hs=await window.showOpenFilePicker({multiple:false,types:[{description:'Excel or CSV',accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx'],'application/vnd.ms-excel':['.xls'],'text/csv':['.csv'],'text/tab-separated-values':['.tsv']}}]});
+      _refreshHandle=hs[0]; file=await hs[0].getFile();
+    }catch(e){ if(e&&e.name==='AbortError'){ _refreshMode=false; _refreshHandle=null; return; } }
+  }
+  openImportModal(); setImportMode('add'); _refreshModalText(true);
+  if(file) handleImportFile(file);
+  else document.getElementById('import-status-text').textContent='Choose the spreadsheet this map came from.';
+}
+// Columns the map already knows keep the meaning they had last time. A column that is new is left for you to check.
+function _refreshApplyMapping(){
+  if(!LINKED_SHEET||!Array.isArray(LINKED_SHEET.cols)) return;
+  const norm=x=>String(x||'').trim().toLowerCase();
+  const saved=new Map(LINKED_SHEET.cols.map(c=>[norm(c.header),c]));
+  const fresh=[];
+  importHeaders.forEach((h,i)=>{
+    const lab=String(h||'').trim()||('Column '+(i+1));
+    const c=saved.get(norm(lab));
+    if(!c){ fresh.push(lab); return; }
+    const sel=document.getElementById('imp-role-'+i), inp=document.getElementById('imp-fname-'+i);
+    if(sel) sel.value=c.role; if(inp&&c.fname) inp.value=c.fname;
+    _importRefreshRow(i);
+  });
+  const st=document.getElementById('import-status-text');
+  if(fresh.length){ if(st) st.textContent='New column'+(fresh.length>1?'s':'')+' since last time: '+fresh.slice(0,4).join(', ')+'. Check what '+(fresh.length>1?'they are':'it is')+', then continue.'; return; }
+  setTimeout(()=>{ if(_refreshMode&&_importStep==='mapper') runImportMapper(); },0);
+}
+// What would change, worked out from the plan the importer has already built.
+function _refreshDiff(plan){
+  const changes=[]; let same=0; const matched=new Set();
+  (plan.toUpdate||[]).forEach(u=>{
+    const n=u.existing; matched.add(n.id);
+    if(u.isMerge) return;
+    const r=u.incoming, diffs=[];
+    Object.entries(r.fields||{}).forEach(([fname,v])=>{
+      const f=findFieldByName(fname); if(!f) return;          // a brand-new column is simply filled in
+      const old=String(n.customFields&&n.customFields[f.id]!=null?n.customFields[f.id]:'').trim(), nv=String(v).trim();
+      if(nv&&nv!==old) diffs.push({kind:'field',label:f.name,fid:f.id,from:old,to:nv});
+    });
+    const nn=String(r.notes||'').trim(), on=String(n.notes||'').trim();
+    if(nn&&nn!==on) diffs.push({kind:'notes',label:'Notes',from:on,to:nn});
+    if(r.date&&r.date!==n.date) diffs.push({kind:'date',label:'Date added',from:n.date||'',to:r.date});
+    if(diffs.length) changes.push({node:n,diffs}); else same++;
+  });
+  const key=LINKED_SHEET&&LINKED_SHEET.key;
+  const cands=nodes.filter(n=>n.type!=='centre'&&(key?n.sheetKey===key:_isSheetNode(n)));
+  const missing=cands.filter(n=>!matched.has(n.id));
+  const newMissing=missing.filter(n=>!n.missingSince);
+  const back=nodes.filter(n=>n.missingSince&&matched.has(n.id));
+  let suspicious='';
+  if(cands.length>=4&&matched.size===0) suspicious='None of the organisations in this file are on the map. Check you picked the right spreadsheet. Marking them as missing is switched off until you tick it.';
+  else if(cands.length>=6&&missing.length>cands.length*0.5) suspicious='More than half of the organisations from the spreadsheet are not in this file. Check it is the right one. Marking them as missing is switched off until you tick it.';
+  plan._refresh={changes,same,missing,newMissing,stillMissing:missing.length-newMissing.length,back,suspicious};
+}
+function _refreshSummaryRows(plan,row){
+  const R=plan._refresh; let html='';
+  const nm=x=>escHtml(x.label);
+  const short=v=>{ v=String(v); return v.length>40?v.slice(0,38)+'…':v; };
+  if(R.changes.length){
+    const lines=[]; R.changes.forEach(c=>c.diffs.forEach(d=>lines.push(`${nm(c.node)}: ${escHtml(d.label)} ${d.from?'“'+escHtml(short(d.from))+'” → ':'now '}“${escHtml(short(d.to))}”`)));
+    html+=row('🔄',`${R.changes.length} existing node${R.changes.length!==1?'s':''} changed`,lines.slice(0,6).join('<br>')+(lines.length>6?`<br>+${lines.length-6} more`:'')+'<br>The spreadsheet wins for the columns it has. Blank cells never clear anything.');
+  }
+  if(R.same) html+=row('✅',`${R.same} unchanged`,'');
+  if(R.back.length) html+=row('↩️',`${R.back.length} back in the spreadsheet`,R.back.slice(0,5).map(nm).join(', ')+(R.back.length>5?`, +${R.back.length-5} more`:'')+'. The missing mark will be removed.');
+  if(R.newMissing.length){
+    const names=R.newMissing.slice(0,6).map(nm).join(', ')+(R.newMissing.length>6?`, +${R.newMissing.length-6} more`:'');
+    html+=row('❓',`${R.newMissing.length} node${R.newMissing.length!==1?'s':''} no longer in the spreadsheet`,
+      names+`<br><label style="display:flex;align-items:center;gap:6px;margin-top:6px;cursor:pointer;color:var(--ink);"><input type="checkbox" id="refresh-flag-missing" ${R.suspicious?'':'checked'} style="width:auto;margin:0;"> Mark them on the map as not in the spreadsheet. Nothing is deleted.</label>`);
+  }
+  if(R.stillMissing) html+=row('❓',`${R.stillMissing} still not in the spreadsheet`,'Already marked from an earlier refresh.');
+  return html;
+}
+// The Filter tab: what the map is linked to, and who is marked as not in it.
+let _sheetSig='';
+function renderSheetLink(force){
+  const el=document.getElementById('sheet-link-status'); if(!el) return;
+  const miss=nodes.filter(n=>n.missingSince&&n.type!=='centre');
+  const sig=(LINKED_SHEET?LINKED_SHEET.key+LINKED_SHEET.at:'none')+'|'+miss.map(n=>n.id).join(',');
+  if(!force&&sig===_sheetSig) return; _sheetSig=sig;
+  let h='';
+  if(LINKED_SHEET){
+    const when=new Date(LINKED_SHEET.at).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+    h+=`Linked to ${escHtml(LINKED_SHEET.name||'a spreadsheet')}. Last refreshed ${when}.`;
+  } else h+='Nothing linked yet. Refresh asks for the spreadsheet and remembers how its columns match.';
+  if(miss.length){
+    h+=`<div style="margin-top:8px;font-weight:700;color:#B45309;">${miss.length} not in the spreadsheet</div>`+
+       miss.slice(0,12).map(n=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-top:1px solid var(--bdr);"><span style="flex:1;color:var(--ink);cursor:pointer;" onclick="sheetShowMissing(${n.id})" title="Show on the map">${escHtml(n.label)}</span><button onclick="sheetDismissMissing(${n.id})" title="Remove the mark. The node stays." style="height:22px;padding:0 8px;font-size:10px;">Dismiss</button></div>`).join('')+
+       (miss.length>12?`<div style="padding-top:3px;">+${miss.length-12} more</div>`:'')+
+       `<button onclick="sheetShowMissing()" style="width:100%;height:26px;font-size:11px;margin-top:6px;">Show all on the map</button>`;
+  }
+  el.innerHTML=h;
+}
+function sheetShowMissing(id){
+  clearHighlight();
+  nodes.filter(n=>n.missingSince&&(id===undefined||n.id===id)).forEach(n=>highlightIds.add(n.id));
+  draw();
+}
+function sheetDismissMissing(id){
+  const n=nodes.find(x=>x.id===id); if(!n) return;
+  n.missingSince=0; saveState(); markUnsaved(); draw(); renderSheetLink(true);
 }
 
 // ── Dates and timeline ─────────────────────────────────────────────────────
@@ -9083,6 +9251,16 @@ function confirmImport(){
   const {toAdd,toUpdate,toAddEdges}=importPlan;
   // mergeMap: incoming name (lowercase) → existing node object (for edge resolution)
   const mergeMap=importPlan._mergeMap||{};
+  // Refresh: the sheet is the source of truth for the columns it carries. Read before the modal closes.
+  const _R=(_refreshMode&&importPlan._refresh)?importPlan._refresh:null;
+  if(_R){ const cb=document.getElementById('refresh-flag-missing'); _R.flagMissing=cb?cb.checked:true; }
+  const _linkNow=_refreshMode||_importMode==='replace'||!LINKED_SHEET;
+  const _keepKey=_refreshMode&&LINKED_SHEET&&LINKED_SHEET.key;
+  const _key=_linkNow?(_keepKey||('sh_'+Date.now().toString(36))):'';
+  const _linkCols=(_importCurrentMapping.cols||[]).map((c,i)=>({header:String(importHeaders[i]||'').trim()||('Column '+(i+1)),role:c.role,fname:c.fname||''}));
+  const _linkName=_importFileName||(LINKED_SHEET&&LINKED_SHEET.name)||'';
+  const _hnd=_refreshHandle;
+  let changedCount=0,missingCount=0,backCount=0;
   const catList=typeof currentMapMode!=='undefined'&&currentMapMode==='personal'?PERSONAL_CATEGORIES:CATEGORIES;
   let added=0,mergedCount=0,connsAdded=0;
 
@@ -9129,7 +9307,8 @@ function confirmImport(){
       grants:[],contacts:[],
       groupSize:r.groupsize||'',
       lastUpdated:Date.now(),
-      history:[{ts:Date.now(),text:'Imported from spreadsheet'}]
+      history:[{ts:Date.now(),text:'Imported from spreadsheet'}],
+      fromSheet:true,sheetKey:_key
     };
     if(r._mergedFrom&&r._mergedFrom.length){
       node.merged=true;
@@ -9159,6 +9338,16 @@ function confirmImport(){
     if(r.tags&&r.tags.length){
       if(!n.tags) n.tags=[];
       r.tags.forEach(t=>{if(!n.tags.includes(t)) n.tags.push(t);});
+    }
+    if(_R){
+      const ch=_R.changes.find(c=>c.node===n);
+      if(ch&&!isMerge){
+        ch.diffs.forEach(d=>{ if(d.kind==='field'&&d.fid) n.customFields[d.fid]=d.to; else if(d.kind==='notes') n.notes=d.to; else if(d.kind==='date') n.date=d.to; });
+        (n.history=n.history||[]).push({ts:Date.now(),text:'Updated from spreadsheet refresh'});
+        n.lastUpdated=Date.now(); changedCount++;
+      }
+      n.fromSheet=true; if(_key) n.sheetKey=_key;
+      if(n.missingSince){ n.missingSince=0; backCount++; }
     }
     // Mark as merged from multiple sources
     if(isMerge){
@@ -9205,8 +9394,18 @@ function confirmImport(){
     connsAdded++;
   });
 
+  if(_R&&_R.flagMissing){
+    _R.missing.forEach(n=>{ if(!n.missingSince){ n.missingSince=Date.now(); (n.history=n.history||[]).push({ts:Date.now(),text:'Not in the spreadsheet on refresh'}); missingCount++; } });
+  }
   closeImportModal();
+  if(_linkNow){
+    LINKED_SHEET={key:_key,name:_linkName,cols:_linkCols,at:Date.now()};
+    if(_hnd) _sheetHandlePut(_key,_hnd);
+  }
   const parts=[];
+  if(changedCount) parts.push(`${changedCount} updated`);
+  if(missingCount) parts.push(`${missingCount} marked as not in the spreadsheet`);
+  if(backCount) parts.push(`${backCount} back in the spreadsheet`);
   if(added) parts.push(`${added} node${added!==1?'s':''} added`);
   if(mergedCount) parts.push(`${mergedCount} empty field${mergedCount!==1?'s':''} filled`);
   if(connsAdded) parts.push(`${connsAdded} connection${connsAdded!==1?'s':''}`);
@@ -9214,7 +9413,7 @@ function confirmImport(){
   if(mergedNodeCount) parts.push(`${mergedNodeCount} node${mergedNodeCount!==1?'s':''} identified as same`);
   const msg=parts.length?parts.join(', ')+'.':'Nothing new to import.';
   if(added){ layoutImportedNodes(nodes.slice(nodes.length-added)); untangleLayout(350); resolveOverlaps({silent:true}); }
-  if(added||connsAdded||mergedCount||mergedNodeCount){
+  if(added||connsAdded||mergedCount||mergedNodeCount||changedCount||missingCount||backCount||_linkNow){
     addLog(`imported: ${msg}`);
     buildSim();if(typeof forceOn!=='undefined'&&forceOn&&sim) sim.alpha(0.4).restart();
     if(typeof rebuildTagList==='function') rebuildTagList();
@@ -9225,6 +9424,7 @@ function confirmImport(){
   }
   showStatus(msg);
   importPlan=null;importRows=[];
+  if(typeof renderSheetLink==='function') renderSheetLink(true);
 }
 
 function parseImportPreview(){ runImportMapper(); } // legacy compat
@@ -15648,6 +15848,7 @@ function renderHoverPanel(n){
 
   let html='';
 
+  if(n.missingSince) html+=`<div class="hp-row"><span class="hp-k" style="color:#B45309;">Spreadsheet</span><span class="hp-v">Not in the spreadsheet since ${new Date(n.missingSince).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span></div>`;
   // Map fields (named by the user)
   FIELD_DEFS.forEach(f=>{
     const v=n.customFields&&n.customFields[f.id];
