@@ -5836,6 +5836,7 @@ function clearAskHighlight(){ clearHighlight(); showStatus('Question highlightin
 // adding an entry: the picker, the typed-question matcher and the report all read this list.
 //   systems:true   only offered on a Systems map
 //   noSystems:true never offered on a Systems map
+//   named:1|2      the question is about one or two named items; answer(c,id,from,to,args) gets their ids in args
 //   how, next      plain 'how this was worked out' text, and up to three follow-up question ids
 //   words          [[phrase, weight], ...] scored against what was typed
 //   meaning        [assessment, what this may mean, what is highlighted]
@@ -6209,6 +6210,73 @@ const ASK_REGISTRY=[
     return result(`${pairs.length} pair${pairs.length===1?'':'s'} of ${np} have almost the same partners. Closest: ${nm(top[0].a)} and ${nm(top[0].b)}, sharing ${Math.round(100*top[0].j)}% of their partners.`,
       top.map(p=>`${nm(p.a)} and ${nm(p.b)}: ${p.both} partners in common (${Math.round(100*p.j)}%)`).join('. ')+'. This can mean overlap or a natural pairing; Puddle cannot tell which.',
       {label:'Look-alikes',ids,pairs:[],sec:[]});
+   }}  ,
+  {id:"nconn",cat:"About one organisation",q:"Who is [name] connected to, and how many?",named:1,
+   words:[["connected to",3],["how many connections does",9],["connections does",8],["connections has",6],["who does",3],["work with",4],["works with",4],["partners of",5],["links does",6],["links has",6]],
+   syn:["partners","relationships","contacts","links","network of"],
+   meaning:["Neutral","This lists the recorded connections of one item. A short list may mean few relationships, or relationships that have not been entered.","The item and everything it is connected to are highlighted."],
+   how:"Puddle finds the item you named, counts its connections in this view and lists them, strongest first.",
+   next:["holds","lose3"],
+   answer(c,id,from,to,args){
+    const {I,np,result,linkedFocus}=c, G=_insGraph(I.pool), n=G.nById.get(args&&args[0]);
+    if(!n||!G.adj.has(n.id)) return result('Which item do you mean?','Type the name in place of the brackets, for example "Who is Carrfield Academy connected to, and how many?".');
+    const rank={strong:0,moderate:1,weak:2}, by=new Map(), strength=new Map();
+    edges.forEach(e=>{ const a=_eEnd(e,'source'),b=_eEnd(e,'target'); if(a!==n.id&&b!==n.id) return; const o=a===n.id?b:a; if(!G.adj.get(n.id).has(o)) return; const st=e.strength||'moderate'; if(!strength.has(o)||(rank[st]??3)<(rank[strength.get(o)]??3)) strength.set(o,st); });
+    const list=[...G.adj.get(n.id)].map(o=>({o,st:strength.get(o)||'moderate'})).sort((x,y)=>(rank[x.st]??3)-(rank[y.st]??3)||String(G.nById.get(x.o).label).localeCompare(String(G.nById.get(y.o).label)));
+    if(!list.length) return result(`${n.label} has no connections in this view.`,'It may be new, independent, or missing recorded relationships.',{label:n.label,ids:new Set([n.id]),pairs:[],sec:[]});
+    const cnt=k=>list.filter(x=>x.st===k).length, parts=['strong','moderate','weak'].filter(k=>cnt(k)).map(k=>`${cnt(k)} ${k}`).join(', ');
+    return result(`${n.label} has ${list.length} connection${list.length===1?'':'s'} (${parts}).`,`Connected to: ${list.slice(0,10).map(x=>G.nById.get(x.o).label).join(', ')}${list.length>10?`, and ${list.length-10} more`:''}.`,linkedFocus(n,n.label,''));
+   }},
+  {id:"nleave",cat:"About one organisation",q:"What happens if [name] leaves?",named:1,
+   words:[["leaves",6],["leave",5],["left",3],["closes",6],["closed",4],["close",3],["disappears",6],["removed",4],["what happens if",5],["lose",4],["lost",3],["without",3],["drops out",6]],
+   syn:["departure","closure","withdraw","withdraws","withdrawn","stops","stopped","goes","gone"],
+   meaning:["Concern","This is a what-if on the recorded connections, not a prediction. Items that would be cut off may have routes that were never entered, and an item may be easy to replace.","The item, and the items that would be cut off, are highlighted."],
+   how:"Puddle takes the item you named out of the map and follows connections from what is left to see who can still reach the main network.",
+   next:["lose3","holds"],
+   answer(c,id,from,to,args){
+    const {I,np,result}=c, G=_insGraph(I.pool), adj=G.adj, n=G.nById.get(args&&args[0]);
+    if(!n||!adj.has(n.id)) return result('Which item do you mean?','Type the name in place of the brackets, for example "What happens if Carrfield Academy leaves?".');
+    const comps=skip=>{ const seen=new Set(), out=[]; adj.forEach((_,i)=>{ if(seen.has(i)||skip.has(i)) return; const comp=[],st=[i]; seen.add(i); while(st.length){ const u=st.pop(); comp.push(u); adj.get(u).forEach(v=>{ if(!seen.has(v)&&!skip.has(v)){ seen.add(v); st.push(v); } }); } out.push(comp); }); return out.sort((a,b)=>b.length-a.length); };
+    const after=comps(new Set([n.id])), cut=after.slice(1).flat(), k=adj.get(n.id).size, nm=i=>G.nById.get(i).label;
+    if(!cut.length) return result(`If ${n.label} left, everyone else could still reach the main network.`,`${n.label} has ${k} connection${k===1?'':'s'}, all of which would be lost, but nobody would be cut off.`,{label:'If '+n.label+' left',ids:new Set([n.id]),pairs:[],sec:[]});
+    return result(`If ${n.label} left, ${cut.length} ${cut.length===1?'item':np} would be cut off from the main network.`,`Cut off: ${cut.slice(0,8).map(nm).join(', ')}${cut.length>8?`, and ${cut.length-8} more`:''}. ${n.label} has ${k} connection${k===1?'':'s'}, all of which would be lost.`,{label:'If '+n.label+' left',ids:new Set([n.id]),pairs:[],sec:cut});
+   }},
+  {id:"npath",cat:"About one organisation",q:"How is [A] connected to [B]?",named:2,
+   words:[["how is",3],["how are",3],["route between",7],["path between",7],["link between",6],["connection between",6],["connected to",2],["related to",4],["get from",5],["route from",6],["between",2]],
+   syn:["route","path","chain","steps","links","connects","relationship between"],
+   meaning:["Neutral","This shows one shortest route through the recorded connections. Other routes may exist, and a route on the map is not the same as the two actually knowing each other.","The two items and the route between them are highlighted."],
+   how:"Puddle searches outwards from the first item, one step at a time along connections, until it reaches the second, and shows the shortest route it found.",
+   next:["holds","communities"],
+   answer(c,id,from,to,args){
+    const {I,np,result}=c, G=_insGraph(I.pool), adj=G.adj;
+    if(!args||args.length<2||!G.nById.get(args[0])||!G.nById.get(args[1])) return result('Which two items do you mean?','Type two names in place of the brackets, for example "How is Carrfield Academy connected to Carrfield Food Bank?".');
+    const [a,b]=args, nm=i=>G.nById.get(i).label, prev=new Map([[a,null]]), q=[a];
+    for(let i=0;i<q.length&&!prev.has(b);i++){ [...adj.get(q[i])].sort((x,y)=>x-y).forEach(v=>{ if(!prev.has(v)){ prev.set(v,q[i]); q.push(v); } }); }
+    if(!prev.has(b)) return result(`${nm(a)} and ${nm(b)} are in separate parts of the map: there is no route between them.`,'Neither can reach the other through recorded connections.',{label:'Not connected',ids:new Set([a,b]),pairs:[],sec:[]});
+    const path=[]; for(let x=b;x!==null;x=prev.get(x)) path.unshift(x);
+    const steps=path.length-1;
+    return result(steps===1?`${nm(a)} and ${nm(b)} are directly connected.`:`${nm(a)} is ${steps} steps from ${nm(b)}: ${path.map(nm).join(' → ')}.`,steps===1?'There is a direct connection between them.':`The shortest route found has ${steps} steps, through ${path.slice(1,-1).map(nm).join(', ')}.`,
+      {label:`${nm(a)} to ${nm(b)}`,ids:new Set(path),pairs:path.slice(1).map((x,i)=>_pk(path[i],x)),sec:[]});
+   }},
+  {id:"gainers",cat:"Change over time",q:"Who gained the most connections between two dates?",
+   words:[["gained the most",8],["gained",4],["grew the most",7],["most new connections",7],["new connections",4],["who joined",6],["joined",4],["new arrivals",6],["newcomers",6],["new members",5],["biggest growth",5]],
+   syn:["gain","gains","growth","joined","arrived","arrivals","newcomers","risers","climbed"],
+   meaning:["Neutral","This shows recorded growth in connections between the chosen dates. It does not prove why, and a jump may reflect better recording rather than a real change.","The items that gained the most connections are highlighted."],
+   how:"Puddle rebuilds the map as it stood on each date, counts every item's connections on both, and ranks the difference. Items not on the map at the first date count as new arrivals.",
+   next:["change","communities"],
+   answer(c,id,from,to){
+    const {np,result}=c;
+    if(!from||!to) return result('Choose both dates to compare the map.','Open "Choose dates, when relevant" under the question box. The answer only uses dated items and connections.');
+    if(from>to) return result('The first date must be before the second date.','Swap the dates and ask again.');
+    const A=_snapAt(from,null), B=_snapAt(to,null), aIds=new Set(A.ppl.map(n=>n.id));
+    const deg=(S,i)=>S.adj.get(i)?S.adj.get(i).size:0;
+    const rows=B.ppl.map(n=>({n,d:deg(B,n.id)-deg(A,n.id),now:deg(B,n.id),isNew:!aIds.has(n.id)})).filter(x=>x.d>0).sort((x,y)=>y.d-x.d||String(x.n.label).localeCompare(String(y.n.label)));
+    if(!rows.length) return result(`Nothing gained connections between ${from} and ${to}.`,'Either nothing changed, or the dates do not cover when connections were added.');
+    const fresh=rows.filter(x=>x.isNew).sort((x,y)=>y.now-x.now||String(x.n.label).localeCompare(String(y.n.label)));
+    const top=rows.slice(0,5);
+    return result(`Between ${from} and ${to}, ${top[0].n.label} gained the most connections: ${top[0].d} more${top[0].isNew?' (a new arrival)':''}.`,
+      `Top gainers: ${top.map(x=>`${x.n.label} (+${x.d})`).join(', ')}. ${fresh.length?`${fresh.length} new arrival${fresh.length===1?'':'s'} joined; the best connected is ${fresh[0].n.label} with ${fresh[0].now}.`:'No new arrivals in this period.'}`,
+      {label:'Gained the most connections',ids:new Set(top.map(x=>x.n.id)),pairs:[],sec:[]});
    }}
 ];
 function _askContext(){
@@ -6229,17 +6297,17 @@ function _askContext(){
   const result=(answer,evidence,focus)=>({answer,evidence:evidence||'',focus:focus||null});
   return {I,F,np,labels,nodeFocus,linkedFocus,result};
 }
-function _askQuestions(){ return ASK_REGISTRY.filter(r=>(!r.systems||MAP_TYPE==='systems')&&!(r.noSystems&&MAP_TYPE==='systems')).map(r=>({cat:r.cat,id:r.id,q:r.q})); }
+function _askQuestions(){ return ASK_REGISTRY.filter(r=>(!r.systems||MAP_TYPE==='systems')&&!(r.noSystems&&MAP_TYPE==='systems')).map(r=>({cat:r.cat,id:r.id,q:r.q,named:r.named||0})); }
 function _askWorkedOut(id){ const r=ASK_REGISTRY.find(x=>x.id===id); return r&&r.how?r.how:''; }
 function _askNextIds(id){ const r=ASK_REGISTRY.find(x=>x.id===id), ok=new Set(_askQuestions().map(q=>q.id)); return ((r&&r.next)||[]).filter(x=>ok.has(x)&&x!==id).slice(0,3); }
 function _askMeaning(id){
   const r=ASK_REGISTRY.find(x=>x.id===id), x=r?r.meaning:['Uncertain','Puddle could not match this wording to a calculation it knows.','Nothing is highlighted.'];
   return {assessment:x[0],meaning:x[1],highlight:x[2]};
 }
-function _askAnswerFor(id,from,to){
+function _askAnswerFor(id,from,to,args){
   const r=ASK_REGISTRY.find(x=>x.id===id&&(!x.systems||MAP_TYPE==='systems')&&!(x.noSystems&&MAP_TYPE==='systems')), c=_askContext();
   if(!r) return c.result('Puddle cannot answer that question yet.','Choose the closest suggested question.');
-  return r.answer(c,id,from,to);
+  return r.answer(c,id,from,to,args||[]);
 }
 // Typed wording is scored two ways and the scores added. First, the listed phrases (a phrase found in what was typed
 // adds its weight). Second, single words: every question has a set of word stems, from its own wording, its phrases
@@ -6248,6 +6316,31 @@ function _askAnswerFor(id,from,to){
 const _ASK_STOP=new Set(['a','an','the','of','to','in','on','at','for','and','or','is','are','was','were','be','been','do','does','did','we','you','i','it','its','this','that','these','those','with','by','from','as','about','what','which','who','whom','where','when','how','why','can','could','would','should','will','me','my','our','us','them','their','there','here','any','all','each','please','show','tell','give','list','find','get','have','has','had','map','network','organisation','organisations','organization','organizations','people']);
 function _askStem(w){ w=w.replace(/'s$/,''); const t=w.replace(/(ations|ation|ing|ied|ies|ed|es|s|ly)$/,''); return t.length>=3?t:w; }
 function _askTokens(text){ return [...new Set(String(text||'').toLowerCase().split(/[^a-z']+/).filter(w=>w&&!_ASK_STOP.has(w)).map(_askStem))]; }
+// Which organisations does the typed text name? Each item scores by how much of its own distinctive wording is in
+// what was typed ("the Academy" finds Carrfield Academy, not Carrfield Academy Sixth Form, because the longer name has
+// words that were not typed). Two near-equal matches are reported as ambiguous rather than guessed.
+function _askNames(text,max){
+  const ts=new Set(_askTokens(text)); if(!ts.size||!nodes.length) return {picks:[],used:new Set(),ambiguous:[]};
+  const people=nodes.filter(n=>n.type!=='centre'), df=new Map();
+  const toks=people.map(n=>{ const t=_askTokens(n.label); new Set(t).forEach(x=>df.set(x,(df.get(x)||0)+1)); return t; });
+  const N=people.length||1, idf=x=>Math.log(1+N/(df.get(x)||1));
+  const rows=people.map((n,i)=>{ const lt=toks[i]; if(!lt.length) return null; let tot=0; lt.forEach(x=>{ tot+=idf(x); }); return {n,lt,tot}; }).filter(Boolean);
+  const picks=[], used=new Set(); let ambiguous=[]; const left=new Set(ts);
+  for(let k=0;k<(max||2);k++){
+    const sc=rows.filter(r=>!picks.some(p=>p.id===r.n.id)).map(r=>{ let hit=0; r.lt.forEach(x=>{ if(left.has(x)) hit+=idf(x); }); return {r,score:hit/r.tot,hit}; }).filter(x=>x.hit>0&&x.score>=0.6).sort((a,b)=>b.score-a.score||b.hit-a.hit);
+    if(!sc.length) break;
+    const best=sc[0], dist=r=>new Set(r.lt.filter(x=>left.has(x)&&idf(x)>=2));
+    // near-equal candidates only compete if they rest on the same distinctive typed words: two different names typed together do not
+    const bd=dist(best.r), ties=sc.filter(x=>x.score>=best.score-0.04&&Math.abs(x.hit-best.hit)<0.5&&(x===best||[...dist(x.r)].some(t=>bd.has(t))));
+    if(ties.length>1&&!ties.every(t=>t.r.n.label===best.r.n.label)){ ambiguous=ties.slice(0,5).map(t=>t.r.n.id); break; }
+    picks.push(best.r.n); best.r.lt.forEach(x=>{ used.add(x); left.delete(x); });
+  }
+  // in the order they were typed
+  const low=String(text).toLowerCase(), pos=n=>{ let best=1e9; _askTokens(n.label).forEach(t=>{ const i=low.indexOf(t.slice(0,Math.max(3,t.length-1))); if(i>=0&&idf(t)>=1.5) best=Math.min(best,i); }); return best; };
+  picks.sort((a,b)=>pos(a)-pos(b));
+  return {picks:picks.map(n=>n.id),used,ambiguous};
+}
+function _askWithoutNames(text,used){ return String(text).split(/([^A-Za-z']+)/).filter(w=>!(w&&used.has(_askStem(w.toLowerCase())))).join(''); }
 let _askIndexKey='', _askIndex=null;
 function _askWordIndex(){
   const key=MAP_TYPE+'|'+ASK_REGISTRY.length; if(_askIndex&&key===_askIndexKey) return _askIndex;
@@ -6255,12 +6348,13 @@ function _askWordIndex(){
   const sets=rows.map(r=>{ const st=new Set(); [r.q,...r.words.map(w=>w[0]),...(r.syn||[])].forEach(t=>_askTokens(t).forEach(x=>st.add(x))); st.forEach(x=>df.set(x,(df.get(x)||0)+1)); return {id:r.id,st}; });
   _askIndex={sets,idf:x=>Math.log(1+rows.length/(df.get(x)||1))}; _askIndexKey=key; return _askIndex;
 }
-function _askRank(text){
+function _askRank(text,nameCount){
   const s=' '+String(text||'').toLowerCase().replace(/[?.,!]/g,' ').replace(/\s+/g,' ')+' ';
   const typed=_askTokens(text), X=_askWordIndex(), out=[];
   ASK_REGISTRY.forEach(r=>{
     if((r.systems&&MAP_TYPE!=='systems')||(r.noSystems&&MAP_TYPE==='systems')) return;
-    let sc=0; r.words.forEach(([w,wt])=>{ if(s.includes(w)) sc+=wt; });
+    if(r.named&&nameCount!==r.named) return;                          // a question about named items only competes when exactly that many were named
+    let sc=r.named?6:0; r.words.forEach(([w,wt])=>{ if(s.includes(w)) sc+=wt; });
     const row=X.sets.find(x=>x.id===r.id); let tk=0; if(row) typed.forEach(t=>{ if(row.st.has(t)) tk+=X.idf(t); });
     sc+=1.5*tk;
     if(sc>0) out.push({id:r.id,score:Math.round(sc*100)/100});
@@ -6280,23 +6374,33 @@ function _askDecide(text){
   if(!raw) return {id:'overview',how:'exact',options:[]};
   const plain=t=>String(t).toLowerCase().replace(/[?.!,]+/g,' ').replace(/\s+/g,' ').trim();
   const exact=_askQuestions().find(x=>plain(x.q)===plain(raw));
-  if(exact) return {id:exact.id,how:'exact',options:[]};
-  const r=_askRank(raw);
+  if(exact) return {id:exact.id,how:'exact',options:[],args:[]};
+  const nm=_askNames(raw,2);
+  if(nm.ambiguous.length) return {id:'unknown',how:'name',options:[],ambig:nm.ambiguous,args:[]};
+  const r=_askRank(nm.picks.length?_askWithoutNames(raw,nm.used):raw,nm.picks.length);
   const tm=_askTextMatches(raw);
   if(!r.length) return tm.length?{id:'unknown',how:'list',options:tm}:{id:'unknown',how:'none',options:_askDefaultIds()};
   const top=r[0], second=r[1];
-  if(top.score>=4.5&&(!second||top.score>=1.6*second.score)) return {id:top.id,how:'guess',options:r.slice(1,4).map(x=>x.id)};
+  if(top.score>=4.5&&(!second||top.score>=1.6*second.score)) return {id:top.id,how:'guess',options:r.slice(1,4).map(x=>x.id),args:nm.picks};
   return {id:'unknown',how:'close',options:[...new Set([...r.slice(0,3).map(x=>x.id),...tm])].slice(0,8)};
 }
 function _askMatch(text){ return _askDecide(text).id; }
+function _askFillName(q,input){
+  input.value=q.q; input.focus(); const m=q.q.match(/\[[^\]]+\]/);
+  if(m&&input.setSelectionRange) input.setSelectionRange(m.index,m.index+m[0].length);
+  showStatus('Type the name in place of the brackets, then press the arrow.');
+}
 function askPickAndRun(id){
   const q=_askQuestions().find(x=>x.id===id), input=document.getElementById('ask-map-input');
+  if(q&&q.named&&input){ _askFillName(q,input); return; }
   if(input&&q) input.value=q.q;
   runAskMap();
 }
 function askPickQuestion(id){
   const q=_askQuestions().find(x=>x.id===id);
-  const input=document.getElementById('ask-map-input'); if(input&&q) input.value=q.q;
+  const input=document.getElementById('ask-map-input'); if(!input||!q) return;
+  if(q.named){ _askFillName(q,input); return; }
+  input.value=q.q;
 }
 function askFromTyping(){
   const input=document.getElementById('ask-map-input'), sel=document.getElementById('ask-question-select');
@@ -6343,12 +6447,17 @@ function runAskMap(){
   const sel=document.getElementById('ask-question-select'), input=document.getElementById('ask-map-input');
   const typed=String((input&&input.value)||'').trim(), id=typed?_askMatch(typed):((sel&&sel.value)||'overview'), def=_askQuestions().find(x=>x.id===id), question=def?def.q:(typed||'Question Puddle could not match');
   const from=(document.getElementById('ask-date-from')||{}).value||'', to=(document.getElementById('ask-date-to')||{}).value||'';
-  const _dec=typed?_askDecide(typed):{how:'exact',options:[]};
-  _askAnswer=Object.assign({id,question,from,to,saved:id!=='unknown',typed,how:_dec.how,options:_dec.options},_askAnswerFor(id,from,to),_askMeaning(id),{workedOut:_askWorkedOut(id),nextIds:_askNextIds(id)});
+  const _dec=typed?_askDecide(typed):{how:'exact',options:[],args:[]};
+  const args=_dec.args||[], labelOf=i=>{ const n=nodes.find(x=>x.id===i); return n?n.label:'?'; };
+  const askedAs=(def&&def.named&&args.length)?args.reduce((q,i)=>q.replace(/\[[^\]]+\]/,labelOf(i)),def.q):question;
+  let calc;
+  if(_dec.how==='name') calc={answer:`I found more than one that could match: ${(_dec.ambig||[]).map(labelOf).join('; ')}.`,evidence:'Type the full name of the one you mean.',focus:null};
+  else calc=_askAnswerFor(id,from,to,args);
+  _askAnswer=Object.assign({id,question:askedAs,from,to,saved:id!=='unknown'&&_dec.how!=='name',typed,how:_dec.how,options:_dec.options},calc,_askMeaning(id),{workedOut:_askWorkedOut(id),nextIds:_askNextIds(id)});
   { const lv=document.getElementById('ask-live'); if(lv){ lv.style.display='none'; lv.innerHTML=''; } }
-  const key=id+'|'+from+'|'+to;
-  if(id!=='unknown'){
-    const saved={key,id,question,answer:_askAnswer.answer,evidence:_askAnswer.evidence,assessment:_askAnswer.assessment,meaning:_askAnswer.meaning,highlight:_askAnswer.highlight,workedOut:_askAnswer.workedOut||'',from,to};
+  const key=id+'|'+from+'|'+to+(args.length?'|'+args.join(','):'');
+  if(id!=='unknown'&&_dec.how!=='name'&&!(def&&def.named&&!args.length)){
+    const saved={key,id,question:askedAs,answer:_askAnswer.answer,evidence:_askAnswer.evidence,assessment:_askAnswer.assessment,meaning:_askAnswer.meaning,highlight:_askAnswer.highlight,workedOut:_askAnswer.workedOut||'',from,to};
     const at=ASK_REPORT_ITEMS.findIndex(x=>x.key===key); if(at>=0) ASK_REPORT_ITEMS[at]=saved; else ASK_REPORT_ITEMS.push(saved);
   }
   clearHighlight();
