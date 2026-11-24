@@ -1106,6 +1106,33 @@ body.share-mode #present-exit{display:none !important;}
 @keyframes askPuddlPulse{50%{box-shadow:0 0 0 4px rgba(0,174,239,.18);}}
 @keyframes askPuddlListen{50%{transform:translateY(-1px);}}
 @media(max-width:720px){#ask-puddl-widget{right:10px;left:10px;bottom:74px;width:auto;}#ask-puddl-launcher{right:14px;bottom:14px;}}
+
+/* ── Side panel: At a glance / Ask / Filter / Report, docked left of the map ── */
+#workspace{flex:1;display:flex;min-height:0;min-width:0;position:relative;}
+#workspace:has(>#canvas-area[style*="display: none"]){display:none;}
+#workspace>#canvas-area{order:2;}
+#side-dock{order:0;display:none;flex-direction:column;flex:0 0 auto;width:30%;min-width:300px;min-height:0;background:var(--surf-2);font-family:'DM Sans',sans-serif;}
+#side-dock.open{display:flex;}
+#dock-divider{order:1;display:none;width:8px;flex:0 0 8px;cursor:col-resize;background:var(--bdr);position:relative;touch-action:none;}
+#dock-divider.open{display:block;}
+#dock-divider:after{content:'';position:absolute;top:50%;left:1px;width:6px;height:44px;margin-top:-22px;border-radius:3px;background:var(--bdr-m);}
+#dock-divider:hover:after,#dock-divider.dragging:after{background:var(--ink-h);}
+#canvas-area[style*="display: none"]~#side-dock,#canvas-area[style*="display: none"]~#dock-divider{display:none !important;}
+#side-dock .dock-tabs{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;}
+#side-dock .dock-tabs button{flex:1;height:42px;padding:0 4px;border:none;border-bottom:2px solid transparent;border-radius:0;background:transparent;box-shadow:none;font-size:12.5px;color:var(--ink-m);cursor:pointer;}
+#side-dock .dock-tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--ink);}
+#side-dock .dock-tools{display:flex;justify-content:flex-end;gap:6px;padding:8px 12px 0;flex-shrink:0;}
+#side-dock .dock-tools button{height:25px;padding:0 10px;font-size:11px;}
+#side-dock .dock-panes{flex:1;min-height:0;position:relative;}
+#side-dock .dock-pane{display:none;position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 14px 22px;}
+#side-dock .dock-pane.on{display:block;}
+#search-panel.docked{position:static !important;display:block !important;width:auto !important;max-height:none !important;overflow:visible !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;background:transparent !important;}
+#side-dock .ask-puddl-body{overflow:visible;padding:0;}
+#side-dock .dock-ask-head{display:flex;align-items:center;gap:9px;margin-bottom:9px;}
+#side-dock .dock-ask-head img{width:44px;height:44px;object-fit:cover;border-radius:11px;flex-shrink:0;}
+#dock-ask-away,#dock-report-empty{display:none;font-size:12px;line-height:1.5;color:var(--ink-m);}
+#ask-puddl-report:empty~#dock-report-empty{display:block;}
+@media(max-width:760px){#side-dock.open{position:absolute;inset:0;width:auto !important;min-width:0;z-index:30;}#dock-divider{display:none !important;}}
 </style>
 <!-- Supabase Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1256,6 +1283,7 @@ body.share-mode #present-exit{display:none !important;}
   <div class="ask-puddl-head">
     <img src="assets/ask-puddl-plush.png" alt="Puddle sheep">
     <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:800;color:var(--ink);">Ask Puddle</div><div style="font-size:10px;color:var(--ink-h);line-height:1.3;">Calculated from this map · not an AI chatbot</div></div>
+    <button onclick="dockBringBackAsk()" title="Put Ask back in the side panel" style="height:26px;padding:0 9px;font-size:10.5px;">Dock</button>
     <button onclick="closeAskMap()" title="Close" aria-label="Close Ask Puddle" style="width:28px;height:28px;padding:0;border:none;background:transparent;font-size:16px;color:var(--ink-h);">×</button>
   </div>
   <div class="ask-puddl-body">
@@ -1320,6 +1348,7 @@ body.share-mode #present-exit{display:none !important;}
   </div>
 </div>
 
+<div id="workspace">
 <div id="canvas-area">
   <canvas id="bg"></canvas>
 
@@ -1639,6 +1668,32 @@ body.share-mode #present-exit{display:none !important;}
     <button onclick="cancelLoop()" style="font-size:11px;padding:0 10px;height:26px;">✕ Cancel</button>
     <button onclick="confirmLoop()" id="btn-confirm-loop" style="font-size:11px;padding:0 14px;height:26px;background:var(--ink);color:var(--on-ink);border-color:var(--ink);font-weight:600;" disabled>✓ Create loop</button>
   </div>
+</div>
+<aside id="side-dock" aria-label="Map panel">
+  <div class="dock-tabs" role="tablist">
+    <button role="tab" id="dock-tab-glance" onclick="dockShow('glance')">At a glance</button>
+    <button role="tab" id="dock-tab-ask" onclick="dockShow('ask')">Ask</button>
+    <button role="tab" id="dock-tab-filter" onclick="dockShow('filter')">Filter</button>
+    <button role="tab" id="dock-tab-report" onclick="dockShow('report')">Report<span id="dock-report-count"></span></button>
+  </div>
+  <div class="dock-tools">
+    <button id="dock-popout" onclick="dockPopOutAsk()" title="Move Ask into a box you can drag around">Pop out</button>
+    <button onclick="dockFold()" title="Hide the panel and give the whole screen to the map">Fold away</button>
+  </div>
+  <div class="dock-panes">
+    <div class="dock-pane" id="dock-pane-glance"></div>
+    <div class="dock-pane" id="dock-pane-ask">
+      <div class="dock-ask-head"><img src="assets/ask-puddl-plush.png" alt=""><div><div style="font-size:13px;font-weight:800;color:var(--ink);">Ask Puddle</div><div style="font-size:10px;color:var(--ink-h);line-height:1.3;">Calculated from this map · not an AI chatbot</div></div></div>
+      <div id="dock-ask-away">Ask Puddle is open in its own box on the map.<br><button onclick="dockBringBackAsk()" style="margin-top:8px;height:28px;padding:0 12px;font-size:11.5px;">Bring it back here</button></div>
+    </div>
+    <div class="dock-pane" id="dock-pane-filter"></div>
+    <div class="dock-pane" id="dock-pane-report">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);margin-bottom:6px;">Report</div>
+      <div id="dock-report-empty">No questions chosen yet. Ask a question, then choose to add it to the report. The report will then show just those.<br><button onclick="askOpenReport(false)" style="margin-top:8px;height:30px;padding:0 12px;font-size:11.5px;">View full report</button></div>
+    </div>
+  </div>
+</aside>
+<div id="dock-divider" role="separator" aria-orientation="vertical" aria-label="Drag to resize the panel" title="Drag to resize"></div>
 </div>
 
 <!-- Add/Edit Modal -->
@@ -2560,6 +2615,11 @@ function selectConnColour(col){
     <span id="theme-btn-label">Dark mode</span></button>
         </div>
         <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Spacing</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">How much room auto-arrange leaves between items. Dense maps read better with more. It takes effect the next time you press Auto-arrange.</p>
+          <label style="display:block;font-size:12px;color:var(--ink);">Spread out <span id="settings-node-spacing-val" style="color:var(--txt-m);">76</span> <input type="range" id="settings-node-spacing" min="50" max="150" step="2" oninput="setNodeSpacing(this.value)" style="width:100%;"></label>
+        </div>
+        <div style="margin-bottom:24px;">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Background image</h4>
           <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Put a picture behind the map, like a street map or a logo. JPG or PNG.</p>
           <div style="display:flex;gap:8px;">
@@ -2584,6 +2644,13 @@ function selectConnColour(col){
           <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Click a colour to change it. Choosing one switches on "Colour connections by strength", so every connection follows it.</p>
           <div id="connection-styles-list" style="display:flex;flex-direction:column;gap:8px;"></div>
           <button onclick="resetStrengthColours()" style="margin-top:10px;padding:6px 12px;font-size:11px;">Reset to the original colours</button>
+        </div>
+        <div style="margin-bottom:28px;">
+          <h4 style="margin:0 0 6px 0;font-size:14px;font-weight:600;color:var(--ink);">How the lines look</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Longer lines sweep more when they curve. Fainter lines let the items stand out. Lit-up lines are always full strength.</p>
+          <label style="display:block;font-size:12px;color:var(--ink);margin-bottom:10px;">Curve <input type="range" id="settings-edge-curve" min="0" max="0.4" step="0.02" oninput="setEdgeLook()" style="width:100%;"></label>
+          <label style="display:block;font-size:12px;color:var(--ink);">Line strength <input type="range" id="settings-edge-opacity" min="0.25" max="1" step="0.05" oninput="setEdgeLook()" style="width:100%;"></label>
+          <button onclick="resetEdgeLook()" style="margin-top:8px;padding:6px 12px;font-size:11px;">Reset the line look</button>
         </div>
       </div>
     </div>
@@ -2790,6 +2857,9 @@ function argEdgeFor(aId,bId){
   const child=nodes.find(n=>n.id===from);
   return {from,to,strength:argLinkFor(child&&child.argPart)};
 }
+let EDGE_CURVE=0.2;              // how much a connection bows, as a share of its length (Kumu-style arcs: longer lines sweep more)
+let EDGE_OPACITY=0.8;            // how solid ordinary connections are; lit-up ones are always full
+function _curveOffset(dist){ return MAP_TYPE==='argument'?0:dist*EDGE_CURVE; }
 let EDGE_COLOUR_BY_STRENGTH=false; // when on, connections draw in their strength's colour
 function largeMapOn(){ return nodes.length>=LARGE_MAP_AT; }
 function nodeSizeScale(){ const m=NODE_SIZE_MODE; return (m==='always'||(m==='auto'&&largeMapOn()))?SMALLER_NODE_SCALE:1; }
@@ -3142,7 +3212,7 @@ function edgeAt(sx,sy){
     const b=typeof e.target==='object'?e.target:nodes.find(n=>n.id===e.target);
     if(!a||!b) continue;
     const dx=b.x-a.x, dy=b.y-a.y, dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+    const curve=_curveOffset(dist);
     const mx=(a.x+b.x)/2-dy/dist*curve;
     const my=(a.y+b.y)/2+dx/dist*curve;
     // Sample points along the quadratic bezier
@@ -3194,6 +3264,7 @@ function snap(){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
+    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,
     askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
@@ -3272,6 +3343,8 @@ function restoreSnap(s){
   }
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
+  EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
+  if(typeof d.nodeSpacing==='number') NODE_BREATHING=d.nodeSpacing;
   ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
   _askAnswer=null;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
@@ -3484,6 +3557,17 @@ function setNodeSizeMode(v){
   NODE_SIZE_MODE=['auto','always','never'].includes(v)?v:'auto';
   syncLargeMapUI(); saveState(); markUnsaved(); draw();
 }
+function setEdgeLook(){
+  const c=document.getElementById('settings-edge-curve'), o=document.getElementById('settings-edge-opacity');
+  if(c) EDGE_CURVE=parseFloat(c.value); if(o) EDGE_OPACITY=parseFloat(o.value);
+  draw(); saveState(); markUnsaved();
+}
+function resetEdgeLook(){ EDGE_CURVE=0.2; EDGE_OPACITY=0.8; syncEdgeLookControls(); draw(); saveState(); markUnsaved(); }
+function syncEdgeLookControls(){
+  const c=document.getElementById('settings-edge-curve'), o=document.getElementById('settings-edge-opacity'), sp=document.getElementById('settings-node-spacing'), sv=document.getElementById('settings-node-spacing-val');
+  if(c) c.value=EDGE_CURVE; if(o) o.value=EDGE_OPACITY; if(sp) sp.value=NODE_BREATHING; if(sv) sv.textContent=NODE_BREATHING;
+}
+function setNodeSpacing(v){ NODE_BREATHING=parseInt(v,10)||76; const sv=document.getElementById('settings-node-spacing-val'); if(sv) sv.textContent=NODE_BREATHING; saveState(); markUnsaved(); }
 function setEdgeColourByStrength(on){
   EDGE_COLOUR_BY_STRENGTH=!!on;
   const c=document.getElementById('settings-edge-colour-strength'); if(c) c.checked=EDGE_COLOUR_BY_STRENGTH;
@@ -3672,7 +3756,7 @@ function draw(){
     const bp=_arc?edgePtClearOfLabel(b,_arc.x,_arc.y):edgePtClearOfLabel(b,a.x,a.y);
 
     const dx=bp.x-ap.x,dy=bp.y-ap.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+    const curve=_curveOffset(dist);
     // For loop edges: P = 2·arcMid − midEdgePt
     // This is the exact control point that forces B(0.5) through the true arc midpoint
     // on the stored circle, regardless of node size. Works for any N.
@@ -3698,7 +3782,7 @@ function draw(){
     ctx.save();
     // Edges pass under nodes — no clipping needed (nodes drawn on top in render order)
 
-    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
+    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
     const _pc=_pinEdgeCols.size?_pinEdgeCols.get(i):null;
     const _pcs=_pc?_pc.map(ci=>loopColourOf(ci,_dark)):null;
     const _typeCol=isHl&&_ctFilterOn?(_dark?adaptColourForDark(style.colour):style.colour):null;
@@ -3783,7 +3867,7 @@ function draw(){
       // Arrowhead at source (backward or both)
       if(headS){
         ctx.save();
-        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
+        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
         ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
@@ -4524,6 +4608,101 @@ function toggleSearchPanel(){
   }
   if(open) setTimeout(()=>document.getElementById('search-input').focus(),50);
 }
+
+// ── Side panel (docked left of the map) ──────────────────────────────────────
+// One panel, four tabs. The old Search & filter pop-up, At a glance, the Ask box and the report picks
+// all live in it. Nothing is rebuilt: the existing pieces are moved in, so their ids and code still work.
+const DOCK_TABS=['glance','ask','filter','report'];
+let _dock={open:false,tab:'glance',frac:0.30,popped:false,suspended:false};
+try{ const _d=JSON.parse(localStorage.getItem('puddl-dock')||'null'); if(_d&&typeof _d==='object'){
+  if(typeof _d.open==='boolean') _dock.open=_d.open;
+  if(DOCK_TABS.indexOf(_d.tab)>=0) _dock.tab=_d.tab;
+  if(_d.frac>=0.25&&_d.frac<=0.40) _dock.frac=_d.frac;
+  if(typeof _d.popped==='boolean') _dock.popped=_d.popped;
+} }catch(e){}
+let _dockBuilt=false;
+function _dockSave(){ try{ localStorage.setItem('puddl-dock',JSON.stringify({open:_dock.open,tab:_dock.tab,frac:_dock.frac,popped:_dock.popped})); }catch(e){} }
+function _dockBuild(){
+  if(_dockBuilt) return; _dockBuilt=true;
+  const $=id=>document.getElementById(id);
+  const ins=$('sec-insights-body'), fsec=ins&&ins.closest('.fsec'), sp=$('search-panel');
+  if(fsec){ const t=$('insights-toggle'); if(t) t.style.display='none'; fsec.style.cssText='margin:0;padding:0;border:none;'; ins.style.marginTop='0'; $('dock-pane-glance').appendChild(fsec); }
+  if(sp){ sp.classList.add('docked'); $('dock-pane-filter').appendChild(sp); }
+  const ab=document.querySelector('#ask-puddl-widget .ask-puddl-body');
+  if(ab){ ab.id='ask-puddl-body'; const rep=$('ask-puddl-report'); if(rep) $('dock-pane-report').insertBefore(rep,$('dock-report-empty')); if(!_dock.popped) $('dock-pane-ask').appendChild(ab); }
+  const btn=$('btn-search-toggle');
+  if(btn){ btn.onclick=function(){ dockToggle(); }; btn.title='Open or fold away the side panel'; const lb=$('search-btn-label'); if(lb) lb.textContent='Panel'; }
+}
+function _dockSize(){
+  const dock=document.getElementById('side-dock'), ws=document.getElementById('workspace'); if(!dock||!ws) return;
+  if(_dock.open&&!_dock.suspended){ dock.style.width=Math.max(300,Math.min(Math.round(ws.clientWidth*_dock.frac),Math.round(ws.clientWidth*0.6)))+'px'; }
+  const area=document.getElementById('canvas-area'), oldW=W;
+  resize();
+  if(area&&area.offsetParent!==null&&oldW>0&&W>0&&Math.abs(W-oldW)>0.5){ panX+=(W-oldW)/2; }
+  draw();
+}
+function _dockBadge(){
+  const c=document.getElementById('dock-report-count'); if(!c) return;
+  const n=(typeof ASK_REPORT_ITEMS!=='undefined'&&ASK_REPORT_ITEMS)?ASK_REPORT_ITEMS.length:0;
+  c.textContent=n?` (${n})`:'';
+}
+function _dockApply(){
+  _dockBuild();
+  const $=id=>document.getElementById(id);
+  const open=_dock.open&&!_dock.suspended;
+  $('side-dock').classList.toggle('open',open); $('dock-divider').classList.toggle('open',open);
+  DOCK_TABS.forEach(t=>{ const b=$('dock-tab-'+t), p=$('dock-pane-'+t), on=t===_dock.tab; if(b){ b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); } if(p) p.classList.toggle('on',on); });
+  const pop=$('dock-popout'); if(pop) pop.style.display=(_dock.tab==='ask'&&!_dock.popped)?'':'none';
+  const away=$('dock-ask-away'); if(away) away.style.display=_dock.popped?'block':'none';
+  const ins=$('sec-insights-body'), showGlance=open&&_dock.tab==='glance';
+  if(ins){ ins.style.display=showGlance?'block':'none'; if(showGlance) renderInsights(); }
+  if(open&&_dock.tab==='filter') syncDateFilterUI();
+  const btn=$('btn-search-toggle');
+  if(btn){ btn.style.background=open?'var(--ink)':'var(--surf)'; btn.style.color=open?'var(--on-ink)':'var(--ink-m)'; btn.style.borderColor=open?'var(--ink)':'var(--bdr)'; }
+  _dockBadge();
+  _dockSize();
+}
+function dockShow(tab){
+  if(DOCK_TABS.indexOf(tab)<0) tab='glance';
+  _dock.open=true; _dock.tab=tab; _dockSave(); _dockApply();
+}
+function dockFold(){ _dock.open=false; _dockSave(); _dockApply(); }
+function dockToggle(){ if(_dock.open&&!_dock.suspended) dockFold(); else dockShow(_dock.tab); }
+function dockSuspend(on){ if(!document.getElementById('side-dock')) return; _dock.suspended=!!on; _dockApply(); }
+function dockPopOutAsk(){
+  _dockBuild();
+  const ab=document.getElementById('ask-puddl-body'), w=document.getElementById('ask-puddl-widget'); if(!ab||!w) return;
+  w.appendChild(ab); _dock.popped=true;
+  if(_dock.tab==='ask') _dock.tab='glance';
+  _dockSave(); _dockApply();
+  w.classList.add('open'); _askPlace(); renderAskWidget();
+}
+function dockBringBackAsk(){
+  _dockBuild();
+  const ab=document.getElementById('ask-puddl-body'), w=document.getElementById('ask-puddl-widget'); if(!ab) return;
+  document.getElementById('dock-pane-ask').appendChild(ab); _dock.popped=false;
+  if(w) w.classList.remove('open');
+  dockShow('ask'); renderAskWidget();
+}
+(function(){
+  let drag=false;
+  document.addEventListener('pointerdown',function(e){
+    const d=e.target.closest&&e.target.closest('#dock-divider'); if(!d) return;
+    drag=true; d.classList.add('dragging'); try{ d.setPointerCapture(e.pointerId); }catch(x){}
+    document.body.style.userSelect='none'; e.preventDefault();
+  });
+  document.addEventListener('pointermove',function(e){
+    if(!drag) return; const ws=document.getElementById('workspace'); if(!ws) return;
+    const r=ws.getBoundingClientRect(); _dock.frac=Math.min(0.40,Math.max(0.25,(e.clientX-r.left)/r.width)); _dockSize();
+  });
+  document.addEventListener('pointerup',function(){
+    if(!drag) return; drag=false; const d=document.getElementById('dock-divider'); if(d) d.classList.remove('dragging');
+    document.body.style.userSelect=''; _dockSave();
+  });
+  window.addEventListener('resize',function(){ if(_dock.open&&!_dock.suspended){ const dock=document.getElementById('side-dock'), ws=document.getElementById('workspace'); if(dock&&ws){ dock.style.width=Math.max(300,Math.min(Math.round(ws.clientWidth*_dock.frac),Math.round(ws.clientWidth*0.6)))+'px'; resize(); draw(); } } });
+  document.addEventListener('puddl-presedit',function(e){ dockSuspend(!!(e.detail)); });
+  setTimeout(function(){ try{ if(document.getElementById('side-dock')){ _dockBuild(); _dockApply(); } }catch(e){ console.error(e); } },0);
+})();
 
 // ── View / Edit mode ─────────────────────────────────────────────────────────
 let isViewMode=false;
@@ -5420,6 +5599,7 @@ function toggleInsGroup(k){
 }
 
 function openAskMap(){
+  if(document.getElementById('side-dock')&&!_dock.popped){ dockShow('ask'); renderAskWidget(); setTimeout(()=>{ const i=document.getElementById('ask-map-input'); if(i) i.focus(); },60); return; }
   const w=document.getElementById('ask-puddl-widget'); if(!w) return;
   w.classList.add('open'); _askPlace(); renderAskWidget();
 }
@@ -5568,8 +5748,9 @@ function renderAskWidget(){
     else if(_askAnswer.how==='none') ans.insertAdjacentHTML('afterbegin',`<div class="ask-puddl-bubble" style="font-size:11px;">I could not match "${escHtml(_askAnswer.typed)}" to anything I can work out from this map. Here are some I can answer, or pick from the list below:${btns}</div>`);
   }
   const report=document.getElementById('ask-puddl-report');
-  if(report) report.innerHTML=ASK_REPORT_ITEMS.length?`<details style="margin-top:9px;"><summary style="font-size:10.5px;font-weight:700;color:var(--ink-h);cursor:pointer;">Selected for the report (${ASK_REPORT_ITEMS.length})</summary>`+ASK_REPORT_ITEMS.map((x,i)=>`<div style="display:flex;align-items:center;gap:4px;padding:5px 0;border-top:1px solid var(--bdr);font-size:10.5px;"><span style="flex:1;line-height:1.3;">${escHtml(x.question)}</span><button onclick="askReportMove(${i},-1)" title="Move up" style="width:22px;height:22px;padding:0;"${i===0?' disabled':''}>↑</button><button onclick="askReportMove(${i},1)" title="Move down" style="width:22px;height:22px;padding:0;"${i===ASK_REPORT_ITEMS.length-1?' disabled':''}>↓</button><button onclick="askReportRemove(${i})" title="Remove" style="width:22px;height:22px;padding:0;">×</button></div>`).join('')+`</details>`:'';
+  if(report) report.innerHTML=ASK_REPORT_ITEMS.length?`<details${report.closest('#dock-pane-report')?' open':''} style="margin-top:9px;"><summary style="font-size:10.5px;font-weight:700;color:var(--ink-h);cursor:pointer;">Selected for the report (${ASK_REPORT_ITEMS.length})</summary>`+ASK_REPORT_ITEMS.map((x,i)=>`<div style="display:flex;align-items:center;gap:4px;padding:5px 0;border-top:1px solid var(--bdr);font-size:10.5px;"><span style="flex:1;line-height:1.3;">${escHtml(x.question)}</span><button onclick="askReportMove(${i},-1)" title="Move up" style="width:22px;height:22px;padding:0;"${i===0?' disabled':''}>↑</button><button onclick="askReportMove(${i},1)" title="Move down" style="width:22px;height:22px;padding:0;"${i===ASK_REPORT_ITEMS.length-1?' disabled':''}>↓</button><button onclick="askReportRemove(${i})" title="Remove" style="width:22px;height:22px;padding:0;">×</button></div>`).join('')+`</details>`:'';
   if(report&&ASK_REPORT_ITEMS.length) report.insertAdjacentHTML('beforeend',`<div style="display:flex;gap:6px;margin-top:8px;"><button onclick="askOpenReport(true)" style="flex:1;height:30px;font-size:11px;background:var(--ink);color:var(--surf);border-color:var(--ink);">View selected report</button><button onclick="askOpenReport(false)" style="flex:1;height:30px;font-size:11px;">View full report</button></div>`);
+  if(typeof _dockBadge==='function') _dockBadge();
 }
 function _askAnswerFor(id,from,to){
   const I=computeInsights(), F=MAP_TYPE==='argument'?{list:[]}:computeFindings(I), np=mapNounPack()[1];
@@ -9945,7 +10126,7 @@ canvas.addEventListener('dblclick',e=>{
     const b=typeof ed.target==='object'?ed.target:nodes.find(nd=>nd.id===ed.target);
     if(!a||!b) return;
     const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+    const curve=_curveOffset(dist);
     const mx=(a.x+b.x)/2-dy/dist*curve, my=(a.y+b.y)/2+dx/dist*curve;
     for(let t=0;t<=1;t+=0.04){
       const qx=(1-t)**2*a.x+2*(1-t)*t*mx+t*t*b.x;
@@ -10276,7 +10457,7 @@ canvas.addEventListener('click',e=>{
       const b=typeof ed.target==='object'?ed.target:nodes.find(n=>n.id===ed.target);
       if(!a||!b) return;
       const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-      const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+      const curve=_curveOffset(dist);
       const mx=(a.x+b.x)/2-dy/dist*curve,my=(a.y+b.y)/2+dx/dist*curve;
       for(let t=0;t<=1;t+=0.04){
         const qx=(1-t)**2*a.x+2*(1-t)*t*mx+t*t*b.x;
@@ -11598,6 +11779,7 @@ function togglePresentationEditMode(){
 }
 
 function enterPresentationEditMode(){
+  document.dispatchEvent(new CustomEvent('puddl-presedit',{detail:true}));
   inPresentationEditMode=true;
   const panel=document.getElementById('pres-edit-panel');
   if(panel) panel.classList.add('open');
@@ -11611,6 +11793,7 @@ function enterPresentationEditMode(){
 }
 
 function exitPresentationEditMode(){
+  document.dispatchEvent(new CustomEvent('puddl-presedit',{detail:false}));
   inPresentationEditMode=false;
   const panel=document.getElementById('pres-edit-panel');
   if(panel) panel.classList.remove('open');
@@ -13693,7 +13876,7 @@ const WALK_STEPS=[
   },
   {
     title:'Search and filter',
-    text:"Use Search & filter in the top-left (magnifying glass) to open the panel. Search by name, or filter by category, area, tag and connection type. All filters combine — for example Health service + Strong connections.",
+    text:"Use Panel in the top-left to open the side panel. It has four tabs: At a glance, Ask, Filter and Report. Under Filter you can search by name, or filter by category, area, tag and connection type. All filters combine, for example Health service + Strong connections.",
     target:'search-toggle-wrap', pos:'below'
   },
   {
@@ -14638,11 +14821,12 @@ function syncSizeByConnButtons(){
   { const sm=document.getElementById('settings-simple-mode'); if(sm) sm.value=SIMPLE_MODE; }
   { const mt=document.getElementById('settings-map-type'); if(mt) mt.value=MAP_TYPE; }
   { const ec=document.getElementById('settings-edge-colour-strength'); if(ec) ec.checked=EDGE_COLOUR_BY_STRENGTH; }
+  syncEdgeLookControls();
   syncLargeMapUI();
   const ss=document.getElementById('settings-size-by'), cs=document.getElementById('settings-colour-by');
   const opt=(v,t,sel)=>'<option value="'+escHtml(v)+'"'+(v===sel?' selected':'')+'>'+escHtml(t)+'</option>';
   if(ss){
-    let h=opt('','Off (use each node\'s own size)',SIZE_BY)+opt('connections','Number of connections',SIZE_BY);
+    let h=opt('','Off (use each node\'s own size)',SIZE_BY)+opt('connections','Number of connections',SIZE_BY)+opt('betweenness','Go-between score (bottleneck)',SIZE_BY);
     FIELD_DEFS.filter(f=>fieldIsNumeric(f.id)).forEach(f=>{ h+=opt('field:'+f.id,f.name,SIZE_BY); });
     ss.innerHTML=h;
   }
@@ -14692,8 +14876,16 @@ function fieldStats(id){
 function fieldIsNumeric(id){ return fieldStats(id).numeric; }
 function maxConnections(){ let m=0; nodes.forEach(n=>{ if(n.type!=='centre') m=Math.max(m,connectionCount(n)); }); return m; }
 // 0..1 position of a node on the current measure, or null when it has no value
+let _bwCache={sig:'',map:null,max:0};
+function _betweennessFor(n){
+  const sig=nodes.length+'|'+edges.length+'|'+(DATE_ASAT||'');
+  if(_bwCache.sig!==sig){ let m=null, mx=0; try{ const I=computeInsights(); if(I.betweenness){ m=I.betweenness; I.betweenness.forEach(v=>{ if(v>mx) mx=v; }); } }catch(e){} _bwCache={sig,map:m,max:mx}; }
+  if(!_bwCache.map||!_bwCache.max) return null;
+  const v=_bwCache.map.get(n.id); return v===undefined?0:v/_bwCache.max;
+}
 function _measure(n,key){
   if(key==='connections'){ const m=maxConnections(); return m?connectionCount(n)/m:0; }
+  if(key==='betweenness') return _betweennessFor(n);
   if(key&&key.startsWith('field:')){
     const id=key.slice(6), st=fieldStats(id); if(!st.numeric) return null;
     const x=_num(n.customFields&&n.customFields[id]); if(isNaN(x)) return null;

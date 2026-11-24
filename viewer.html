@@ -1108,6 +1108,33 @@ body.share-mode #present-exit{display:none !important;}
 @keyframes askPuddlListen{50%{transform:translateY(-1px);}}
 @media(max-width:720px){#ask-puddl-widget{right:10px;left:10px;bottom:74px;width:auto;}#ask-puddl-launcher{right:14px;bottom:14px;}}
 
+/* ── Side panel: At a glance / Ask / Filter / Report, docked left of the map ── */
+#workspace{flex:1;display:flex;min-height:0;min-width:0;position:relative;}
+#workspace:has(>#canvas-area[style*="display: none"]){display:none;}
+#workspace>#canvas-area{order:2;}
+#side-dock{order:0;display:none;flex-direction:column;flex:0 0 auto;width:30%;min-width:300px;min-height:0;background:var(--surf-2);font-family:'DM Sans',sans-serif;}
+#side-dock.open{display:flex;}
+#dock-divider{order:1;display:none;width:8px;flex:0 0 8px;cursor:col-resize;background:var(--bdr);position:relative;touch-action:none;}
+#dock-divider.open{display:block;}
+#dock-divider:after{content:'';position:absolute;top:50%;left:1px;width:6px;height:44px;margin-top:-22px;border-radius:3px;background:var(--bdr-m);}
+#dock-divider:hover:after,#dock-divider.dragging:after{background:var(--ink-h);}
+#canvas-area[style*="display: none"]~#side-dock,#canvas-area[style*="display: none"]~#dock-divider{display:none !important;}
+#side-dock .dock-tabs{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;}
+#side-dock .dock-tabs button{flex:1;height:42px;padding:0 4px;border:none;border-bottom:2px solid transparent;border-radius:0;background:transparent;box-shadow:none;font-size:12.5px;color:var(--ink-m);cursor:pointer;}
+#side-dock .dock-tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--ink);}
+#side-dock .dock-tools{display:flex;justify-content:flex-end;gap:6px;padding:8px 12px 0;flex-shrink:0;}
+#side-dock .dock-tools button{height:25px;padding:0 10px;font-size:11px;}
+#side-dock .dock-panes{flex:1;min-height:0;position:relative;}
+#side-dock .dock-pane{display:none;position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 14px 22px;}
+#side-dock .dock-pane.on{display:block;}
+#search-panel.docked{position:static !important;display:block !important;width:auto !important;max-height:none !important;overflow:visible !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;background:transparent !important;}
+#side-dock .ask-puddl-body{overflow:visible;padding:0;}
+#side-dock .dock-ask-head{display:flex;align-items:center;gap:9px;margin-bottom:9px;}
+#side-dock .dock-ask-head img{width:44px;height:44px;object-fit:cover;border-radius:11px;flex-shrink:0;}
+#dock-ask-away,#dock-report-empty{display:none;font-size:12px;line-height:1.5;color:var(--ink-m);}
+#ask-puddl-report:empty~#dock-report-empty{display:block;}
+@media(max-width:760px){#side-dock.open{position:absolute;inset:0;width:auto !important;min-width:0;z-index:30;}#dock-divider{display:none !important;}}
+
 
 /* Viewer chrome */
 #viewer-bar{position:fixed;top:0;left:0;right:0;height:46px;z-index:10001;display:flex;
@@ -1478,6 +1505,9 @@ function ensureArgStyles(){
    {id:'opposes', label:'Opposes', colour:'#DC2626',lineWidth:2.4,dashPattern:[7,4],arrowScale:1.1}]
   .forEach(st=>{ if(!CONNECTION_STYLES.find(x=>x.id===st.id)) CONNECTION_STYLES.push(st); });
 }
+let EDGE_CURVE=0.2;              // how much a connection bows, as a share of its length (Kumu-style arcs: longer lines sweep more)
+let EDGE_OPACITY=0.8;            // how solid ordinary connections are; lit-up ones are always full
+function _curveOffset(dist){ return MAP_TYPE==='argument'?0:dist*EDGE_CURVE; }
 let EDGE_COLOUR_BY_STRENGTH=false; // when on, connections draw in their strength's colour
 function largeMapOn(){ return nodes.length>=LARGE_MAP_AT; }
 function nodeSizeScale(){ const m=NODE_SIZE_MODE; return (m==='always'||(m==='auto'&&largeMapOn()))?SMALLER_NODE_SCALE:1; }
@@ -1758,6 +1788,7 @@ function snap(){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
+    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,
     askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
@@ -1828,6 +1859,8 @@ function restoreSnap(s){
   }
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
+  EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
+  if(typeof d.nodeSpacing==='number') NODE_BREATHING=d.nodeSpacing;
   ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
   _askAnswer=null;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
@@ -2186,7 +2219,7 @@ function draw(){
     const bp=_arc?edgePtClearOfLabel(b,_arc.x,_arc.y):edgePtClearOfLabel(b,a.x,a.y);
 
     const dx=bp.x-ap.x,dy=bp.y-ap.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+    const curve=_curveOffset(dist);
     // For loop edges: P = 2·arcMid − midEdgePt
     // This is the exact control point that forces B(0.5) through the true arc midpoint
     // on the stored circle, regardless of node size. Works for any N.
@@ -2212,7 +2245,7 @@ function draw(){
     ctx.save();
     // Edges pass under nodes — no clipping needed (nodes drawn on top in render order)
 
-    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
+    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
     const _pc=_pinEdgeCols.size?_pinEdgeCols.get(i):null;
     const _pcs=_pc?_pc.map(ci=>loopColourOf(ci,_dark)):null;
     const _typeCol=isHl&&_ctFilterOn?(_dark?adaptColourForDark(style.colour):style.colour):null;
@@ -2297,7 +2330,7 @@ function draw(){
       // Arrowhead at source (backward or both)
       if(headS){
         ctx.save();
-        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
+        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
         ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
@@ -5208,6 +5241,7 @@ function timelinePlay(){
     if(cur>=hi) timelineStop();
   },100);
 }
+let NODE_BREATHING=76;
 function updateColourLegend(){ _updateColourLegend(); syncLegendVisibility(); }
 function _updateColourLegend(){
   const el=document.getElementById('colour-legend');
@@ -5767,6 +5801,7 @@ function saveNamedVersion(){
   showStatus(`Version "${name}" saved. ${namedVersions.length} version${namedVersions.length!==1?'s':''} stored.`);
 }
 function exitPresentationEditMode(){
+  document.dispatchEvent(new CustomEvent('puddl-presedit',{detail:false}));
   inPresentationEditMode=false;
   const panel=document.getElementById('pres-edit-panel');
   if(panel) panel.classList.remove('open');
@@ -6439,8 +6474,16 @@ function fieldStats(id){
 }
 function maxConnections(){ let m=0; nodes.forEach(n=>{ if(n.type!=='centre') m=Math.max(m,connectionCount(n)); }); return m; }
 // 0..1 position of a node on the current measure, or null when it has no value
+let _bwCache={sig:'',map:null,max:0};
+function _betweennessFor(n){
+  const sig=nodes.length+'|'+edges.length+'|'+(DATE_ASAT||'');
+  if(_bwCache.sig!==sig){ let m=null, mx=0; try{ const I=computeInsights(); if(I.betweenness){ m=I.betweenness; I.betweenness.forEach(v=>{ if(v>mx) mx=v; }); } }catch(e){} _bwCache={sig,map:m,max:mx}; }
+  if(!_bwCache.map||!_bwCache.max) return null;
+  const v=_bwCache.map.get(n.id); return v===undefined?0:v/_bwCache.max;
+}
 function _measure(n,key){
   if(key==='connections'){ const m=maxConnections(); return m?connectionCount(n)/m:0; }
+  if(key==='betweenness') return _betweennessFor(n);
   if(key&&key.startsWith('field:')){
     const id=key.slice(6), st=fieldStats(id); if(!st.numeric) return null;
     const x=_num(n.customFields&&n.customFields[id]); if(isNaN(x)) return null;
