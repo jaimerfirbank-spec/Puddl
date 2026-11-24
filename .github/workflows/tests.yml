@@ -31,3 +31,22 @@ jobs:
         run: node tests/ask-phrases.cjs
       - name: Feature checks in a browser
         run: node tests/run-browser.cjs
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Who can see, edit, share and delete what
+        run: bash tests/sql/run.sh
