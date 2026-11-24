@@ -10,3 +10,7 @@ blocks auth requests and never writes production map records.
 
 The SQL migration is prepared only. Check it on a staging database with two
 accounts and concurrent transactions before applying it to production.
+
+## Ask Puddle answers
+
+`tests/ask-golden.cjs` compares every Ask question's answer, meaning and highlight, on the three demo maps, with a stored record (`tests/fixtures/ask-golden.json`). See the top of the file for how to run it. Run it after any change to the Ask question list. Existing answers must not change; new questions are allowed, then add them with `--write`.
