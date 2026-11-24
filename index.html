@@ -1224,6 +1224,11 @@ body.share-mode #present-exit{display:none !important;}
   </div>
 </div>
 <div id="node-ctx-menu">
+  <button onclick="ctxFocusView()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+    Focus on this and its neighbours
+  </button>
+  <div class="ctx-sep"></div>
   <button id="ctx-btn-reposition" onclick="ctxReposition()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
     Reposition
@@ -1356,6 +1361,7 @@ body.share-mode #present-exit{display:none !important;}
   <div id="hover-panel">
     <div id="hover-panel-header">
       <div id="hover-panel-title">Node</div>
+      <button class="hp-hdr-btn" id="hp-focus-btn" onclick="focusOnNode(hoverPanelNodeId)" title="Show just this one and what is connected to it" style="width:auto;padding:0 8px;font-size:11px;font-weight:600;">Focus</button>
       <button class="hp-hdr-btn" id="hp-dock-btn" onclick="toggleHoverDock()" title="Dock this panel to the side">⤢</button>
       <button class="hp-hdr-btn" id="hp-close-btn" onclick="toggleHoverDock(false)" title="Close">✕</button>
     </div>
@@ -2811,6 +2817,8 @@ let DATE_ASAT=null;              // show the map as it was on this date (hides a
 let DATE_FROM=null, DATE_TO=null;// highlight things added between these dates
 let CONN_MIN=null, CONN_MAX=null;// connection-count filter
 let TIMELINE_ON=false;
+const _focusHidden=new Set();            // Focus view: everything further than the chosen number of steps from one item
+let FOCUS_VIEW=null;                     // {id,depth,shown} while Focus is on
 const _dateHidden=new Set();              // map's own node fields: [{id,name}] — values live in node.customFields[id]
 let SIZE_BY_CONNECTIONS=false;   // true whenever SIZE_BY is set (kept for the radius refresh logic)
 let SIMPLE_MODE='auto';          // 'auto' | 'on' | 'off' — fast square drawing for big maps
@@ -3199,6 +3207,7 @@ function nodeAt(sx,sy){
   for(let i=nodes.length-1;i>=0;i--){
     const n=nodes[i];
     if(_dateHidden.size&&_dateHidden.has(n.id)) continue;
+    if(_focusHidden.size&&_focusHidden.has(n.id)) continue;
     if(n.type==='centre'){
       if(wx>=n.x-65&&wx<=n.x+65&&wy>=n.y-31&&wy<=n.y+31) return n;
     } else if(_simpleNow){
@@ -3220,6 +3229,7 @@ function edgeAt(sx,sy){
     const a=typeof e.source==='object'?e.source:nodes.find(n=>n.id===e.source);
     const b=typeof e.target==='object'?e.target:nodes.find(n=>n.id===e.target);
     if(!a||!b) continue;
+    if(_focusHidden.size&&(_focusHidden.has(a.id)||_focusHidden.has(b.id))) continue;
     const dx=b.x-a.x, dy=b.y-a.y, dist=Math.sqrt(dx*dx+dy*dy)||1;
     const curve=_curveOffset(dist);
     const mx=(a.x+b.x)/2-dy/dist*curve;
@@ -3323,6 +3333,7 @@ function validateMapSnapshot(d){
   return d;
 }
 function restoreSnap(s,keepVersions){
+  if(FOCUS_VIEW){ FOCUS_VIEW=null; _focusHidden.clear(); document.dispatchEvent(new Event('puddl-focus-reset')); }
   const d=validateMapSnapshot(JSON.parse(s));
   const previousSkipSave=skipSave;
   skipSave=true;
@@ -3528,6 +3539,7 @@ function drawSimpleEdges(hasHL,_dark){
     const a=typeof e.source==='object'?e.source:byId.get(e.source);
     const b=typeof e.target==='object'?e.target:byId.get(e.target);
     if(!a||!b) return;
+    if(_focusHidden.size&&(_focusHidden.has(a.id)||_focusHidden.has(b.id))) return;
     if(DATE_ASAT&&edgeHiddenByDate(e,a,b)) return;
     if(Math.max(a.x,b.x)<vb.x0||Math.min(a.x,b.x)>vb.x1||Math.max(a.y,b.y)<vb.y0||Math.min(a.y,b.y)>vb.y1) return;
     const isHl=highlightEdges.has(i);
@@ -3555,6 +3567,7 @@ function drawSimpleNodes(hasHL,_dark){
   nodes.forEach(n=>{
     if(n.x<vb.x0||n.x>vb.x1||n.y<vb.y0||n.y>vb.y1) return;
     if(_dateHidden.size&&_dateHidden.has(n.id)) return;
+    if(_focusHidden.size&&_focusHidden.has(n.id)) return;
     const isHl=highlightIds.has(n.id), isSec=secondaryIds.has(n.id)&&!isHl;
     ctx.globalAlpha=knockNodeAlpha(n,hasHL&&!isHl&&!isSec?DIM_ALPHA:isSec?DIM_SECONDARY:1);
     const r=Math.max(_simpleDrawR(n),2.2/zoom);
@@ -3768,6 +3781,7 @@ function draw(){
     const b=typeof e.target==='object'?e.target:nodes.find(n=>n.id===e.target);
     if(DATE_ASAT&&edgeHiddenByDate(e,a,b)) return;
     if(!a||!b) return;
+    if(_focusHidden.size&&(_focusHidden.has(a.id)||_focusHidden.has(b.id))) return;
     const isHl=highlightEdges.has(i);
     const dimmed=hasHL&&!isHl;
     // Check if this edge connects to a secondary (neighbour) node
@@ -4074,6 +4088,7 @@ function draw(){
   nodes.forEach(n=>{
     if(_simpleNow) return;
     if(_dateHidden.size&&_dateHidden.has(n.id)) return;
+    if(_focusHidden.size&&_focusHidden.has(n.id)) return;
     const isHl=highlightIds.has(n.id);
     const isSecondary=secondaryIds.has(n.id)&&!highlightIds.has(n.id)||false;
     const dimmed=hasHL&&!isHl&&!isSecondary;
@@ -4527,6 +4542,78 @@ function fitAll(){
   panX=W/2-(b.minX+b.maxX)/2*zoom;panY=H/2-(b.minY+b.maxY)/2*zoom;draw();
 }
 
+// ── Focus: show one item and what is within a few steps of it ─────────────────
+// A view, not an edit: nothing is deleted or moved, and the figures (At a glance, the report) still describe the
+// whole map. Everything further than the chosen number of steps is hidden until you press Show everything.
+function focusOnNode(id,depth){
+  const n=nodes.find(x=>x.id===id); if(!n) return;
+  const d=Math.max(1,Math.min(6,depth||(FOCUS_VIEW&&FOCUS_VIEW.id===id?FOCUS_VIEW.depth:1)));
+  FOCUS_VIEW={id,depth:d,shown:0};
+  _focusRecompute(); _focusFit(); _focusViewBar();
+  if(typeof hideHoverPanel==='function') hideHoverPanel(true);
+}
+function _focusRecompute(){
+  _focusHidden.clear();
+  if(!FOCUS_VIEW) return;
+  const adj=new Map();
+  const link=(a,b)=>{ if(!adj.has(a)) adj.set(a,[]); adj.get(a).push(b); };
+  edges.forEach(e=>{ const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target; link(a,b); link(b,a); });
+  const seen=new Map([[FOCUS_VIEW.id,0]]); let ring=[FOCUS_VIEW.id];
+  for(let step=1;step<=FOCUS_VIEW.depth&&ring.length;step++){
+    const next=[];
+    ring.forEach(a=>(adj.get(a)||[]).forEach(b=>{ if(!seen.has(b)){ seen.set(b,step); next.push(b); } }));
+    ring=next;
+  }
+  nodes.forEach(n=>{ if(!seen.has(n.id)) _focusHidden.add(n.id); });
+  FOCUS_VIEW.shown=nodes.length-_focusHidden.size;
+}
+function _focusFit(){
+  const vis=nodes.filter(n=>!_focusHidden.has(n.id)); if(!vis.length){ draw(); return; }
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  vis.forEach(n=>{ const r=nodeBaseRadius(n)+14; x0=Math.min(x0,n.x-r); x1=Math.max(x1,n.x+r); y0=Math.min(y0,n.y-r); y1=Math.max(y1,n.y+r); });
+  const pad=90, top=84, cw=x1-x0+pad*2, ch=y1-y0+pad*2;      // top: room for the Focus bar
+  zoom=Math.max(minZoomAllowed(),Math.min(1.6,W/cw,(H-top)/ch));
+  panX=W/2-(x0+x1)/2*zoom; panY=top+(H-top)/2-(y0+y1)/2*zoom;
+  draw();
+}
+function focusStep(delta){
+  if(!FOCUS_VIEW) return;
+  const d=Math.max(1,Math.min(6,FOCUS_VIEW.depth+delta));
+  if(d===FOCUS_VIEW.depth) return;
+  FOCUS_VIEW.depth=d; _focusRecompute(); _focusFit(); _focusViewBar();
+}
+function exitFocusMode(){
+  if(!FOCUS_VIEW) return;
+  FOCUS_VIEW=null; _focusHidden.clear(); _focusViewBar();
+  fitAll();
+}
+function _focusViewBar(){
+  const area=document.getElementById('canvas-area'); if(!area) return;
+  let bar=document.getElementById('focus-bar');
+  if(!FOCUS_VIEW){ if(bar) bar.style.display='none'; return; }
+  if(!bar){
+    bar=document.createElement('div'); bar.id='focus-bar';
+    bar.style.cssText='position:absolute;top:calc(56px + var(--demo-banner-offset,0px));left:50%;transform:translateX(-50%);z-index:17;display:flex;align-items:center;gap:8px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px 8px 6px 12px;font-size:12px;color:var(--ink);max-width:calc(100% - 200px);white-space:nowrap;font-family:\'DM Sans\',sans-serif;';
+    area.appendChild(bar);
+  }
+  const n=nodes.find(x=>x.id===FOCUS_VIEW.id), d=FOCUS_VIEW.depth;
+  const btn='height:26px;padding:0 9px;font-size:11.5px;';
+  bar.innerHTML=`<span style="font-weight:700;">Focus</span><span style="overflow:hidden;text-overflow:ellipsis;max-width:240px;">${escHtml(n?n.label:'')}</span>`+
+    `<span style="color:var(--ink-h);">${d} step${d===1?'':'s'} out, ${FOCUS_VIEW.shown} of ${nodes.length} shown</span>`+
+    `<button onclick="focusStep(-1)" title="Narrow: fewer steps out" style="${btn}width:28px;padding:0;"${d<=1?' disabled':''}>−</button>`+
+    `<button onclick="focusStep(1)" title="Widen: one more step out" style="${btn}width:28px;padding:0;"${d>=6?' disabled':''}>+</button>`+
+    `<button onclick="exitFocusMode()" style="${btn}">Show everything</button>`;
+  bar.style.display='flex';
+}
+(function(){
+  document.addEventListener('puddl-focus-reset',function(){ _focusViewBar(); });
+  // Searching for, or lighting up, something that Focus is hiding would otherwise do nothing you can see
+  document.addEventListener('puddl-nodepicked',function(e){ if(FOCUS_VIEW&&_focusHidden.has(e.detail)) focusOnNode(e.detail,FOCUS_VIEW.depth); });
+  document.addEventListener('puddl-lit',function(){ if(FOCUS_VIEW&&[...highlightIds].some(id=>_focusHidden.has(id))) exitFocusMode(); });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&FOCUS_VIEW&&!document.querySelector('#import-modal-bg:not(.hidden)')) exitFocusMode(); });
+})();
+
+
 // ── Search / filter ───────────────────────────────────────────────────────────
 function _applyFiltersCore(){
   const q=document.getElementById('search-input').value.trim().toLowerCase();
@@ -4847,6 +4934,7 @@ function selectSearchSuggestion(id){
   });
   // Pan canvas to centre on this node
   panX=W/2-n.x*zoom; panY=H/2-n.y*zoom;
+  document.dispatchEvent(new CustomEvent('puddl-nodepicked',{detail:n.id}));
   draw();
   updateFilterCount(1,true);
 }
@@ -6495,6 +6583,7 @@ function _applyFocus(f){
   if(f.setDate!==undefined){ if(restoreAt===undefined) restoreAt=DATE_ASAT||null; setDateAsAt(f.setDate); }
   _insightFocus={key:f.key,label:f.label,ids:[...f.ids],pairs:[...f.pairs],sec:[...(f.sec||[])],restoreAt};
   _afterPinChange(`${f.label} lit up. Click it again, or press Clear, to put the map back.`);
+  document.dispatchEvent(new Event('puddl-lit'));
 }
 function clearInsightFocus(){
   if(!_insightFocus) return;
@@ -13764,6 +13853,7 @@ function closeNodeCtxMenu(){
   if(m) m.style.display='none';
   closeIconPicker();
 }
+function ctxFocusView(){ closeNodeCtxMenu(); focusOnNode(ctxMenuNodeId); }
 function ctxReposition(){
   closeNodeCtxMenu();
   const n=nodes.find(nd=>nd.id===ctxMenuNodeId);
