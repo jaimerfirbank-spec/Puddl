@@ -1752,7 +1752,7 @@ function nodeAt(sx,sy){
   }
   return null;
 }
-function snap(){
+function snap(includeVersions=true){
   // Save personal maps into snapshot too
   if(currentUser&&currentMapMode==='personal'){
     personalMaps[currentUser]={
@@ -1764,6 +1764,8 @@ function snap(){
   return JSON.stringify({
     nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,mergedFrom:n.mergedFrom||[],fromSheet:n.fromSheet||false,sheetKey:n.sheetKey||'',missingSince:n.missingSince||0,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
     edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false})),
+    bgImageData:document.getElementById('bg-image-data')?.textContent||'',
+    namedVersions:includeVersions?namedVersions:[],
     colourLegendMap,
     categories:CATEGORIES,
     centralEventLabel,
@@ -1804,9 +1806,36 @@ function updateHistBtns(){
   document.getElementById('btn-undo').disabled=histIdx<=0;
   document.getElementById('btn-redo').disabled=histIdx>=history.length-1;
 }
-function restoreSnap(s){
+function validateMapSnapshot(d){
+  if(!d||!Array.isArray(d.nodes)||!Array.isArray(d.edges)) throw new Error('Invalid map data.');
+  const ids=new Set();
+  const safeColour=value=>value==null||value===''||/^(#[0-9a-f]{3,8}|[a-z]+|rgba?\([\d.,%\s]+\))$/i.test(String(value));
+  for(const n of d.nodes){
+    if(!n||!Number.isSafeInteger(n.id)||ids.has(n.id)||!Number.isFinite(n.x)||!Number.isFinite(n.y)) throw new Error('Invalid or duplicate node.');
+    if(!safeColour(n.colour)) throw new Error('Invalid node colour.');
+    ids.add(n.id);
+  }
+  for(const e of d.edges){
+    if(!e||!ids.has(e.from)||!ids.has(e.to)) throw new Error('A connection refers to a missing node.');
+    if(!safeColour(e.colour)) throw new Error('Invalid connection colour.');
+  }
+  for(const key of ['loops','categories','connectionStyles','presentationStops','savedPresentations','namedVersions','fieldDefs']){
+    if(d[key]!==undefined&&!Array.isArray(d[key])) throw new Error('Invalid map '+key+'.');
+  }
+  // These IDs become control IDs and handler arguments in older settings UI.
+  for(const key of ['categories','connectionStyles','fieldDefs']){
+    for(const item of d[key]||[]){
+      if(!item||!/^[-\w]+$/.test(String(item.id))||item.id==null) throw new Error('Invalid settings identifier.');
+      if(!safeColour(item.colour)) throw new Error('Invalid settings colour.');
+    }
+  }
+  return d;
+}
+function restoreSnap(s,keepVersions){
+  const d=validateMapSnapshot(JSON.parse(s));
+  const previousSkipSave=skipSave;
   skipSave=true;
-  const d=JSON.parse(s);
+  try {
   nodes=d.nodes.map(n=>({...n,vx:0,vy:0,fx:n.x,fy:n.y,tags:n.tags||[],history:n.history||[]}));
   edges=d.edges.map(e => {
     const isLoop = e.isLoop||e.strength==='loop';
@@ -1835,6 +1864,8 @@ function restoreSnap(s){
   if(d.loopConnectionStyle) LOOP_CONNECTION_STYLE={...LOOP_CONNECTION_STYLE,...d.loopConnectionStyle};
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
   _retireConnStyles();
+  if(!keepVersions) namedVersions=Array.isArray(d.namedVersions)?d.namedVersions:[];
+  restoreBackground(d.bgImageData||'');
   presentationStops=d.presentationStops||[];
   presSavedId=d.presSavedId||null;
   savedPresentations=Array.isArray(d.savedPresentations)?d.savedPresentations:[];
@@ -1878,19 +1909,20 @@ function restoreSnap(s){
   rebuildTagList(); rebuildCatFilter(); rebuildAreaFilter(); updateColourLegend();
   buildSim();
   applyFilters();
-  skipSave=false;
+  } finally { skipSave=previousSkipSave; }
 }
 function undo(){
   if(histIdx<=0)return;
   histIdx--;
-  restoreSnap(history[histIdx]);
+  restoreSnap(history[histIdx],true);
   updateHistBtns();
   // Hide undo-separate button only when there's nothing left to undo
   const usb=document.getElementById('btn-undo-separate');
   if(usb) usb.style.display=histIdx<=0?'none':'';
+  markUnsaved();
   showStatus('Undone.');
 }
-function redo(){if(histIdx>=history.length-1)return;histIdx++;restoreSnap(history[histIdx]);updateHistBtns();showStatus('Redone.');}
+function redo(){if(histIdx>=history.length-1)return;histIdx++;restoreSnap(history[histIdx],true);updateHistBtns();markUnsaved();showStatus('Redone.');}
 
 // ── Adapt a hex colour for dark-mode canvas rendering (boosts lightness to ≥72%) ──
 // Relative luminance of a hex colour (0 = black, 1 = white); null if not a hex colour
@@ -5298,6 +5330,7 @@ function _updateColourLegend(){
     el.appendChild(row);
   });
 }
+function safeMapColour(value,fallback='#888888'){ return /^#[0-9a-f]{3,8}$/i.test(String(value))?value:fallback; }
 function escHtml(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function videoBadgeGeom(n){
   const r=nodeDims(n).r||40;
@@ -5426,7 +5459,7 @@ function buildSummaryReport(){
       ${isolated.length>0?`<span class="report-stat warn">${isolated.length} isolated</span>`:''}
     </div>
     ${centreNode?`<div class="report-row"><strong style="color:var(--navy);">Central node:</strong> ${centreNode.label}</div>`:''}
-    <div class="report-row"><strong>Map:</strong> ${mapTitle}</div>
+    <div class="report-row"><strong>Map:</strong> ${escHtml(mapTitle)}</div>
     <div class="report-row"><strong>Mode:</strong> ${currentMapMode.charAt(0).toUpperCase()+currentMapMode.slice(1)} map</div>
   </div>`;
 
@@ -5477,12 +5510,12 @@ function buildSummaryReport(){
       html+=`<div class="report-row" style="flex-direction:column;align-items:flex-start;gap:4px;">
         <div style="display:flex;align-items:center;gap:8px;width:100%;">
           <div class="report-node-dot" style="background:${col};"></div>
-          <span style="font-weight:600;color:var(--navy);flex:1;">${n.label}</span>
+          <span style="font-weight:600;color:var(--navy);flex:1;">${escHtml(n.label)}</span>
           <span style="font-size:10px;color:var(--txt-h);">${connCount[n.id]||0} link${(connCount[n.id]||0)!==1?'s':''}</span>
         </div>
         ${detail?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;">${detail}</div>`:''}
         ${connLabels.length?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;">→ ${connLabels.slice(0,8).join(', ')}${connLabels.length>8?` and ${connLabels.length-8} more`:''}</div>`:''}
-        ${notes?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;font-style:italic;border-top:1px dashed var(--bdr);padding-top:4px;margin-top:2px;white-space:pre-wrap;">${notes.substring(0,200)}${notes.length>200?'…':''}</div>`:''}
+        ${notes?`<div style="font-size:11px;color:var(--txt-m);padding-left:18px;font-style:italic;border-top:1px dashed var(--bdr);padding-top:4px;margin-top:2px;white-space:pre-wrap;">${escHtml(notes.substring(0,200))}${notes.length>200?'…':''}</div>`:''}
       </div>`;
     });
     html+=`</details>`;
@@ -5592,7 +5625,7 @@ function buildMatrixReport(){
     <thead><tr><th class="row-label">Node</th><th title="Total connections">#</th>`;
   sorted.forEach(n=>{
     const short=n.label.length>10?n.label.substring(0,9)+'…':n.label;
-    html+=`<th title="${n.label}">${short}</th>`;
+    html+=`<th title="${escHtml(n.label)}">${short}</th>`;
   });
   html+=`</tr></thead><tbody>`;
   sorted.forEach(a=>{
@@ -5667,7 +5700,7 @@ function buildStrengthReport(){
       const col=n.colour||'#888';
       html+=`<div class="report-row" style="gap:8px;">
         <div class="report-node-dot" style="background:${col};"></div>
-        <span style="flex:1;font-weight:500;">${n.label}</span>
+        <span style="flex:1;font-weight:500;">${escHtml(n.label)}</span>
         <div style="width:100px;height:8px;background:var(--surf-2);border-radius:4px;overflow:hidden;">
           <div style="height:100%;width:${pct}%;background:${col};border-radius:4px;transition:width .3s;"></div>
         </div>
@@ -5695,7 +5728,7 @@ function buildStrengthReport(){
       const col=n.colour||'#888';
       html+=`<div class="report-row">
         <div class="report-node-dot" style="background:${col};"></div>
-        <span style="flex:1;">${n.label}</span>
+        <span style="flex:1;">${escHtml(n.label)}</span>
         <span style="font-size:11px;color:var(--coral-t);">No connections</span>
       </div>`;
     });
@@ -5740,7 +5773,7 @@ function _buildVersionChangeReport(){
   const vname2=namedVersions[namedVersions.length-1].name;
 
   let html=`<div class="report-section">
-    <h4>Comparing "${vname1}" → "${vname2}"</h4>
+    <h4>Comparing "${escHtml(vname1)}" → "${escHtml(vname2)}"</h4>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
       <span class="report-stat">+${added.length} added</span>
       <span class="report-stat warn">${removed.length} removed</span>
@@ -5757,12 +5790,12 @@ function _buildVersionChangeReport(){
 
   if(added.length){
     html+=`<div class="report-section"><h4>Nodes added</h4>`;
-    added.forEach(n=>{ html+=`<div class="report-row report-pos"><span style="width:10px;height:10px;border-radius:50%;background:${n.colour||'#888'};display:inline-block;margin-right:8px;"></span>+ ${n.label}</div>`; });
+    added.forEach(n=>{ html+=`<div class="report-row report-pos"><span style="width:10px;height:10px;border-radius:50%;background:${n.colour||'#888'};display:inline-block;margin-right:8px;"></span>+ ${escHtml(n.label)}</div>`; });
     html+=`</div>`;
   }
   if(removed.length){
     html+=`<div class="report-section"><h4>Nodes removed</h4>`;
-    removed.forEach(n=>{ html+=`<div class="report-row" style="color:var(--coral-t);">− ${n.label}</div>`; });
+    removed.forEach(n=>{ html+=`<div class="report-row" style="color:var(--coral-t);">− ${escHtml(n.label)}</div>`; });
     html+=`</div>`;
   }
   if(changed.length){
@@ -5770,11 +5803,11 @@ function _buildVersionChangeReport(){
     changed.forEach(n=>{
       const old=n1.get(n.id);
       const diffs=[];
-      if(old.label!==n.label) diffs.push(`Name: "${old.label}" → "${n.label}"`);
+      if(old.label!==n.label) diffs.push(`Name: "${old.label}" → "${escHtml(n.label)}"`);
       if(old.colour!==n.colour) diffs.push(`Colour changed`);
       if(old.notes!==n.notes) diffs.push(`Notes updated`);
       html+=`<div class="report-row" style="flex-direction:column;align-items:flex-start;">
-        <span style="font-weight:600;">${n.label}</span>
+        <span style="font-weight:600;">${escHtml(n.label)}</span>
         <span style="font-size:11px;color:var(--txt-m);">${diffs.join(' · ')}</span>
       </div>`;
     });
@@ -5794,8 +5827,8 @@ function _buildVersionChangeReport(){
     <h4>All saved versions</h4>`;
   namedVersions.forEach((v,i)=>{
     html+=`<div class="report-row">
-      <span style="flex:1;font-weight:${i===namedVersions.length-1?'600':'400'};">${v.name}</span>
-      <span style="font-size:11px;color:var(--txt-h);">${v.date}</span>
+      <span style="flex:1;font-weight:${i===namedVersions.length-1?'600':'400'};">${escHtml(v.name)}</span>
+      <span style="font-size:11px;color:var(--txt-h);">${escHtml(v.date)}</span>
     </div>`;
   });
   html+=`</div>`;
@@ -5808,9 +5841,10 @@ function saveNamedVersion(){
   namedVersions.push({
     name: name.trim(),
     date: new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}),
-    snap: snap()
+    snap: snap(false)
   });
   if(namedVersions.length>20) namedVersions.shift();
+  saveState(); markUnsaved();
   showStatus(`Version "${name}" saved. ${namedVersions.length} version${namedVersions.length!==1?'s':''} stored.`);
 }
 function exitPresentationEditMode(){
@@ -6457,6 +6491,23 @@ function closeIconPicker(){
   if(p) p.style.display='none';
 }
 let bgImg=null;
+let bgImageRevision=0;
+function restoreBackground(url){
+  const revision=++bgImageRevision;
+  bgImg=null;
+  const el=document.getElementById('bg-image-data');
+  if(el) el.textContent='';
+  if(!/^data:image\/(png|jpeg|webp);base64,/.test(url)){ draw(); return; }
+  if(el) el.textContent=url;
+  const image=new Image();
+  image.onload=()=>{ if(revision!==bgImageRevision) return; bgImg=image; draw(); updateBgMenuItems(); };
+  image.src=url;
+}
+function updateBgMenuItems(){
+  const hasBg=!!bgImg;
+  const rem=document.getElementById('btn-settings-remove-bg');
+  if(rem) rem.style.display=hasBg?'':'none';
+}
 function setTheme(theme){
   document.documentElement.setAttribute('data-theme',theme);
   try{ localStorage.setItem('puddl-theme',theme); }catch(e){}
@@ -6614,7 +6665,7 @@ function renderHoverPanel(n){
   const isCentre=n.type==='centre';
   document.getElementById('hover-panel-title').textContent=n.label;
 
-  const col=n.colour||'#C5E86C';
+  const col=safeMapColour(n.colour,'#C5E86C');
   // Colour chip for category
   const chip=document.getElementById('hover-panel-title').parentElement;
   // Reset any previous colour dot
@@ -6641,46 +6692,46 @@ function renderHoverPanel(n){
   if(!isCentre){
     // Category — stacked pill
     if(n.colourLabel){
-      html+=`<div class="sp-field"><div class="sp-label">Category</div><div class="sp-value" style="margin-top:2px;"><span style="display:inline-block;padding:1px 7px;border-radius:20px;background:${col};color:#18181b;font-size:10px;font-weight:600;">${n.colourLabel}</span></div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Category</div><div class="sp-value" style="margin-top:2px;"><span style="display:inline-block;padding:1px 7px;border-radius:20px;background:${col};color:#18181b;font-size:10px;font-weight:600;">${escHtml(n.colourLabel)}</span></div></div>`;
     }
 
     // Area — team map only
     if(currentMapMode!=='personal'&&n.area){
-      html+=`<div class="sp-field"><div class="sp-label">Area</div><div class="sp-value">${n.area}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Area</div><div class="sp-value">${escHtml(n.area)}</div></div>`;
     }
 
     // Group size — team map only
     if(currentMapMode!=='personal'&&n.groupSize){
-      html+=`<div class="sp-field"><div class="sp-label">Group size</div><div class="sp-value">${n.groupSize}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Group size</div><div class="sp-value">${escHtml(n.groupSize)}</div></div>`;
     }
 
     // Group status — team map only
     if(currentMapMode!=='personal'&&n.groupStatus){
-      html+=`<div class="sp-field"><div class="sp-label">Group status</div><div class="sp-value">${n.groupStatus}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Group status</div><div class="sp-value">${escHtml(n.groupStatus)}</div></div>`;
     }
     if(currentMapMode!=='personal'&&n.trainingCompleted){
-      html+=`<div class="sp-field"><div class="sp-label">Training Completed</div><div class="sp-value">${n.trainingCompleted}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Training Completed</div><div class="sp-value">${escHtml(n.trainingCompleted)}</div></div>`;
     }
     if(currentMapMode!=='personal'&&n.mainAreaOfDelivery){
-      html+=`<div class="sp-field"><div class="sp-label">Main Area of Delivery</div><div class="sp-value">${n.mainAreaOfDelivery}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Main Area of Delivery</div><div class="sp-value">${escHtml(n.mainAreaOfDelivery)}</div></div>`;
     }
     if(currentMapMode!=='personal'&&n.protectedCharacteristics?.length){
-      html+=`<div class="sp-field"><div class="sp-label">Protected Characteristics</div><div class="sp-value">${n.protectedCharacteristics.join(', ')}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Protected Characteristics</div><div class="sp-value">${escHtml(n.protectedCharacteristics.join(', '))}</div></div>`;
     }
     if(currentMapMode!=='personal'&&n.operationalTimetable){
-      html+=`<div class="sp-field"><div class="sp-label">Operational Timetable</div><div class="sp-value">${n.operationalTimetable}</div></div>`;
+      html+=`<div class="sp-field"><div class="sp-label">Operational Timetable</div><div class="sp-value">${escHtml(n.operationalTimetable)}</div></div>`;
     }
 
     // Personal map fields — personal/combined only
     if(currentMapMode!=='team'){
-      if(n.pJobTitle) html+=`<div class="sp-field"><div class="sp-label">Job title</div><div class="sp-value">${n.pJobTitle}</div></div>`;
-      if(n.pCompany)  html+=`<div class="sp-field"><div class="sp-label">Organisation</div><div class="sp-value">${n.pCompany}</div></div>`;
-      if(n.pSector)   html+=`<div class="sp-field"><div class="sp-label">Sector</div><div class="sp-value">${n.pSector}</div></div>`;
-      if(n.pRole)     html+=`<div class="sp-field"><div class="sp-label">Role</div><div class="sp-value">${n.pRole}</div></div>`;
-      if(n.pTopic)    html+=`<div class="sp-field"><div class="sp-label">Topic</div><div class="sp-value">${n.pTopic}</div></div>`;
-      if(n.pDate)     html+=`<div class="sp-field"><div class="sp-label">Date</div><div class="sp-value">${n.pDate}</div></div>`;
-      if(n.pLocation) html+=`<div class="sp-field"><div class="sp-label">Location</div><div class="sp-value">${n.pLocation}</div></div>`;
-      if(n.pAttendees)html+=`<div class="sp-field"><div class="sp-label">Attendees</div><div class="sp-value">${n.pAttendees}</div></div>`;
+      if(n.pJobTitle) html+=`<div class="sp-field"><div class="sp-label">Job title</div><div class="sp-value">${escHtml(n.pJobTitle)}</div></div>`;
+      if(n.pCompany)  html+=`<div class="sp-field"><div class="sp-label">Organisation</div><div class="sp-value">${escHtml(n.pCompany)}</div></div>`;
+      if(n.pSector)   html+=`<div class="sp-field"><div class="sp-label">Sector</div><div class="sp-value">${escHtml(n.pSector)}</div></div>`;
+      if(n.pRole)     html+=`<div class="sp-field"><div class="sp-label">Role</div><div class="sp-value">${escHtml(n.pRole)}</div></div>`;
+      if(n.pTopic)    html+=`<div class="sp-field"><div class="sp-label">Topic</div><div class="sp-value">${escHtml(n.pTopic)}</div></div>`;
+      if(n.pDate)     html+=`<div class="sp-field"><div class="sp-label">Date</div><div class="sp-value">${escHtml(n.pDate)}</div></div>`;
+      if(n.pLocation) html+=`<div class="sp-field"><div class="sp-label">Location</div><div class="sp-value">${escHtml(n.pLocation)}</div></div>`;
+      if(n.pAttendees)html+=`<div class="sp-field"><div class="sp-label">Attendees</div><div class="sp-value">${escHtml(n.pAttendees)}</div></div>`;
     }
 
     // Grants
@@ -6688,7 +6739,7 @@ function renderHoverPanel(n){
       html+=`<div class="sp-field"><div class="sp-label">Grants</div>`;
       n.grants.forEach(g=>{
         const parts=[g.amount&&'£'+g.amount,g.source,g.date].filter(Boolean);
-        html+=`<div class="sp-value" style="margin-bottom:3px;">${parts.join(' · ')}</div>`;
+        html+=`<div class="sp-value" style="margin-bottom:3px;">${escHtml(parts.join(' · '))}</div>`;
       });
       html+=`</div>`;
     }
@@ -6697,7 +6748,7 @@ function renderHoverPanel(n){
     if(n.contacts&&n.contacts.length){
       html+=`<div class="sp-field"><div class="sp-label">Key contacts</div>`;
       n.contacts.forEach(c=>{
-        html+=`<div class="sp-value" style="margin-bottom:4px;"><strong style="font-weight:600;">${c.name||''}</strong>${c.role?`<br><span style="color:var(--ink-h);font-size:11px;">${c.role}</span>`:''}${c.email?`<br><span style="font-size:11px;">${c.email}</span>`:''}${c.phone?`<br><span style="font-size:11px;">${c.phone}</span>`:''}</div>`;
+        html+=`<div class="sp-value" style="margin-bottom:4px;"><strong style="font-weight:600;">${escHtml(c.name||'')}</strong>${c.role?`<br><span style="color:var(--ink-h);font-size:11px;">${escHtml(c.role)}</span>`:''}${c.email?`<br><span style="font-size:11px;">${escHtml(c.email)}</span>`:''}${c.phone?`<br><span style="font-size:11px;">${escHtml(c.phone)}</span>`:''}</div>`;
       });
       html+=`</div>`;
     }
@@ -6725,7 +6776,7 @@ function renderHoverPanel(n){
       }).filter(Boolean).join(' &nbsp;');
       html+=`<div class="sp-field" style="margin-top:6px;"><div style="font-size:12px;font-weight:600;color:var(--ink);">${list.length} connection${list.length===1?'':'s'}</div><div style="font-size:10.5px;color:var(--ink-m);margin-top:1px;">${counts}</div><div style="display:flex;flex-wrap:wrap;margin-top:3px;">`;
       shown.forEach(x=>{
-        html+=`<span style="display:inline-flex;align-items:center;gap:4px;padding:1px 7px 1px 5px;margin:2px 3px 0 0;border-radius:20px;font-size:11px;color:var(--ink);background:var(--surf-3);border:1px solid var(--bdr);max-width:100%;"><span style="width:6px;height:6px;border-radius:50%;background:${x.other.colour||'#ddd'};flex-shrink:0;"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(x.other.label)}</span></span>`;
+        html+=`<span style="display:inline-flex;align-items:center;gap:4px;padding:1px 7px 1px 5px;margin:2px 3px 0 0;border-radius:20px;font-size:11px;color:var(--ink);background:var(--surf-3);border:1px solid var(--bdr);max-width:100%;"><span style="width:6px;height:6px;border-radius:50%;background:${safeMapColour(x.other.colour,'#ddd')};flex-shrink:0;"></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(x.other.label)}</span></span>`;
       });
       if(foldable) html+=`<button onclick="hpToggleConns(${n.id})" style="margin:2px 0 0;font-size:11px;height:22px;padding:0 9px;border-radius:20px;">${expanded?'Show fewer':`+${list.length-LIMIT} more`}</button>`;
       html+=`</div></div>`;
@@ -6734,19 +6785,19 @@ function renderHoverPanel(n){
     // Shared by (combined mode)
     if(currentMapMode==='combined'&&n.owners&&n.owners.length){
       html+=`<div class="sp-field"><div class="sp-label">Shared by</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">`;
-      n.owners.forEach(o=>html+=`<span class="sp-chip" style="background:#e8f5ec;color:#2A5C3A;border:1px solid #5BAD72;">${o}</span>`);
+      n.owners.forEach(o=>html+=`<span class="sp-chip" style="background:#e8f5ec;color:#2A5C3A;border:1px solid #5BAD72;">${escHtml(o)}</span>`);
       html+=`</div></div>`;
     }
   }
 
   // Notes
   const notes=n.notes||(currentMapMode!=='team'?(n.pNotesIndividual||n.pNotesOrganisation||n.pNotesProject||n.pNotesMeeting||''):'');
-  if(notes) html+=`<div class="sp-field"><div class="sp-label">Notes</div><div class="sp-value" style="white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;" title="${escHtml(String(notes))}">${notes}</div></div>`;
+  if(notes) html+=`<div class="sp-field"><div class="sp-label">Notes</div><div class="sp-value" style="white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;" title="${escHtml(String(notes))}">${escHtml(notes)}</div></div>`;
 
   // Tags
   if(n.tags&&n.tags.length){
     html+=`<div class="sp-field"><div class="sp-label">Tags</div><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px;">`;
-    n.tags.forEach(t=>{html+=`<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;background:var(--surf-3);color:var(--ink-m);border:1px solid var(--bdr);">${t}</span>`;});
+    n.tags.forEach(t=>{html+=`<span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;background:var(--surf-3);color:var(--ink-m);border:1px solid var(--bdr);">${escHtml(t)}</span>`;});
     html+=`</div></div>`;
   }
 
@@ -6762,7 +6813,7 @@ function renderHoverPanel(n){
     html+=`<div class="sp-field" style="margin-top:4px;"><div class="sp-label">Latest</div>`;
     _hist.slice(0,2).forEach(h=>{
       const ds=new Date(h.ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit'});
-      html+=`<div style="font-size:11px;color:var(--ink-m);line-height:1.35;"><span style="color:var(--ink-h);font-weight:600;">${ds}</span> ${h.text}</div>`;
+      html+=`<div style="font-size:11px;color:var(--ink-m);line-height:1.35;"><span style="color:var(--ink-h);font-weight:600;">${ds}</span> ${escHtml(h.text)}</div>`;
     });
     if(_hist.length>2) html+=`<div style="font-size:10.5px;color:var(--ink-h);font-style:italic;">+${_hist.length-2} earlier</div>`;
     html+=`</div>`;
