@@ -17887,11 +17887,13 @@ async function afterSignIn(){
   const ok = await cloudInit();
   const btn = document.getElementById('btn-my-maps');
   if (btn) btn.style.display = '';
-  if (!ok) { if(listRecoveryCopies().length) openMyMaps(); return; }
+  // Saved maps already appear beside the new-project form. Never cover that
+  // start screen with the older Your maps pop-up, including when a browser
+  // recovery copy exists. The pop-up remains available from Your maps.
+  if (!ok) return;
   try {
     const maps = await cloudListMaps();
     if (maps.length) renderStartMaps(maps);
-    if (listRecoveryCopies().length) openMyMaps();
   } catch (err) { /* nothing saved yet is not an error */ }
 }
 
