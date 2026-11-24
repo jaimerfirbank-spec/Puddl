@@ -26,6 +26,30 @@ paste this file and `CLAUDE.md` to you, and give him changes as small, exact edi
   production at once.
 - Draft emails and messages for him; never send them.
 
+## State at handover to Codex, 24 November evening
+
+Everything below is merged to `main` and live except where it says otherwise. Read `AI_WORKFLOW.md` first and use a `codex/<task>` branch.
+
+- **Live and working:** side panel (Explore), Refresh from spreadsheet, Google Sheet link, saving fix, Focus, thinned names, community colours,
+  arrow size and gradient, Ask rebuild (31 questions), plain-English ripple bar, dotted connection line, arrow and +/- when adding a connection,
+  no empty name box. Tests run on every pull request (`tests/README.md`).
+- **Built but NOT live:** the shared workspace (share a map, view-only role, team list, last saved by, history). It needs five database
+  migrations, in order, none applied: `20261117`, `20261124`, `20261125`, `20261126`, `20261127` in `supabase/migrations/`. The steps, with
+  backup and a staging check first, are in `docs/DATABASE-ROLLOUT.md`. **Do not apply them to the live database without Jaime saying so.**
+- **Waiting on Jaime:** his evening walk-through (checklist), a real-Google check of the Google Sheet link, a Supabase spare project and backup
+  before the migrations, whether the first customer team and owner exist in the database, and the first real tester.
+- **Branding branch** (`codex/ask-the-map`: plush logos, opening animation) has no pull request and clashes with `main`. Jaime wants the new logo
+  live: update it against current `main` (the panel, toolbar and Ask button have all changed), open a pull request and show him a picture first.
+  Do not bring back the floating Ask Puddle button or the toolbar "Ask the map" button; both were removed on purpose.
+- **Drafts #13 (photo import) and #16 (Puddle Lens)** predate today's changes and need updating and a production setup. #12 is replaced by the
+  saving fix and can be closed; #43 (demo sector rename) is parked and can be closed.
+- **Next jobs, in order:** see "Next jobs" below. After the walk-through: the data side (one Excel table per organisation, a kind-of-relationship
+  field, filter by any field, saved views), then public-body readiness (accessibility, a plain data-storage note), then comments on shared maps
+  only if a customer asks.
+- **Rules that bit us:** never read `index.html` whole (grep, then read a range); run `python3 tools/build-viewer.py` after any drawing, hover,
+  insight or presentation change (CI fails if `viewer.html` is stale); no customer names, prices or day-job material in the repo; Jaime listens
+  to replies as audio, so report in plain before-and-after words and end with one decision question.
+
 ## What is live on main
 
 Everything below is merged and deployed. Pull requests #26 to #29 hold the detail.
