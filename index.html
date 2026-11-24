@@ -5834,6 +5834,8 @@ function clearAskHighlight(){ clearHighlight(); showStatus('Question highlightin
 // what the answer means, and the function that works the answer out and says what to light up. Add a question by
 // adding an entry: the picker, the typed-question matcher and the report all read this list.
 //   systems:true   only offered on a Systems map
+//   noSystems:true never offered on a Systems map
+//   how, next      plain 'how this was worked out' text, and up to three follow-up question ids
 //   words          [[phrase, weight], ...] scored against what was typed
 //   meaning        [assessment, what this may mean, what is highlighted]
 //   answer(c,id,from,to)  c holds the calculated insights and helpers; return result(answer, evidence, focus)
@@ -5857,6 +5859,8 @@ const ASK_REGISTRY=[
   {id:"overview",cat:"Overview",q:"What are the main findings?",
    words:[["findings", 4], ["summary", 4], ["overview", 4], ["tell me about", 3], ["what should i know", 3], ["main", 2]],
    meaning:["Neutral", "This is a summary of the strongest calculated patterns, not a judgement on the map.", "The first matching finding is highlighted as an example."],
+   how:"Puddle checks the whole map for the patterns it can calculate, such as who holds it together, who is isolated and what changed, and lists the strongest ones.",
+   next:["holds", "isolated", "communities"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       const list=F.list.slice(0,5); return result(list.length?list.map(x=>x.text).join(' '):insightSummaryLines(I).slice(0,5).join(' ')||'Nothing stands out yet.',list.map(x=>x.evidence).filter(Boolean).join(' '),list[0]?list[0].focus():null);
@@ -5864,6 +5868,8 @@ const ASK_REGISTRY=[
   {id:"holds",cat:"People and structure",q:"Who holds this map together?",
    words:[["holds", 3], ["together", 3], ["depend", 4], ["rely", 3], ["lean on", 3], ["critical", 3], ["essential", 3], ["key organisation", 3], ["lose if", 4], ["would we lose", 4], ["what if", 2], ["closed", 2], ["removed", 2], ["if it went", 2], ["single point", 3]],
    meaning:["Mixed", "Holding different parts together can help information travel, but relying on very few connectors can also create fragility.", "The connectors that hold sections together are highlighted."],
+   how:"An item holds the map together if taking it out would cut other items off from the rest. Puddle takes each item out in turn and counts who loses their route.",
+   next:["bottleneck", "quiet", "communities"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       const a=I.bridges.map(x=>x.node); if(a.length) return result(`${labels(a)} ${a.length===1?'is':'are'} holding parts of this map together.`,I.bridges.map(x=>`${x.node.label} cuts off ${x.cutOff}.`).join(' '),nodeFocus(a,'Who holds the map together'));
@@ -5872,6 +5878,8 @@ const ASK_REGISTRY=[
   {id:"isolated",cat:"People and structure",q:"Who is isolated?",
    words:[["isolated", 4], ["alone", 3], ["not connected", 4], ["isn't connected", 4], ["isnt connected", 4], ["no connection", 4], ["unconnected", 4], ["disconnected", 3], ["no links", 3], ["left out", 3], ["on their own", 3], ["nobody", 2]],
    meaning:["Concern", "Items with no recorded connections may be overlooked, newly added, intentionally independent, or simply missing data.", "Every item with no connection in the current view is highlighted."],
+   how:"These are the items with no recorded connection at all in the current view.",
+   next:["connected", "groups"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
     return result(I.isolated?`${I.isolated} ${I.isolated===1?mapNounPack()[0]:np} ${I.isolated===1?'has':'have'} no connections: ${labels(I.orphanNodes)}.`:'Nobody is isolated in the current view.','Calculated from the connections visible in this view.',nodeFocus(I.orphanNodes,'Isolated items'));
@@ -5879,6 +5887,8 @@ const ASK_REGISTRY=[
   {id:"connected",cat:"People and structure",q:"Who is most connected?",
    words:[["most connected", 4], ["best connected", 4], ["most connections", 4], ["most links", 4], ["highest number", 3], ["most amount", 3], ["biggest hub", 4], ["busiest", 3], ["hub", 2], ["popular", 2], ["well connected", 3], ["greatest reach", 4]],
    meaning:["Neutral", "Being well connected may indicate reach or workload. It does not by itself mean influence or good performance.", "The best-connected items and their immediate connections are highlighted."],
+   how:"Puddle counts every item's connections, in either direction, and ranks them.",
+   next:["bottleneck", "quiet"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       const a=I.most.filter(n=>I.total.get(n.id)>0), top=a[0]; return result(top?`${top.label} is best connected with ${I.total.get(top.id)} connections.`:'There are no connections in this view.',a.slice(1).map(n=>`${n.label}: ${I.total.get(n.id)}`).join(' · '),top?linkedFocus(top,'Most connected'):null);
@@ -5886,6 +5896,8 @@ const ASK_REGISTRY=[
   {id:"least",cat:"People and structure",q:"Who has the fewest connections?",
    words:[["fewest", 4], ["least connected", 4], ["least connections", 4], ["lowest number", 3], ["barely connected", 3], ["weakly connected", 2]],
    meaning:["Neutral", "Having few connections may mean an item is peripheral, specialist, newly added, or missing recorded relationships.", "The items with the fewest recorded connections are highlighted."],
+   how:"Puddle counts every item's connections and lists those with the fewest, including none.",
+   next:["isolated", "introduce"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       const a=I.least||[], min=a.length?I.total.get(a[0].id):0, tied=a.filter(n=>I.total.get(n.id)===min);
@@ -5894,6 +5906,8 @@ const ASK_REGISTRY=[
   {id:"bottleneck",cat:"People and structure",q:"Who sits on the most routes between others?",
    words:[["go-between", 5], ["go between", 5], ["bottleneck", 5], ["between others", 4], ["routes", 3], ["route", 2], ["broker", 3], ["gatekeeper", 4], ["bridge", 2], ["pass through", 3], ["middle", 2]],
    meaning:["Mixed", "A bottleneck can coordinate activity, but it can also slow or interrupt the network if too much depends on it.", "The items sitting on the most routes are highlighted."],
+   how:"For every pair of items Puddle finds the shortest routes between them, then counts how many pass through each item. The percentage is that count against all pairs.",
+   next:["holds", "quiet"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       if(I.betweennessCapped) return result('This map is too large to calculate bottleneck scores all at once.',`Filter it below ${BETWEENNESS_CAP} ${np} and ask again.`);
@@ -5902,6 +5916,8 @@ const ASK_REGISTRY=[
   {id:"weak",cat:"Connections",q:"Where are the weak connections?",
    words:[["weak", 4]],
    meaning:["Concern", "Weak connections may be early relationships worth developing, or links that no longer need strengthening.", "Every connection marked weak, and both of its ends, are highlighted."],
+   how:"Puddle lists the connections marked weak, and the items at both ends.",
+   next:["strong", "introduce"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       const E=_askEdgeData(e=>(e.strength||'moderate')==='weak'); return result(E.pairs.length?`${E.pairs.length} weak connection${E.pairs.length===1?'':'s'} appear in this view.`:'There are no weak connections in this view.','Strength comes from the setting on each connection.',{label:'Weak connections',ids:E.ids,pairs:E.pairs,sec:[]});
@@ -5909,6 +5925,8 @@ const ASK_REGISTRY=[
   {id:"strong",cat:"Connections",q:"Where are the strong connections?",
    words:[["strong", 4]],
    meaning:["Neutral", "Strong recorded relationships may support coordination, but they can also show where activity is concentrated.", "Every connection marked strong, and both of its ends, are highlighted."],
+   how:"Puddle lists the connections marked strong, and the items at both ends.",
+   next:["weak", "holds"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       const E=_askEdgeData(e=>(e.strength||'moderate')==='strong'); return result(E.pairs.length?`${E.pairs.length} strong connection${E.pairs.length===1?'':'s'} appear in this view.`:'There are no strong connections in this view.','Strength comes from the setting on each connection.',{label:'Strong connections',ids:E.ids,pairs:E.pairs,sec:[]});
@@ -5916,6 +5934,8 @@ const ASK_REGISTRY=[
   {id:"groups",cat:"Connections",q:"Which parts of the map do not connect?",
    words:[["do not connect", 4], ["don't connect", 4], ["separate", 3], ["islands", 3], ["clusters", 3], ["not linked", 3], ["parts of the map", 3]],
    meaning:["Concern", "Separate parts cannot reach one another through this map. That may be intentional, or it may reveal a gap.", "The answer describes the disconnected structure; no single item is selected."],
+   how:"Puddle follows connections outwards from each item to find the parts of the map that cannot reach each other.",
+   next:["largestgroup", "communities"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
     return result(I.compCount===1?'Everything with a connection belongs to one connected network.':`This view contains ${I.compCount} separate connected networks.`,`The largest contains ${I.compBig} ${I.compBig===1?mapNounPack()[0]:np}.`);
@@ -5923,6 +5943,8 @@ const ASK_REGISTRY=[
   {id:"largestgroup",cat:"Connections",q:"What is the largest connected group?",
    words:[["largest", 3], ["connected network", 4], ["connected group", 4], ["biggest network", 4]],
    meaning:["Neutral", "The largest connected group shows where the greatest concentration of recorded relationships sits.", "Every item and connection in the largest group is highlighted."],
+   how:"Puddle finds the biggest set of items that can all reach one another through connections.",
+   next:["groups", "communities"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       const G=_insGraph(I.pool), start=I.groupList&&I.groupList[0]&&I.groupList[0].best, ids=start?_insReach(G.adj,start.id,null,null):new Set(), pairs=_insPairsWithin(G.adj,ids);
@@ -5931,6 +5953,8 @@ const ASK_REGISTRY=[
   {id:"density",cat:"Connections",q:"How connected is the map overall?",
    words:[["how connected", 4], ["density", 4], ["overall", 2], ["how well connected", 4]],
    meaning:["Neutral", "Density describes how many possible relationships are recorded. More is not automatically better; the right level depends on the system.", "The answer describes the whole current view, so nothing specific is highlighted."],
+   how:"Puddle divides the connections that exist by the number there would be if everything linked to everything.",
+   next:["groups", "communities"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
     return result(`This map contains ${I.edgesCount} of ${I.pool.length>1?I.pool.length*(I.pool.length-1)/2:0} possible connections: ${I.density}%.`,'Calculated across the current view. Direction is not counted separately.');
@@ -5938,14 +5962,20 @@ const ASK_REGISTRY=[
   {id:"incoming",cat:"Direction",q:"Who has the most connections coming in?",
    words:[["coming in", 5], ["incoming", 5], ["affected by", 4], ["arrows in", 3], ["receives", 2]],
    meaning:["Neutral", "Many incoming connections can indicate visibility, demand, dependence or influence, depending on what the arrows mean.", "The top item and its incoming connections are highlighted."],
+   how:"Puddle counts the arrows pointing into each item.",
+   next:["outgoing", "holds"],
    answer:_askAnsDirection},
   {id:"outgoing",cat:"Direction",q:"Who has the most connections going out?",
    words:[["going out", 5], ["outgoing", 5], ["affects the most", 4], ["drives", 3], ["arrows out", 3]],
    meaning:["Neutral", "Many outgoing connections can indicate reach, activity or influence, depending on what the arrows mean.", "The top item and its outgoing connections are highlighted."],
+   how:"Puddle counts the arrows pointing out of each item.",
+   next:["incoming", "holds"],
    answer:_askAnsDirection},
   {id:"change",cat:"Change over time",q:"What changed between two dates?",
    words:[["change", 3], ["changed", 4], ["different", 2], ["since", 2], ["over time", 4], ["between two dates", 4], ["grew", 3], ["grown", 3]],
    meaning:["Neutral", "This shows recorded growth between the chosen dates. It does not prove why the change happened.", "Items and connections added during the period are highlighted."],
+   how:"Puddle rebuilds the map as it stood on each date and compares the two.",
+   next:["holds", "communities"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       if(!from||!to) return result('Choose both dates to compare the map.','The answer will only use dated nodes and connections.');
@@ -5957,14 +5987,20 @@ const ASK_REGISTRY=[
   {id:"reinforcing",cat:"Systems",q:"Which loops are reinforcing?",systems:true,
    words:[["reinforc", 5], ["snowball", 4], ["vicious", 3], ["virtuous", 3], ["amplif", 3]],
    meaning:["Neutral", "Reinforcing means change compounds around the loop. It can amplify something helpful or harmful.", "The detected reinforcing loops are highlighted."],
+   how:"Puddle finds every feedback loop up to 8 steps long and classes each from its signs: an even number of minus signs reinforces, an odd number balances.",
+   next:["balancing", "unsigned"],
    answer:_askAnsLoopKind},
   {id:"balancing",cat:"Systems",q:"Which loops are balancing?",systems:true,
    words:[["balanc", 5], ["self-correct", 4], ["resist", 3], ["stabil", 3]],
    meaning:["Neutral", "Balancing means the loop pushes against change. It may stabilise the system or resist improvement.", "The detected balancing loops are highlighted."],
+   how:"Puddle finds every feedback loop up to 8 steps long and classes each from its signs: an even number of minus signs reinforces, an odd number balances.",
+   next:["reinforcing", "unsigned"],
    answer:_askAnsLoopKind},
   {id:"unsigned",cat:"Systems",q:"Where are connection signs missing?",systems:true,
    words:[["missing", 3], ["unsigned", 5], ["no sign", 5], ["plus or minus", 3], ["sign", 2]],
    meaning:["Uncertain", "Without a + or - sign, Puddle cannot reliably classify any loop containing that connection.", "Directed connections missing a sign are highlighted."],
+   how:"Puddle lists the directed connections that have no + or - sign yet.",
+   next:["reinforcing", "roots"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       const E=_askEdgeData(e=>arrowOf(e)!=='none'&&!e.polarity); return result(E.pairs.length?`${E.pairs.length} directed connection${E.pairs.length===1?' is':'s are'} missing a + or - sign.`:'Every directed connection has a + or - sign.','Loops containing an unsigned connection cannot be classified.',{label:'Connections missing a sign',ids:E.ids,pairs:E.pairs,sec:[]});
@@ -5972,18 +6008,81 @@ const ASK_REGISTRY=[
   {id:"roots",cat:"Systems",q:"What are the likely starting points?",systems:true,
    words:[["root cause", 5], ["starting point", 5], ["start point", 5], ["where does it start", 4], ["origin", 3], ["source", 3]],
    meaning:["Neutral", "These are structural starting points on the map, not proven real-world root causes.", "The factors with little or nothing pointing into them are highlighted."],
+   how:"Puddle looks for factors with arrows going out but little or nothing coming in.",
+   next:["outcomes", "loops"],
    answer:_askAnsStartEnd},
   {id:"outcomes",cat:"Systems",q:"What are the likely end results?",systems:true,
    words:[["end result", 5], ["outcome", 4], ["where does it end", 4], ["sink", 3]],
    meaning:["Neutral", "These are structural end results on the map, not guaranteed future outcomes.", "The factors with little or nothing flowing out of them are highlighted."],
+   how:"Puddle looks for factors with arrows coming in but little or nothing going out.",
+   next:["roots", "loops"],
    answer:_askAnsStartEnd},
   {id:"loops",cat:"Systems",q:"Which factors appear in several feedback loops?",systems:true,
    words:[["feedback", 4], ["loop", 4], ["several loops", 4], ["more than one loop", 4]],
    meaning:["Mixed", "Appearing in several loops can make a factor important, but the direction and signs determine what that means.", "Factors shared by several detected loops are highlighted."],
+   how:"Puddle counts how many of the detected loops each factor sits in.",
+   next:["reinforcing", "balancing"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       const a=[...I.nodeLoopCount.entries()].filter(x=>x[1]>=2).sort((x,y)=>y[1]-x[1]).map(([nid,count])=>({node:I.pool.find(n=>n.id===nid),count})).filter(x=>x.node);
       return result(a.length?`${a[0].node.label} appears in the most feedback loops: ${a[0].count}.`:'No factor appears in more than one detected loop.',a.slice(1,5).map(x=>`${x.node.label}: ${x.count}`).join(' · '),nodeFocus(a.map(x=>x.node),'Factors in several loops'));
+   }}  ,
+  {id:"communities",cat:"Groups",q:"What communities are there?",
+   words:[["communit",5],["natural groups",4],["work together",3],["works together",3],["cliques",3],["circles",2],["groups of",2],["split into",3],["how many groups",3]],
+   meaning:["Neutral","Communities are groups of items that are more joined up with each other than with the rest. They may be real working groups, a place, or simply who was entered together. Puddle finds them from the connections alone, so it cannot say what they are.","The largest community is highlighted."],
+   how:"Puddle groups the items so that as many connections as possible stay inside a group. Strong connections count more than weak ones and direction is ignored. The same map always gives the same groups.",
+   next:["holds","quiet","introduce"],
+   answer(c){
+    const {I,np,result}=c, C=_communityRefresh(), inPool=new Set(I.pool.map(n=>n.id));
+    const list=C.list.map(g=>({hub:g.hub,ids:g.ids.filter(id=>inPool.has(id))})).filter(g=>g.ids.length).sort((a,b)=>b.ids.length-a.ids.length);
+    if(!list.length) return result('There are no connections in this view, so there are no communities to find.','Communities are found from connections.');
+    const top=list.slice(0,4).map(g=>`around ${g.hub} (${g.ids.length})`).join(', ');
+    const clear=C.Q>=0.5?'The map splits clearly into groups.':C.Q>=0.3?'The map splits fairly clearly into groups.':'The map does not split clearly: the groups are only slightly more joined up inside than outside.';
+    return result(list.length===1?`Everything with a connection forms one community, around ${list[0].hub}.`:`${list.length} communities found. The biggest ${list.length>4?'are':'are'} ${top}.`,
+      `${clear} To see them in colour: Settings, Map, Colour by, Community.`,
+      {label:'Largest community',ids:new Set(list[0].ids),pairs:[],sec:[]});
+   }},
+  {id:"quiet",cat:"People and structure",q:"Who is quietly important?",
+   words:[["quiet",4],["quietly",4],["hidden",3],["overlooked",3],["under the radar",4],["unsung",4],["small but",3],["behind the scenes",3],["influen",3],["few connections but",4]],
+   meaning:["Mixed","An item with few connections that sits on many routes may be a vital link that nobody has noticed, or an item that is carrying more than its size suggests. It does not by itself mean influence.","The quietly important items are highlighted."],
+   how:"Puddle takes the items that sit on the most routes between others (the top 15%) and keeps those with no more connections than average. The percentage is the share of all routes through that item.",
+   next:["bottleneck","holds","introduce"],
+   answer(c){
+    const {I,np,result}=c;
+    if(!I.structureEligible) return result(`This map has only ${I.pool.length} ${np}. Below ${MIN_STRUCTURE_NODES}, what sits between whom is whatever you can see by looking.`,'Add more items and ask again.');
+    if(I.betweennessCapped||!I.betweenness) return result('This map is too large to calculate go-between scores all at once.',`Filter it below ${BETWEENNESS_CAP} ${np} and ask again.`);
+    const N=I.pool.length, deg=n=>I.total.get(n.id)||0;
+    const mean=I.pool.reduce((a,n)=>a+deg(n),0)/N, few=Math.max(2,Math.round(mean));
+    const byBt=[...I.pool].sort((x,y)=>(I.betweenness.get(y.id)||0)-(I.betweenness.get(x.id)||0)||String(x.label).localeCompare(String(y.label)));
+    const cut=Math.max(3,Math.ceil(N*0.15)), top=byBt.slice(0,cut).filter(n=>(I.betweenness.get(n.id)||0)>0);
+    const q=top.filter(n=>deg(n)<=few).slice(0,5);
+    if(!q.length) return result('No one stands out as quietly important: the items on the most routes are also the best connected.',`Looked at the ${top.length} items on the most routes, for any with ${few} connections or fewer.`);
+    const line=n=>`${n.label}: ${deg(n)} connection${deg(n)===1?'':'s'}, on about ${_bottleneckShare(Math.round(I.betweenness.get(n.id)),N)}% of routes`;
+    return result(`${q.length} ${q.length===1?'item has':'items have'} few connections but sit${q.length===1?'s':''} on many routes: ${q.map(n=>n.label).join(', ')}.`,q.map(line).join('. ')+'.',
+      {label:'Quietly important',ids:new Set(q.map(n=>n.id)),pairs:[],sec:[]});
+   }},
+  {id:"introduce",cat:"Opportunities",q:"Who should be introduced?",noSystems:true,
+   words:[["introduc",5],["should meet",4],["should connect",4],["should work together",4],["not connected but",4],["could collaborate",4],["partner up",3],["shared partners",4],["in common",3],["match",2]],
+   meaning:["Neutral","Two items that share several partners but are not connected may already work in the same space without knowing each other, or may be deliberately separate. It is a prompt for a conversation, not a recommendation.","The suggested pairs, and the partners they share, are highlighted."],
+   how:"Puddle looks for pairs that are not connected to each other but are both connected to the same partners. It asks for at least 3 shared partners on a map of 30 or more items, and 2 on a smaller one, and ranks pairs by how much of their circle they share.",
+   next:["quiet","communities","least"],
+   answer(c){
+    const {I,np,result}=c, G=_insGraph(I.pool), adj=G.adj;
+    if(I.pool.length<4) return result(`This map has only ${I.pool.length} ${np}, too few to suggest introductions.`,'Add more items and ask again.');
+    let work=0; adj.forEach(s=>{ work+=s.size*s.size; });
+    if(work>3e6) return result('This map is too large to check every pair for shared partners at once.',`Filter it below about 1,500 ${np} and ask again.`);
+    const need=I.pool.length>=30?3:2, found=new Map();
+    adj.forEach((nbs,v)=>{ const a=[...nbs]; for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++){ if(adj.get(a[i]).has(a[j])) continue; const k=_pk(a[i],a[j]); let e=found.get(k); if(!e){ e={a:a[i],b:a[j],shared:[]}; found.set(k,e); } e.shared.push(v); } });
+    const pairs=[...found.values()].filter(e=>e.shared.length>=need).map(e=>({...e,j:e.shared.length/((adj.get(e.a).size+adj.get(e.b).size-e.shared.length)||1)}))
+      .sort((x,y)=>y.shared.length-x.shared.length||y.j-x.j||x.a-y.a||x.b-y.b);
+    if(!pairs.length) return result(`No two unconnected ${np} share ${need} or more partners.`,'That can mean the map is already well joined up, or that not all connections have been recorded.');
+    const nm=id=>(G.nById.get(id)||{}).label||'?', top=pairs.slice(0,3), best=pairs[0];
+    const ids=new Set(), sec=new Set(), pr=[];
+    top.forEach(p=>{ ids.add(p.a); ids.add(p.b); p.shared.forEach(s=>{ sec.add(s); pr.push(_pk(p.a,s),_pk(p.b,s)); }); });
+    const names=best.shared.slice(0,4).map(nm).join(', ')+(best.shared.length>4?` and ${best.shared.length-4} more`:'');
+    return result(`${pairs.length} pair${pairs.length===1?'':'s'} of ${np} share ${need} or more partners but are not connected. The strongest: ${nm(best.a)} and ${nm(best.b)}, with ${best.shared.length} in common.`,
+      `They both work with ${names}.`+(top.length>1?' Next: '+top.slice(1).map(p=>`${nm(p.a)} and ${nm(p.b)} (${p.shared.length})`).join('; ')+'.':''),
+      {label:'Suggested introductions',ids,pairs:pr,sec:[...sec].filter(x=>!ids.has(x))});
    }}
 ];
 function _askContext(){
@@ -6004,20 +6103,22 @@ function _askContext(){
   const result=(answer,evidence,focus)=>({answer,evidence:evidence||'',focus:focus||null});
   return {I,F,np,labels,nodeFocus,linkedFocus,result};
 }
-function _askQuestions(){ return ASK_REGISTRY.filter(r=>!r.systems||MAP_TYPE==='systems').map(r=>({cat:r.cat,id:r.id,q:r.q})); }
+function _askQuestions(){ return ASK_REGISTRY.filter(r=>(!r.systems||MAP_TYPE==='systems')&&!(r.noSystems&&MAP_TYPE==='systems')).map(r=>({cat:r.cat,id:r.id,q:r.q})); }
+function _askWorkedOut(id){ const r=ASK_REGISTRY.find(x=>x.id===id); return r&&r.how?r.how:''; }
+function _askNextIds(id){ const r=ASK_REGISTRY.find(x=>x.id===id), ok=new Set(_askQuestions().map(q=>q.id)); return ((r&&r.next)||[]).filter(x=>ok.has(x)&&x!==id).slice(0,3); }
 function _askMeaning(id){
   const r=ASK_REGISTRY.find(x=>x.id===id), x=r?r.meaning:['Uncertain','Puddle could not match this wording to a calculation it knows.','Nothing is highlighted.'];
   return {assessment:x[0],meaning:x[1],highlight:x[2]};
 }
 function _askAnswerFor(id,from,to){
-  const r=ASK_REGISTRY.find(x=>x.id===id&&(!x.systems||MAP_TYPE==='systems')), c=_askContext();
+  const r=ASK_REGISTRY.find(x=>x.id===id&&(!x.systems||MAP_TYPE==='systems')&&!(x.noSystems&&MAP_TYPE==='systems')), c=_askContext();
   if(!r) return c.result('Puddle cannot answer that question yet.','Choose the closest suggested question.');
   return r.answer(c,id,from,to);
 }
 function _askRank(text){
   const s=' '+String(text||'').toLowerCase().replace(/[?.,!]/g,' ').replace(/\s+/g,' ')+' ';
   const out=[];
-  ASK_REGISTRY.forEach(r=>{ if(r.systems&&MAP_TYPE!=='systems') return; let sc=0; r.words.forEach(([w,wt])=>{ if(s.includes(w)) sc+=wt; }); if(sc>0) out.push({id:r.id,score:sc}); });
+  ASK_REGISTRY.forEach(r=>{ if((r.systems&&MAP_TYPE!=='systems')||(r.noSystems&&MAP_TYPE==='systems')) return; let sc=0; r.words.forEach(([w,wt])=>{ if(s.includes(w)) sc+=wt; }); if(sc>0) out.push({id:r.id,score:sc}); });
   return out.sort((a,b)=>b.score-a.score);
 }
 function _askDefaultIds(){ return MAP_TYPE==='systems'?['reinforcing','unsigned','roots']:['holds','isolated','change']; }
@@ -6069,7 +6170,7 @@ function renderAskWidget(){
     sug.innerHTML=ids.map(id=>{ const q=qs.find(x=>x.id===id); return q?`<button onclick="askPickQuestion('${id}')">${escHtml(q.q)}</button>`:''; }).join('');
   }
   const ans=document.getElementById('ask-puddl-answer');
-  if(ans) ans.innerHTML=_askAnswer?`<div class="ask-puddl-bubble"><div class="ask-puddl-status">${escHtml(_askAnswer.assessment||'Neutral')}</div><div style="font-weight:700;">${escHtml(_askAnswer.answer)}</div>${_askAnswer.evidence?`<div style="color:var(--ink-h);font-size:10.5px;margin-top:3px;">${escHtml(_askAnswer.evidence)}</div>`:''}<div style="margin-top:7px;"><strong>What this may mean:</strong> ${escHtml(_askAnswer.meaning||'')}</div><div style="margin-top:4px;color:var(--ink-m);"><strong>Highlighted:</strong> ${escHtml(_askAnswer.highlight||'')}</div>${_askAnswer.saved?`<div style="font-size:10px;color:var(--ink-h);margin-top:5px;">Added to the report.</div>`:`<div style="font-size:10px;color:var(--ink-h);margin-top:5px;">Try one of the suggested questions.</div>`}</div>`:'';
+  if(ans) ans.innerHTML=_askAnswer?`<div class="ask-puddl-bubble"><div class="ask-puddl-status">${escHtml(_askAnswer.assessment||'Neutral')}</div><div style="font-weight:700;">${escHtml(_askAnswer.answer)}</div>${_askAnswer.evidence?`<div style="color:var(--ink-h);font-size:10.5px;margin-top:3px;">${escHtml(_askAnswer.evidence)}</div>`:''}<div style="margin-top:7px;"><strong>What this may mean:</strong> ${escHtml(_askAnswer.meaning||'')}</div><div style="margin-top:4px;color:var(--ink-m);"><strong>Highlighted:</strong> ${escHtml(_askAnswer.highlight||'')}</div>${_askAnswer.workedOut?`<details style="margin-top:6px;"><summary style="font-size:10.5px;font-weight:700;color:var(--ink-h);cursor:pointer;">How this was worked out</summary><div style="font-size:11px;line-height:1.45;margin-top:3px;color:var(--ink-m);">${escHtml(_askAnswer.workedOut)}</div></details>`:''}${_askAnswer.saved?`<div style="font-size:10px;color:var(--ink-h);margin-top:5px;">Added to the report.</div>`:`<div style="font-size:10px;color:var(--ink-h);margin-top:5px;">Try one of the suggested questions.</div>`}${(_askAnswer.nextIds||[]).length?`<div style="font-size:10px;font-weight:700;color:var(--ink-h);margin-top:8px;">You might ask next</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:3px;">${(_askAnswer.nextIds||[]).map(id=>{ const q=_askQuestions().find(x=>x.id===id); return q?`<button onclick="askPickAndRun('${id}')" style="height:auto;min-height:25px;padding:3px 9px;font-size:10px;border-radius:13px;text-align:left;">${escHtml(q.q)}</button>`:''; }).join('')}</div>`:''}</div>`:'';
   if(ans&&_askAnswer){
     const opts=(_askAnswer.options||[]).map(id=>_askQuestions().find(x=>x.id===id)).filter(Boolean);
     const btns=opts.map(q=>`<button onclick="askPickAndRun('${q.id}')" style="display:block;width:100%;text-align:left;margin-top:4px;font-size:11px;height:auto;padding:5px 8px;">${escHtml(q.q)}</button>`).join('');
@@ -6088,10 +6189,10 @@ function runAskMap(){
   const typed=String((input&&input.value)||'').trim(), id=typed?_askMatch(typed):((sel&&sel.value)||'overview'), def=_askQuestions().find(x=>x.id===id), question=def?def.q:(typed||'Question Puddle could not match');
   const from=(document.getElementById('ask-date-from')||{}).value||'', to=(document.getElementById('ask-date-to')||{}).value||'';
   const _dec=typed?_askDecide(typed):{how:'exact',options:[]};
-  _askAnswer=Object.assign({id,question,from,to,saved:id!=='unknown',typed,how:_dec.how,options:_dec.options},_askAnswerFor(id,from,to),_askMeaning(id));
+  _askAnswer=Object.assign({id,question,from,to,saved:id!=='unknown',typed,how:_dec.how,options:_dec.options},_askAnswerFor(id,from,to),_askMeaning(id),{workedOut:_askWorkedOut(id),nextIds:_askNextIds(id)});
   const key=id+'|'+from+'|'+to;
   if(id!=='unknown'){
-    const saved={key,id,question,answer:_askAnswer.answer,evidence:_askAnswer.evidence,assessment:_askAnswer.assessment,meaning:_askAnswer.meaning,highlight:_askAnswer.highlight,from,to};
+    const saved={key,id,question,answer:_askAnswer.answer,evidence:_askAnswer.evidence,assessment:_askAnswer.assessment,meaning:_askAnswer.meaning,highlight:_askAnswer.highlight,workedOut:_askAnswer.workedOut||'',from,to};
     const at=ASK_REPORT_ITEMS.findIndex(x=>x.key===key); if(at>=0) ASK_REPORT_ITEMS[at]=saved; else ASK_REPORT_ITEMS.push(saved);
   }
   clearHighlight();
@@ -6102,7 +6203,7 @@ function askReportMove(i,d){ const j=i+d; if(j<0||j>=ASK_REPORT_ITEMS.length) re
 function askReportRemove(i){ const gone=ASK_REPORT_ITEMS[i]; ASK_REPORT_ITEMS.splice(i,1); if(gone&&_insightFocus&&_insightFocus.key==='asked:'+gone.key) clearHighlight(); saveState(); markUnsaved(); renderAskWidget(); renderInsights(); }
 function _askedReportHTML(){
   if(!ASK_REPORT_ITEMS.length) return '';
-  return `<div class="report-section"><h4>Your selected questions</h4>`+ASK_REPORT_ITEMS.map(x=>`<div class="report-row" style="display:block;border-left:3px solid #2563EB;padding-left:10px;"><div style="font-size:12px;font-weight:700;color:var(--navy);">${escHtml(x.question)}</div><div style="font-size:12px;line-height:1.5;margin-top:2px;">${escHtml(x.answer)}</div>${x.evidence?`<div style="font-size:11px;color:var(--txt-m);margin-top:2px;">${escHtml(x.evidence)}</div>`:''}${x.meaning?`<div style="font-size:11px;line-height:1.45;margin-top:5px;"><strong>${escHtml(x.assessment||'Neutral')} — what this may mean:</strong> ${escHtml(x.meaning)}</div>`:''}${x.highlight?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;"><strong>Highlighted:</strong> ${escHtml(x.highlight)}</div>`:''}${x.from||x.to?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;">${escHtml(x.from||'Start')} to ${escHtml(x.to||'Now')}</div>`:''}</div>`).join('')+`</div>`;
+  return `<div class="report-section"><h4>Your selected questions</h4>`+ASK_REPORT_ITEMS.map(x=>`<div class="report-row" style="display:block;border-left:3px solid #2563EB;padding-left:10px;"><div style="font-size:12px;font-weight:700;color:var(--navy);">${escHtml(x.question)}</div><div style="font-size:12px;line-height:1.5;margin-top:2px;">${escHtml(x.answer)}</div>${x.evidence?`<div style="font-size:11px;color:var(--txt-m);margin-top:2px;">${escHtml(x.evidence)}</div>`:''}${x.meaning?`<div style="font-size:11px;line-height:1.45;margin-top:5px;"><strong>${escHtml(x.assessment||'Neutral')} — what this may mean:</strong> ${escHtml(x.meaning)}</div>`:''}${x.highlight?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;"><strong>Highlighted:</strong> ${escHtml(x.highlight)}</div>`:''}${x.workedOut?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;"><strong>How this was worked out:</strong> ${escHtml(x.workedOut)}</div>`:''}${x.from||x.to?`<div style="font-size:10.5px;color:var(--txt-h);margin-top:2px;">${escHtml(x.from||'Start')} to ${escHtml(x.to||'Now')}</div>`:''}</div>`).join('')+`</div>`;
 }
 let _insFull=false;           // false: the short At a glance view; true: the full lists
 function setInsightsFull(on){ _insFull=!!on; renderInsights(); }
@@ -12030,7 +12131,7 @@ function buildPrintReport(){
 
   // Questions were chosen for the report: print just those (the on-screen report has the same switch)
   if(ASK_REPORT_ITEMS.length&&REPORT_SELECTED_ONLY){
-    h+=sec('Your selected questions',ASK_REPORT_ITEMS.map(x=>`<div style="margin:8px 0;padding-left:10px;border-left:3px solid #2563EB;"><div style="font-size:12.5px;font-weight:700;">${esc(x.question)}</div><div style="font-size:12px;line-height:1.5;">${esc(x.answer)}</div>${x.evidence?`<div style="font-size:11px;color:#666;">${esc(x.evidence)}</div>`:''}${x.meaning?`<div style="font-size:11px;line-height:1.45;margin-top:3px;"><strong>${esc(x.assessment||'Neutral')} - what this may mean:</strong> ${esc(x.meaning)}</div>`:''}</div>`).join(''));
+    h+=sec('Your selected questions',ASK_REPORT_ITEMS.map(x=>`<div style="margin:8px 0;padding-left:10px;border-left:3px solid #2563EB;"><div style="font-size:12.5px;font-weight:700;">${esc(x.question)}</div><div style="font-size:12px;line-height:1.5;">${esc(x.answer)}</div>${x.evidence?`<div style="font-size:11px;color:#666;">${esc(x.evidence)}</div>`:''}${x.meaning?`<div style="font-size:11px;line-height:1.45;margin-top:3px;"><strong>${esc(x.assessment||'Neutral')} - what this may mean:</strong> ${esc(x.meaning)}</div>`:''}${x.workedOut?`<div style="font-size:10.5px;color:#666;margin-top:3px;"><strong>How this was worked out:</strong> ${esc(x.workedOut)}</div>`:''}</div>`).join(''));
     h+=`<div style="margin-top:20px;font-size:10px;color:#999;">Made with Puddle · ${new Date().toLocaleDateString('en-GB')}</div>`;
     document.getElementById('print-area').innerHTML=`<div style="font-family:'DM Sans','Segoe UI',sans-serif;padding:8px 4px;max-width:800px;margin:0 auto;color:#111;">${h}</div>`;
     return;
