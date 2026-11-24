@@ -14,6 +14,9 @@ test('all inline scripts parse, editor and generated viewer',()=>{
   if(!/src=|application\/json/.test(m[1])&&m[2].trim())new vm.Script(m[2],{filename:file});
  }
 });
+test('sign-in leaves the saved-map list on the start screen instead of opening the old modal',()=>{
+ assert.ok(!fn('afterSignIn').includes('openMyMaps('));
+});
 test('invalid snapshots are rejected before changing live map or history guard',()=>{
  const nodes=[{id:99}],c=ctx({nodes,skipSave:false},['validateMapSnapshot','restoreSnap']);
  for(const d of [{}, {...valid(),nodes:[{id:1,x:Infinity,y:0}]},{...valid(),edges:[{from:1,to:7}]},{...valid(),loops:{}}]){
