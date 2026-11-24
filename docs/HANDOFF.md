@@ -123,6 +123,13 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
   white box that stopped lines short of it. Also fixed: At a glance was left blank when a map was loaded with the panel open
   (`clearSearch` collapsed the old dropdown).
 
+- Ripple wording, dotted line, no floating Ask button (after #78): the ripple bar now reads in plain words ("If X goes up: 5 things go up;
+  3 things go down; ...") with one line saying how it is worked out; the floating Ask Puddle button is gone for good (Explore, then the
+  Ask tab, is the way in; the pop-out Ask window still exists); a connection can be drawn **Dotted** (`edge.dotted`, saved with the map,
+  chosen when adding a connection and in the edit popup). Dotted is a look only: it does not change strength counts or any figure, and it
+  means "informal, planned or unconfirmed" only by the tooltip. If Jaime wants it to carry a meaning (a kind-of-relationship field),
+  that is the data-side job.
+
 ## Test assets
 
 - Note on the sector name: the demo files still say "Community and VCS". Jaime is renaming it to VCFS in his own
