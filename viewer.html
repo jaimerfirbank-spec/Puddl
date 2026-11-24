@@ -3013,6 +3013,59 @@ function fitAll(){
   zoom=Math.max(minZoomAllowed(),Math.min(2,Math.min(W/b.cw,H/b.ch)));
   panX=W/2-(b.minX+b.maxX)/2*zoom;panY=H/2-(b.minY+b.maxY)/2*zoom;draw();
 }
+function _focusRecompute(){
+  _focusHidden.clear();
+  if(!FOCUS_VIEW) return;
+  const adj=new Map();
+  const link=(a,b)=>{ if(!adj.has(a)) adj.set(a,[]); adj.get(a).push(b); };
+  edges.forEach(e=>{ const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target; link(a,b); link(b,a); });
+  const seen=new Map([[FOCUS_VIEW.id,0]]); let ring=[FOCUS_VIEW.id];
+  for(let step=1;step<=FOCUS_VIEW.depth&&ring.length;step++){
+    const next=[];
+    ring.forEach(a=>(adj.get(a)||[]).forEach(b=>{ if(!seen.has(b)){ seen.set(b,step); next.push(b); } }));
+    ring=next;
+  }
+  nodes.forEach(n=>{ if(!seen.has(n.id)) _focusHidden.add(n.id); });
+  FOCUS_VIEW.shown=nodes.length-_focusHidden.size;
+}
+function _focusFit(){
+  const vis=nodes.filter(n=>!_focusHidden.has(n.id)); if(!vis.length){ draw(); return; }
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  vis.forEach(n=>{ const r=nodeBaseRadius(n)+14; x0=Math.min(x0,n.x-r); x1=Math.max(x1,n.x+r); y0=Math.min(y0,n.y-r); y1=Math.max(y1,n.y+r); });
+  const pad=90, top=64, cw=x1-x0+pad*2, ch=y1-y0+pad*2;      // top: room for the Focus bar
+  zoom=Math.max(minZoomAllowed(),Math.min(1.6,W/cw,(H-top)/ch));
+  panX=W/2-(x0+x1)/2*zoom; panY=top+(H-top)/2-(y0+y1)/2*zoom;
+  draw();
+}
+function focusStep(delta){
+  if(!FOCUS_VIEW) return;
+  const d=Math.max(1,Math.min(6,FOCUS_VIEW.depth+delta));
+  if(d===FOCUS_VIEW.depth) return;
+  FOCUS_VIEW.depth=d; _focusRecompute(); _focusFit(); _focusViewBar();
+}
+function exitFocusMode(){
+  if(!FOCUS_VIEW) return;
+  FOCUS_VIEW=null; _focusHidden.clear(); _focusViewBar();
+  fitAll();
+}
+function _focusViewBar(){
+  const area=document.getElementById('canvas-area'); if(!area) return;
+  let bar=document.getElementById('focus-bar');
+  if(!FOCUS_VIEW){ if(bar) bar.style.display='none'; return; }
+  if(!bar){
+    bar=document.createElement('div'); bar.id='focus-bar';
+    bar.style.cssText='position:absolute;top:calc(12px + var(--demo-banner-offset,0px));max-width:calc(100% - 240px);left:50%;transform:translateX(-50%);z-index:17;display:flex;align-items:center;gap:8px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px 8px 6px 12px;font-size:12px;color:var(--ink);max-width:calc(100% - 200px);white-space:nowrap;font-family:\'DM Sans\',sans-serif;';
+    area.appendChild(bar);
+  }
+  const n=nodes.find(x=>x.id===FOCUS_VIEW.id), d=FOCUS_VIEW.depth;
+  const btn='height:26px;padding:0 9px;font-size:11.5px;';
+  bar.innerHTML=`<span style="font-weight:700;">Focus</span><span style="overflow:hidden;text-overflow:ellipsis;max-width:240px;">${escHtml(n?n.label:'')}</span>`+
+    `<span style="color:var(--ink-h);">${d} step${d===1?'':'s'} out, ${FOCUS_VIEW.shown} of ${nodes.length} shown</span>`+
+    `<button onclick="focusStep(-1)" title="Narrow: fewer steps out" style="${btn}width:28px;padding:0;"${d<=1?' disabled':''}>−</button>`+
+    `<button onclick="focusStep(1)" title="Widen: one more step out" style="${btn}width:28px;padding:0;"${d>=6?' disabled':''}>+</button>`+
+    `<button onclick="exitFocusMode()" style="${btn}">Show everything</button>`;
+  bar.style.display='flex';
+}
 function _applyFiltersCore(){
   const q=document.getElementById('search-input').value.trim().toLowerCase();
   // Multi-select: get arrays of selected values
@@ -6454,6 +6507,8 @@ function computeKnock(originId){
 function ctxKnockOn(){
   const id=ctxMenuNodeId; closeNodeCtxMenu();
   const n=nodes.find(x=>x.id===id); if(!n) return;
+  // Only one of the two top bars at a time: starting a ripple ends Focus (the view stays where it is)
+  if(FOCUS_VIEW){ FOCUS_VIEW=null; _focusHidden.clear(); _focusViewBar(); }
   const r=computeKnock(id);
   highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
   highlightIds.add(id);

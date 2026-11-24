@@ -296,4 +296,21 @@ test('a node with no name leaves no white box, and a line to it reaches its edge
   assert.equal(r.named,true);assert.equal(r.blank,false);assert.equal(r.spaces,false);
   assert.ok(r.red>=10,'the line and arrowhead are visible right up to the node ('+r.red+' of 19 samples)');
 });
+
+test('ripple and Focus: only one top bar at a time, and the Focus bar sits at the top',async({page})=>{
+  await loadMap(page,CARRFIELD);
+  const r=await page.evaluate(()=>{
+    const q=id=>document.getElementById(id), vis=id=>q(id)&&getComputedStyle(q(id)).display!=='none';
+    const id=nodes[0].id, id2=nodes[1].id, out={};
+    focusOnNode(id,1); out.focusOnly={focus:vis('focus-bar'),ripple:vis('knock-banner')};
+    const area=q('canvas-area').getBoundingClientRect(); out.focusTop=Math.round(q('focus-bar').getBoundingClientRect().top-area.top);
+    ctxMenuNodeId=id2; ctxKnockOn(); out.rippleOnly={focus:vis('focus-bar'),ripple:vis('knock-banner'),focusView:FOCUS_VIEW,knock:!!KNOCK};
+    focusOnNode(id,1); out.focusAgain={focus:vis('focus-bar'),ripple:vis('knock-banner'),knock:KNOCK,lit:highlightIds.size};
+    return out;
+  });
+  assert.deepEqual(r.focusOnly,{focus:true,ripple:false});
+  assert.ok(r.focusTop<=16,'Focus bar is at the top ('+r.focusTop+'px)');
+  assert.deepEqual(r.rippleOnly,{focus:false,ripple:true,focusView:null,knock:true});
+  assert.deepEqual(r.focusAgain,{focus:true,ripple:false,knock:null,lit:0});
+});
 module.exports={tests};
