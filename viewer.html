@@ -1108,6 +1108,33 @@ body.share-mode #present-exit{display:none !important;}
 @keyframes askPuddlListen{50%{transform:translateY(-1px);}}
 @media(max-width:720px){#ask-puddl-widget{right:10px;left:10px;bottom:74px;width:auto;}#ask-puddl-launcher{right:14px;bottom:14px;}}
 
+/* ── Side panel: At a glance / Ask / Filter / Report, docked left of the map ── */
+#workspace{flex:1;display:flex;min-height:0;min-width:0;position:relative;}
+#workspace:has(>#canvas-area[style*="display: none"]){display:none;}
+#workspace>#canvas-area{order:2;}
+#side-dock{order:0;display:none;flex-direction:column;flex:0 0 auto;width:30%;min-width:300px;min-height:0;background:var(--surf-2);font-family:'DM Sans',sans-serif;}
+#side-dock.open{display:flex;}
+#dock-divider{order:1;display:none;width:8px;flex:0 0 8px;cursor:col-resize;background:var(--bdr);position:relative;touch-action:none;}
+#dock-divider.open{display:block;}
+#dock-divider:after{content:'';position:absolute;top:50%;left:1px;width:6px;height:44px;margin-top:-22px;border-radius:3px;background:var(--bdr-m);}
+#dock-divider:hover:after,#dock-divider.dragging:after{background:var(--ink-h);}
+#canvas-area[style*="display: none"]~#side-dock,#canvas-area[style*="display: none"]~#dock-divider{display:none !important;}
+#side-dock .dock-tabs{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;}
+#side-dock .dock-tabs button{flex:1;height:42px;padding:0 4px;border:none;border-bottom:2px solid transparent;border-radius:0;background:transparent;box-shadow:none;font-size:12.5px;color:var(--ink-m);cursor:pointer;}
+#side-dock .dock-tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--ink);}
+#side-dock .dock-tools{display:flex;justify-content:flex-end;gap:6px;padding:8px 12px 0;flex-shrink:0;}
+#side-dock .dock-tools button{height:25px;padding:0 10px;font-size:11px;}
+#side-dock .dock-panes{flex:1;min-height:0;position:relative;}
+#side-dock .dock-pane{display:none;position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 14px 22px;}
+#side-dock .dock-pane.on{display:block;}
+#search-panel.docked{position:static !important;display:block !important;width:auto !important;max-height:none !important;overflow:visible !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;background:transparent !important;}
+#side-dock .ask-puddl-body{overflow:visible;padding:0;}
+#side-dock .dock-ask-head{display:flex;align-items:center;gap:9px;margin-bottom:9px;}
+#side-dock .dock-ask-head img{width:44px;height:44px;object-fit:cover;border-radius:11px;flex-shrink:0;}
+#dock-ask-away,#dock-report-empty{display:none;font-size:12px;line-height:1.5;color:var(--ink-m);}
+#ask-puddl-report:empty~#dock-report-empty{display:block;}
+@media(max-width:760px){#side-dock.open{position:absolute;inset:0;width:auto !important;min-width:0;z-index:30;}#dock-divider{display:none !important;}}
+
 
 /* Viewer chrome */
 #viewer-bar{position:fixed;top:0;left:0;right:0;height:46px;z-index:10001;display:flex;
@@ -5774,6 +5801,7 @@ function saveNamedVersion(){
   showStatus(`Version "${name}" saved. ${namedVersions.length} version${namedVersions.length!==1?'s':''} stored.`);
 }
 function exitPresentationEditMode(){
+  document.dispatchEvent(new CustomEvent('puddl-presedit',{detail:false}));
   inPresentationEditMode=false;
   const panel=document.getElementById('pres-edit-panel');
   if(panel) panel.classList.remove('open');

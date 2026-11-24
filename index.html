@@ -1106,6 +1106,33 @@ body.share-mode #present-exit{display:none !important;}
 @keyframes askPuddlPulse{50%{box-shadow:0 0 0 4px rgba(0,174,239,.18);}}
 @keyframes askPuddlListen{50%{transform:translateY(-1px);}}
 @media(max-width:720px){#ask-puddl-widget{right:10px;left:10px;bottom:74px;width:auto;}#ask-puddl-launcher{right:14px;bottom:14px;}}
+
+/* ── Side panel: At a glance / Ask / Filter / Report, docked left of the map ── */
+#workspace{flex:1;display:flex;min-height:0;min-width:0;position:relative;}
+#workspace:has(>#canvas-area[style*="display: none"]){display:none;}
+#workspace>#canvas-area{order:2;}
+#side-dock{order:0;display:none;flex-direction:column;flex:0 0 auto;width:30%;min-width:300px;min-height:0;background:var(--surf-2);font-family:'DM Sans',sans-serif;}
+#side-dock.open{display:flex;}
+#dock-divider{order:1;display:none;width:8px;flex:0 0 8px;cursor:col-resize;background:var(--bdr);position:relative;touch-action:none;}
+#dock-divider.open{display:block;}
+#dock-divider:after{content:'';position:absolute;top:50%;left:1px;width:6px;height:44px;margin-top:-22px;border-radius:3px;background:var(--bdr-m);}
+#dock-divider:hover:after,#dock-divider.dragging:after{background:var(--ink-h);}
+#canvas-area[style*="display: none"]~#side-dock,#canvas-area[style*="display: none"]~#dock-divider{display:none !important;}
+#side-dock .dock-tabs{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;}
+#side-dock .dock-tabs button{flex:1;height:42px;padding:0 4px;border:none;border-bottom:2px solid transparent;border-radius:0;background:transparent;box-shadow:none;font-size:12.5px;color:var(--ink-m);cursor:pointer;}
+#side-dock .dock-tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--ink);}
+#side-dock .dock-tools{display:flex;justify-content:flex-end;gap:6px;padding:8px 12px 0;flex-shrink:0;}
+#side-dock .dock-tools button{height:25px;padding:0 10px;font-size:11px;}
+#side-dock .dock-panes{flex:1;min-height:0;position:relative;}
+#side-dock .dock-pane{display:none;position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 14px 22px;}
+#side-dock .dock-pane.on{display:block;}
+#search-panel.docked{position:static !important;display:block !important;width:auto !important;max-height:none !important;overflow:visible !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;background:transparent !important;}
+#side-dock .ask-puddl-body{overflow:visible;padding:0;}
+#side-dock .dock-ask-head{display:flex;align-items:center;gap:9px;margin-bottom:9px;}
+#side-dock .dock-ask-head img{width:44px;height:44px;object-fit:cover;border-radius:11px;flex-shrink:0;}
+#dock-ask-away,#dock-report-empty{display:none;font-size:12px;line-height:1.5;color:var(--ink-m);}
+#ask-puddl-report:empty~#dock-report-empty{display:block;}
+@media(max-width:760px){#side-dock.open{position:absolute;inset:0;width:auto !important;min-width:0;z-index:30;}#dock-divider{display:none !important;}}
 </style>
 <!-- Supabase Auth -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1256,6 +1283,7 @@ body.share-mode #present-exit{display:none !important;}
   <div class="ask-puddl-head">
     <img src="assets/ask-puddl-plush.png" alt="Puddle sheep">
     <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:800;color:var(--ink);">Ask Puddle</div><div style="font-size:10px;color:var(--ink-h);line-height:1.3;">Calculated from this map · not an AI chatbot</div></div>
+    <button onclick="dockBringBackAsk()" title="Put Ask back in the side panel" style="height:26px;padding:0 9px;font-size:10.5px;">Dock</button>
     <button onclick="closeAskMap()" title="Close" aria-label="Close Ask Puddle" style="width:28px;height:28px;padding:0;border:none;background:transparent;font-size:16px;color:var(--ink-h);">×</button>
   </div>
   <div class="ask-puddl-body">
@@ -1320,6 +1348,7 @@ body.share-mode #present-exit{display:none !important;}
   </div>
 </div>
 
+<div id="workspace">
 <div id="canvas-area">
   <canvas id="bg"></canvas>
 
@@ -1639,6 +1668,32 @@ body.share-mode #present-exit{display:none !important;}
     <button onclick="cancelLoop()" style="font-size:11px;padding:0 10px;height:26px;">✕ Cancel</button>
     <button onclick="confirmLoop()" id="btn-confirm-loop" style="font-size:11px;padding:0 14px;height:26px;background:var(--ink);color:var(--on-ink);border-color:var(--ink);font-weight:600;" disabled>✓ Create loop</button>
   </div>
+</div>
+<aside id="side-dock" aria-label="Map panel">
+  <div class="dock-tabs" role="tablist">
+    <button role="tab" id="dock-tab-glance" onclick="dockShow('glance')">At a glance</button>
+    <button role="tab" id="dock-tab-ask" onclick="dockShow('ask')">Ask</button>
+    <button role="tab" id="dock-tab-filter" onclick="dockShow('filter')">Filter</button>
+    <button role="tab" id="dock-tab-report" onclick="dockShow('report')">Report<span id="dock-report-count"></span></button>
+  </div>
+  <div class="dock-tools">
+    <button id="dock-popout" onclick="dockPopOutAsk()" title="Move Ask into a box you can drag around">Pop out</button>
+    <button onclick="dockFold()" title="Hide the panel and give the whole screen to the map">Fold away</button>
+  </div>
+  <div class="dock-panes">
+    <div class="dock-pane" id="dock-pane-glance"></div>
+    <div class="dock-pane" id="dock-pane-ask">
+      <div class="dock-ask-head"><img src="assets/ask-puddl-plush.png" alt=""><div><div style="font-size:13px;font-weight:800;color:var(--ink);">Ask Puddle</div><div style="font-size:10px;color:var(--ink-h);line-height:1.3;">Calculated from this map · not an AI chatbot</div></div></div>
+      <div id="dock-ask-away">Ask Puddle is open in its own box on the map.<br><button onclick="dockBringBackAsk()" style="margin-top:8px;height:28px;padding:0 12px;font-size:11.5px;">Bring it back here</button></div>
+    </div>
+    <div class="dock-pane" id="dock-pane-filter"></div>
+    <div class="dock-pane" id="dock-pane-report">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--ink-h);margin-bottom:6px;">Report</div>
+      <div id="dock-report-empty">No questions chosen yet. Ask a question, then choose to add it to the report. The report will then show just those.<br><button onclick="askOpenReport(false)" style="margin-top:8px;height:30px;padding:0 12px;font-size:11.5px;">View full report</button></div>
+    </div>
+  </div>
+</aside>
+<div id="dock-divider" role="separator" aria-orientation="vertical" aria-label="Drag to resize the panel" title="Drag to resize"></div>
 </div>
 
 <!-- Add/Edit Modal -->
@@ -4554,6 +4609,101 @@ function toggleSearchPanel(){
   if(open) setTimeout(()=>document.getElementById('search-input').focus(),50);
 }
 
+// ── Side panel (docked left of the map) ──────────────────────────────────────
+// One panel, four tabs. The old Search & filter pop-up, At a glance, the Ask box and the report picks
+// all live in it. Nothing is rebuilt: the existing pieces are moved in, so their ids and code still work.
+const DOCK_TABS=['glance','ask','filter','report'];
+let _dock={open:false,tab:'glance',frac:0.30,popped:false,suspended:false};
+try{ const _d=JSON.parse(localStorage.getItem('puddl-dock')||'null'); if(_d&&typeof _d==='object'){
+  if(typeof _d.open==='boolean') _dock.open=_d.open;
+  if(DOCK_TABS.indexOf(_d.tab)>=0) _dock.tab=_d.tab;
+  if(_d.frac>=0.25&&_d.frac<=0.40) _dock.frac=_d.frac;
+  if(typeof _d.popped==='boolean') _dock.popped=_d.popped;
+} }catch(e){}
+let _dockBuilt=false;
+function _dockSave(){ try{ localStorage.setItem('puddl-dock',JSON.stringify({open:_dock.open,tab:_dock.tab,frac:_dock.frac,popped:_dock.popped})); }catch(e){} }
+function _dockBuild(){
+  if(_dockBuilt) return; _dockBuilt=true;
+  const $=id=>document.getElementById(id);
+  const ins=$('sec-insights-body'), fsec=ins&&ins.closest('.fsec'), sp=$('search-panel');
+  if(fsec){ const t=$('insights-toggle'); if(t) t.style.display='none'; fsec.style.cssText='margin:0;padding:0;border:none;'; ins.style.marginTop='0'; $('dock-pane-glance').appendChild(fsec); }
+  if(sp){ sp.classList.add('docked'); $('dock-pane-filter').appendChild(sp); }
+  const ab=document.querySelector('#ask-puddl-widget .ask-puddl-body');
+  if(ab){ ab.id='ask-puddl-body'; const rep=$('ask-puddl-report'); if(rep) $('dock-pane-report').insertBefore(rep,$('dock-report-empty')); if(!_dock.popped) $('dock-pane-ask').appendChild(ab); }
+  const btn=$('btn-search-toggle');
+  if(btn){ btn.onclick=function(){ dockToggle(); }; btn.title='Open or fold away the side panel'; const lb=$('search-btn-label'); if(lb) lb.textContent='Panel'; }
+}
+function _dockSize(){
+  const dock=document.getElementById('side-dock'), ws=document.getElementById('workspace'); if(!dock||!ws) return;
+  if(_dock.open&&!_dock.suspended){ dock.style.width=Math.max(300,Math.min(Math.round(ws.clientWidth*_dock.frac),Math.round(ws.clientWidth*0.6)))+'px'; }
+  const area=document.getElementById('canvas-area'), oldW=W;
+  resize();
+  if(area&&area.offsetParent!==null&&oldW>0&&W>0&&Math.abs(W-oldW)>0.5){ panX+=(W-oldW)/2; }
+  draw();
+}
+function _dockBadge(){
+  const c=document.getElementById('dock-report-count'); if(!c) return;
+  const n=(typeof ASK_REPORT_ITEMS!=='undefined'&&ASK_REPORT_ITEMS)?ASK_REPORT_ITEMS.length:0;
+  c.textContent=n?` (${n})`:'';
+}
+function _dockApply(){
+  _dockBuild();
+  const $=id=>document.getElementById(id);
+  const open=_dock.open&&!_dock.suspended;
+  $('side-dock').classList.toggle('open',open); $('dock-divider').classList.toggle('open',open);
+  DOCK_TABS.forEach(t=>{ const b=$('dock-tab-'+t), p=$('dock-pane-'+t), on=t===_dock.tab; if(b){ b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); } if(p) p.classList.toggle('on',on); });
+  const pop=$('dock-popout'); if(pop) pop.style.display=(_dock.tab==='ask'&&!_dock.popped)?'':'none';
+  const away=$('dock-ask-away'); if(away) away.style.display=_dock.popped?'block':'none';
+  const ins=$('sec-insights-body'), showGlance=open&&_dock.tab==='glance';
+  if(ins){ ins.style.display=showGlance?'block':'none'; if(showGlance) renderInsights(); }
+  if(open&&_dock.tab==='filter') syncDateFilterUI();
+  const btn=$('btn-search-toggle');
+  if(btn){ btn.style.background=open?'var(--ink)':'var(--surf)'; btn.style.color=open?'var(--on-ink)':'var(--ink-m)'; btn.style.borderColor=open?'var(--ink)':'var(--bdr)'; }
+  _dockBadge();
+  _dockSize();
+}
+function dockShow(tab){
+  if(DOCK_TABS.indexOf(tab)<0) tab='glance';
+  _dock.open=true; _dock.tab=tab; _dockSave(); _dockApply();
+}
+function dockFold(){ _dock.open=false; _dockSave(); _dockApply(); }
+function dockToggle(){ if(_dock.open&&!_dock.suspended) dockFold(); else dockShow(_dock.tab); }
+function dockSuspend(on){ if(!document.getElementById('side-dock')) return; _dock.suspended=!!on; _dockApply(); }
+function dockPopOutAsk(){
+  _dockBuild();
+  const ab=document.getElementById('ask-puddl-body'), w=document.getElementById('ask-puddl-widget'); if(!ab||!w) return;
+  w.appendChild(ab); _dock.popped=true;
+  if(_dock.tab==='ask') _dock.tab='glance';
+  _dockSave(); _dockApply();
+  w.classList.add('open'); _askPlace(); renderAskWidget();
+}
+function dockBringBackAsk(){
+  _dockBuild();
+  const ab=document.getElementById('ask-puddl-body'), w=document.getElementById('ask-puddl-widget'); if(!ab) return;
+  document.getElementById('dock-pane-ask').appendChild(ab); _dock.popped=false;
+  if(w) w.classList.remove('open');
+  dockShow('ask'); renderAskWidget();
+}
+(function(){
+  let drag=false;
+  document.addEventListener('pointerdown',function(e){
+    const d=e.target.closest&&e.target.closest('#dock-divider'); if(!d) return;
+    drag=true; d.classList.add('dragging'); try{ d.setPointerCapture(e.pointerId); }catch(x){}
+    document.body.style.userSelect='none'; e.preventDefault();
+  });
+  document.addEventListener('pointermove',function(e){
+    if(!drag) return; const ws=document.getElementById('workspace'); if(!ws) return;
+    const r=ws.getBoundingClientRect(); _dock.frac=Math.min(0.40,Math.max(0.25,(e.clientX-r.left)/r.width)); _dockSize();
+  });
+  document.addEventListener('pointerup',function(){
+    if(!drag) return; drag=false; const d=document.getElementById('dock-divider'); if(d) d.classList.remove('dragging');
+    document.body.style.userSelect=''; _dockSave();
+  });
+  window.addEventListener('resize',function(){ if(_dock.open&&!_dock.suspended){ const dock=document.getElementById('side-dock'), ws=document.getElementById('workspace'); if(dock&&ws){ dock.style.width=Math.max(300,Math.min(Math.round(ws.clientWidth*_dock.frac),Math.round(ws.clientWidth*0.6)))+'px'; resize(); draw(); } } });
+  document.addEventListener('puddl-presedit',function(e){ dockSuspend(!!(e.detail)); });
+  setTimeout(function(){ try{ if(document.getElementById('side-dock')){ _dockBuild(); _dockApply(); } }catch(e){ console.error(e); } },0);
+})();
+
 // ── View / Edit mode ─────────────────────────────────────────────────────────
 let isViewMode=false;
 let hoverPanelEnabled=true; // toggle for info popups
@@ -5449,6 +5599,7 @@ function toggleInsGroup(k){
 }
 
 function openAskMap(){
+  if(document.getElementById('side-dock')&&!_dock.popped){ dockShow('ask'); renderAskWidget(); setTimeout(()=>{ const i=document.getElementById('ask-map-input'); if(i) i.focus(); },60); return; }
   const w=document.getElementById('ask-puddl-widget'); if(!w) return;
   w.classList.add('open'); _askPlace(); renderAskWidget();
 }
@@ -5597,8 +5748,9 @@ function renderAskWidget(){
     else if(_askAnswer.how==='none') ans.insertAdjacentHTML('afterbegin',`<div class="ask-puddl-bubble" style="font-size:11px;">I could not match "${escHtml(_askAnswer.typed)}" to anything I can work out from this map. Here are some I can answer, or pick from the list below:${btns}</div>`);
   }
   const report=document.getElementById('ask-puddl-report');
-  if(report) report.innerHTML=ASK_REPORT_ITEMS.length?`<details style="margin-top:9px;"><summary style="font-size:10.5px;font-weight:700;color:var(--ink-h);cursor:pointer;">Selected for the report (${ASK_REPORT_ITEMS.length})</summary>`+ASK_REPORT_ITEMS.map((x,i)=>`<div style="display:flex;align-items:center;gap:4px;padding:5px 0;border-top:1px solid var(--bdr);font-size:10.5px;"><span style="flex:1;line-height:1.3;">${escHtml(x.question)}</span><button onclick="askReportMove(${i},-1)" title="Move up" style="width:22px;height:22px;padding:0;"${i===0?' disabled':''}>↑</button><button onclick="askReportMove(${i},1)" title="Move down" style="width:22px;height:22px;padding:0;"${i===ASK_REPORT_ITEMS.length-1?' disabled':''}>↓</button><button onclick="askReportRemove(${i})" title="Remove" style="width:22px;height:22px;padding:0;">×</button></div>`).join('')+`</details>`:'';
+  if(report) report.innerHTML=ASK_REPORT_ITEMS.length?`<details${report.closest('#dock-pane-report')?' open':''} style="margin-top:9px;"><summary style="font-size:10.5px;font-weight:700;color:var(--ink-h);cursor:pointer;">Selected for the report (${ASK_REPORT_ITEMS.length})</summary>`+ASK_REPORT_ITEMS.map((x,i)=>`<div style="display:flex;align-items:center;gap:4px;padding:5px 0;border-top:1px solid var(--bdr);font-size:10.5px;"><span style="flex:1;line-height:1.3;">${escHtml(x.question)}</span><button onclick="askReportMove(${i},-1)" title="Move up" style="width:22px;height:22px;padding:0;"${i===0?' disabled':''}>↑</button><button onclick="askReportMove(${i},1)" title="Move down" style="width:22px;height:22px;padding:0;"${i===ASK_REPORT_ITEMS.length-1?' disabled':''}>↓</button><button onclick="askReportRemove(${i})" title="Remove" style="width:22px;height:22px;padding:0;">×</button></div>`).join('')+`</details>`:'';
   if(report&&ASK_REPORT_ITEMS.length) report.insertAdjacentHTML('beforeend',`<div style="display:flex;gap:6px;margin-top:8px;"><button onclick="askOpenReport(true)" style="flex:1;height:30px;font-size:11px;background:var(--ink);color:var(--surf);border-color:var(--ink);">View selected report</button><button onclick="askOpenReport(false)" style="flex:1;height:30px;font-size:11px;">View full report</button></div>`);
+  if(typeof _dockBadge==='function') _dockBadge();
 }
 function _askAnswerFor(id,from,to){
   const I=computeInsights(), F=MAP_TYPE==='argument'?{list:[]}:computeFindings(I), np=mapNounPack()[1];
@@ -11627,6 +11779,7 @@ function togglePresentationEditMode(){
 }
 
 function enterPresentationEditMode(){
+  document.dispatchEvent(new CustomEvent('puddl-presedit',{detail:true}));
   inPresentationEditMode=true;
   const panel=document.getElementById('pres-edit-panel');
   if(panel) panel.classList.add('open');
@@ -11640,6 +11793,7 @@ function enterPresentationEditMode(){
 }
 
 function exitPresentationEditMode(){
+  document.dispatchEvent(new CustomEvent('puddl-presedit',{detail:false}));
   inPresentationEditMode=false;
   const panel=document.getElementById('pres-edit-panel');
   if(panel) panel.classList.remove('open');
@@ -13722,7 +13876,7 @@ const WALK_STEPS=[
   },
   {
     title:'Search and filter',
-    text:"Use Search & filter in the top-left (magnifying glass) to open the panel. Search by name, or filter by category, area, tag and connection type. All filters combine — for example Health service + Strong connections.",
+    text:"Use Panel in the top-left to open the side panel. It has four tabs: At a glance, Ask, Filter and Report. Under Filter you can search by name, or filter by category, area, tag and connection type. All filters combine, for example Health service + Strong connections.",
     target:'search-toggle-wrap', pos:'below'
   },
   {
