@@ -2560,6 +2560,11 @@ function selectConnColour(col){
     <span id="theme-btn-label">Dark mode</span></button>
         </div>
         <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Spacing</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">How much room auto-arrange leaves between items. Dense maps read better with more. It takes effect the next time you press Auto-arrange.</p>
+          <label style="display:block;font-size:12px;color:var(--ink);">Spread out <span id="settings-node-spacing-val" style="color:var(--txt-m);">76</span> <input type="range" id="settings-node-spacing" min="50" max="150" step="2" oninput="setNodeSpacing(this.value)" style="width:100%;"></label>
+        </div>
+        <div style="margin-bottom:24px;">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Background image</h4>
           <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Put a picture behind the map, like a street map or a logo. JPG or PNG.</p>
           <div style="display:flex;gap:8px;">
@@ -2584,6 +2589,13 @@ function selectConnColour(col){
           <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Click a colour to change it. Choosing one switches on "Colour connections by strength", so every connection follows it.</p>
           <div id="connection-styles-list" style="display:flex;flex-direction:column;gap:8px;"></div>
           <button onclick="resetStrengthColours()" style="margin-top:10px;padding:6px 12px;font-size:11px;">Reset to the original colours</button>
+        </div>
+        <div style="margin-bottom:28px;">
+          <h4 style="margin:0 0 6px 0;font-size:14px;font-weight:600;color:var(--ink);">How the lines look</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Longer lines sweep more when they curve. Fainter lines let the items stand out. Lit-up lines are always full strength.</p>
+          <label style="display:block;font-size:12px;color:var(--ink);margin-bottom:10px;">Curve <input type="range" id="settings-edge-curve" min="0" max="0.4" step="0.02" oninput="setEdgeLook()" style="width:100%;"></label>
+          <label style="display:block;font-size:12px;color:var(--ink);">Line strength <input type="range" id="settings-edge-opacity" min="0.25" max="1" step="0.05" oninput="setEdgeLook()" style="width:100%;"></label>
+          <button onclick="resetEdgeLook()" style="margin-top:8px;padding:6px 12px;font-size:11px;">Reset the line look</button>
         </div>
       </div>
     </div>
@@ -2790,6 +2802,9 @@ function argEdgeFor(aId,bId){
   const child=nodes.find(n=>n.id===from);
   return {from,to,strength:argLinkFor(child&&child.argPart)};
 }
+let EDGE_CURVE=0.2;              // how much a connection bows, as a share of its length (Kumu-style arcs: longer lines sweep more)
+let EDGE_OPACITY=0.8;            // how solid ordinary connections are; lit-up ones are always full
+function _curveOffset(dist){ return MAP_TYPE==='argument'?0:dist*EDGE_CURVE; }
 let EDGE_COLOUR_BY_STRENGTH=false; // when on, connections draw in their strength's colour
 function largeMapOn(){ return nodes.length>=LARGE_MAP_AT; }
 function nodeSizeScale(){ const m=NODE_SIZE_MODE; return (m==='always'||(m==='auto'&&largeMapOn()))?SMALLER_NODE_SCALE:1; }
@@ -3142,7 +3157,7 @@ function edgeAt(sx,sy){
     const b=typeof e.target==='object'?e.target:nodes.find(n=>n.id===e.target);
     if(!a||!b) continue;
     const dx=b.x-a.x, dy=b.y-a.y, dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+    const curve=_curveOffset(dist);
     const mx=(a.x+b.x)/2-dy/dist*curve;
     const my=(a.y+b.y)/2+dx/dist*curve;
     // Sample points along the quadratic bezier
@@ -3194,6 +3209,7 @@ function snap(){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
+    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,
     askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
@@ -3272,6 +3288,8 @@ function restoreSnap(s){
   }
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
+  EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
+  if(typeof d.nodeSpacing==='number') NODE_BREATHING=d.nodeSpacing;
   ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
   _askAnswer=null;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
@@ -3484,6 +3502,17 @@ function setNodeSizeMode(v){
   NODE_SIZE_MODE=['auto','always','never'].includes(v)?v:'auto';
   syncLargeMapUI(); saveState(); markUnsaved(); draw();
 }
+function setEdgeLook(){
+  const c=document.getElementById('settings-edge-curve'), o=document.getElementById('settings-edge-opacity');
+  if(c) EDGE_CURVE=parseFloat(c.value); if(o) EDGE_OPACITY=parseFloat(o.value);
+  draw(); saveState(); markUnsaved();
+}
+function resetEdgeLook(){ EDGE_CURVE=0.2; EDGE_OPACITY=0.8; syncEdgeLookControls(); draw(); saveState(); markUnsaved(); }
+function syncEdgeLookControls(){
+  const c=document.getElementById('settings-edge-curve'), o=document.getElementById('settings-edge-opacity'), sp=document.getElementById('settings-node-spacing'), sv=document.getElementById('settings-node-spacing-val');
+  if(c) c.value=EDGE_CURVE; if(o) o.value=EDGE_OPACITY; if(sp) sp.value=NODE_BREATHING; if(sv) sv.textContent=NODE_BREATHING;
+}
+function setNodeSpacing(v){ NODE_BREATHING=parseInt(v,10)||76; const sv=document.getElementById('settings-node-spacing-val'); if(sv) sv.textContent=NODE_BREATHING; saveState(); markUnsaved(); }
 function setEdgeColourByStrength(on){
   EDGE_COLOUR_BY_STRENGTH=!!on;
   const c=document.getElementById('settings-edge-colour-strength'); if(c) c.checked=EDGE_COLOUR_BY_STRENGTH;
@@ -3672,7 +3701,7 @@ function draw(){
     const bp=_arc?edgePtClearOfLabel(b,_arc.x,_arc.y):edgePtClearOfLabel(b,a.x,a.y);
 
     const dx=bp.x-ap.x,dy=bp.y-ap.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+    const curve=_curveOffset(dist);
     // For loop edges: P = 2·arcMid − midEdgePt
     // This is the exact control point that forces B(0.5) through the true arc midpoint
     // on the stored circle, regardless of node size. Works for any N.
@@ -3698,7 +3727,7 @@ function draw(){
     ctx.save();
     // Edges pass under nodes — no clipping needed (nodes drawn on top in render order)
 
-    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
+    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
     const _pc=_pinEdgeCols.size?_pinEdgeCols.get(i):null;
     const _pcs=_pc?_pc.map(ci=>loopColourOf(ci,_dark)):null;
     const _typeCol=isHl&&_ctFilterOn?(_dark?adaptColourForDark(style.colour):style.colour):null;
@@ -3783,7 +3812,7 @@ function draw(){
       // Arrowhead at source (backward or both)
       if(headS){
         ctx.save();
-        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
+        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
         ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
@@ -9945,7 +9974,7 @@ canvas.addEventListener('dblclick',e=>{
     const b=typeof ed.target==='object'?ed.target:nodes.find(nd=>nd.id===ed.target);
     if(!a||!b) return;
     const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+    const curve=_curveOffset(dist);
     const mx=(a.x+b.x)/2-dy/dist*curve, my=(a.y+b.y)/2+dx/dist*curve;
     for(let t=0;t<=1;t+=0.04){
       const qx=(1-t)**2*a.x+2*(1-t)*t*mx+t*t*b.x;
@@ -10276,7 +10305,7 @@ canvas.addEventListener('click',e=>{
       const b=typeof ed.target==='object'?ed.target:nodes.find(n=>n.id===ed.target);
       if(!a||!b) return;
       const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-      const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+      const curve=_curveOffset(dist);
       const mx=(a.x+b.x)/2-dy/dist*curve,my=(a.y+b.y)/2+dx/dist*curve;
       for(let t=0;t<=1;t+=0.04){
         const qx=(1-t)**2*a.x+2*(1-t)*t*mx+t*t*b.x;
@@ -14638,11 +14667,12 @@ function syncSizeByConnButtons(){
   { const sm=document.getElementById('settings-simple-mode'); if(sm) sm.value=SIMPLE_MODE; }
   { const mt=document.getElementById('settings-map-type'); if(mt) mt.value=MAP_TYPE; }
   { const ec=document.getElementById('settings-edge-colour-strength'); if(ec) ec.checked=EDGE_COLOUR_BY_STRENGTH; }
+  syncEdgeLookControls();
   syncLargeMapUI();
   const ss=document.getElementById('settings-size-by'), cs=document.getElementById('settings-colour-by');
   const opt=(v,t,sel)=>'<option value="'+escHtml(v)+'"'+(v===sel?' selected':'')+'>'+escHtml(t)+'</option>';
   if(ss){
-    let h=opt('','Off (use each node\'s own size)',SIZE_BY)+opt('connections','Number of connections',SIZE_BY);
+    let h=opt('','Off (use each node\'s own size)',SIZE_BY)+opt('connections','Number of connections',SIZE_BY)+opt('betweenness','Go-between score (bottleneck)',SIZE_BY);
     FIELD_DEFS.filter(f=>fieldIsNumeric(f.id)).forEach(f=>{ h+=opt('field:'+f.id,f.name,SIZE_BY); });
     ss.innerHTML=h;
   }
@@ -14692,8 +14722,16 @@ function fieldStats(id){
 function fieldIsNumeric(id){ return fieldStats(id).numeric; }
 function maxConnections(){ let m=0; nodes.forEach(n=>{ if(n.type!=='centre') m=Math.max(m,connectionCount(n)); }); return m; }
 // 0..1 position of a node on the current measure, or null when it has no value
+let _bwCache={sig:'',map:null,max:0};
+function _betweennessFor(n){
+  const sig=nodes.length+'|'+edges.length+'|'+(DATE_ASAT||'');
+  if(_bwCache.sig!==sig){ let m=null, mx=0; try{ const I=computeInsights(); if(I.betweenness){ m=I.betweenness; I.betweenness.forEach(v=>{ if(v>mx) mx=v; }); } }catch(e){} _bwCache={sig,map:m,max:mx}; }
+  if(!_bwCache.map||!_bwCache.max) return null;
+  const v=_bwCache.map.get(n.id); return v===undefined?0:v/_bwCache.max;
+}
 function _measure(n,key){
   if(key==='connections'){ const m=maxConnections(); return m?connectionCount(n)/m:0; }
+  if(key==='betweenness') return _betweennessFor(n);
   if(key&&key.startsWith('field:')){
     const id=key.slice(6), st=fieldStats(id); if(!st.numeric) return null;
     const x=_num(n.customFields&&n.customFields[id]); if(isNaN(x)) return null;
