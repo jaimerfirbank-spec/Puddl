@@ -5,6 +5,7 @@
 const {chromium}=require(process.env.PUDDLE_PLAYWRIGHT_PATH||'playwright'),fs=require('node:fs'),path=require('node:path');
 const ROOT=path.resolve(__dirname,'..'),VERBOSE=process.argv.includes('--verbose');
 const sets=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures','ask-phrases.json'),'utf8'));
+const named=sets.named||[];delete sets.named;
 (async()=>{
   const browser=await chromium.launch(),page=await browser.newPage();
   if(process.env.PUDDLE_D3_PATH){const d3=fs.readFileSync(process.env.PUDDLE_D3_PATH,'utf8');await page.route('**/d3*.js',r=>r.fulfill({status:200,contentType:'application/javascript',body:d3}));}
@@ -24,10 +25,21 @@ const sets=JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures','ask-phrase
       if(VERBOSE&&!direct) console.log((shown?'offered ':'MISSED  ')+JSON.stringify(r.p)+' -> '+r.id+' ('+r.how+') options '+(r.options||[]).join(','));
     }
   }
+  // Questions about named items need a map with those names on it: the Carrfield demo
+  let namedBad=[];
+  if(named.length){
+    await page.evaluate(()=>{['auth-modal','who-modal-bg'].forEach(id=>{const e=document.getElementById(id);if(e)e.style.display='none';});document.getElementById('canvas-area').style.display='block';nodes.length=0;edges.length=0;idCtr=0;MAP_TYPE='general';openImportModal();});
+    await page.setInputFiles('#import-file-input',path.join(ROOT,'demo/carrfield-neighbourhood.csv'));await page.waitForTimeout(1500);
+    await page.evaluate(()=>runImportMapper());await page.waitForTimeout(400);
+    await page.evaluate(()=>{try{skipAllDupes();}catch(e){}confirmImport();});await page.waitForTimeout(1800);
+    const res=await page.evaluate(list=>list.map(([p,exp,names])=>{const d=_askDecide(p);return {p,exp,names,id:d.id,how:d.how,got:(d.args||[]).map(i=>nodes.find(n=>n.id===i).label)};}),named);
+    res.forEach(r=>{total++;const okId=r.id===r.exp&&(r.how==='guess'||r.how==='exact'),okNames=JSON.stringify(r.got)===JSON.stringify(r.names);if(okId&&okNames){first++;offered++;}else{namedBad.push(r);if((r.how==='guess'||r.how==='exact')&&r.id!==r.exp)silentWrong.push(r);else if(!okId)missed.push(r);}});
+  }
   await browser.close();
   const pc=n=>Math.round(100*n/total)+'%';
   console.log(`phrasings: ${total} | answered directly and correctly: ${first} (${pc(first)}) | right question at least offered: ${offered} (${pc(offered)}) | answered with the wrong question: ${silentWrong.length}`);
   silentWrong.forEach(r=>console.log('  WRONG: '+JSON.stringify(r.p)+' expected '+r.exp+' got '+r.id+' ('+r.how+')'));
   if(!VERBOSE&&missed.length)console.log('  not found at all (run with --verbose): '+missed.map(r=>JSON.stringify(r.p)).slice(0,8).join(', ')+(missed.length>8?', ...':''));
-  if(silentWrong.length)process.exit(1);
+  namedBad.forEach(r=>console.log('  NAMED: '+JSON.stringify(r.p)+' expected '+r.exp+' '+JSON.stringify(r.names)+' got '+r.id+' ('+r.how+') '+JSON.stringify(r.got)));
+  if(silentWrong.length||namedBad.length)process.exit(1);
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -878,5 +878,86 @@
    "which factors are shared by lots of loops",
    "loops"
   ]
+ ],
+ "named": [
+  [
+   "how many connections does the Academy have",
+   "nconn",
+   [
+    "Carrfield Academy"
+   ]
+  ],
+  [
+   "who is Carrfield Volunteer Centre connected to",
+   "nconn",
+   [
+    "Carrfield Volunteer Centre"
+   ]
+  ],
+  [
+   "who does the Food Bank work with",
+   "nconn",
+   [
+    "Carrfield Food Bank"
+   ]
+  ],
+  [
+   "what happens if the Volunteer Centre leaves",
+   "nleave",
+   [
+    "Carrfield Volunteer Centre"
+   ]
+  ],
+  [
+   "what if Carrfield Academy closed",
+   "nleave",
+   [
+    "Carrfield Academy"
+   ]
+  ],
+  [
+   "how is Carrfield Academy connected to Carrfield Food Bank",
+   "npath",
+   [
+    "Carrfield Academy",
+    "Carrfield Food Bank"
+   ]
+  ],
+  [
+   "how is the Fishing Club connected to the Family Hub",
+   "npath",
+   [
+    "Carrfield Fishing Club",
+    "Carrfield Family Hub"
+   ]
+  ],
+  [
+   "route between the Library and the Academy",
+   "npath",
+   [
+    "Carrfield Library",
+    "Carrfield Academy"
+   ]
+  ],
+  [
+   "who is the most connected organisation",
+   "connected",
+   []
+  ],
+  [
+   "who holds this map together",
+   "holds",
+   []
+  ],
+  [
+   "which organisations have only one connection",
+   "singles",
+   []
+  ],
+  [
+   "what if we lost the top three",
+   "lose3",
+   []
+  ]
  ]
 }
