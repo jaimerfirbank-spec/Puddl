@@ -1112,20 +1112,20 @@ body.share-mode #present-exit{display:none !important;}
 #workspace{flex:1;display:flex;min-height:0;min-width:0;position:relative;}
 #workspace:has(>#canvas-area[style*="display: none"]){display:none;}
 #workspace>#canvas-area{order:2;}
-#side-dock{order:0;display:none;flex-direction:column;flex:0 0 auto;width:30%;min-width:300px;min-height:0;background:var(--surf-2);font-family:'DM Sans',sans-serif;}
+#side-dock{order:0;display:none;flex-direction:column;flex:0 0 auto;width:30%;min-width:300px;min-height:0;background:var(--surf-2);border-left:1px solid var(--bdr-m);font-family:'DM Sans',sans-serif;}
 #side-dock.open{display:flex;}
 #dock-divider{order:1;display:none;width:8px;flex:0 0 8px;cursor:col-resize;background:var(--bdr);position:relative;touch-action:none;}
 #dock-divider.open{display:block;}
 #dock-divider:after{content:'';position:absolute;top:50%;left:1px;width:6px;height:44px;margin-top:-22px;border-radius:3px;background:var(--bdr-m);}
 #dock-divider:hover:after,#dock-divider.dragging:after{background:var(--ink-h);}
 #canvas-area[style*="display: none"]~#side-dock,#canvas-area[style*="display: none"]~#dock-divider{display:none !important;}
-#side-dock .dock-tabs{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;}
+#side-dock .dock-tabs{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;padding-left:14px;}
 #side-dock .dock-tabs button{flex:1;height:42px;padding:0 4px;border:none;border-bottom:2px solid transparent;border-radius:0;background:transparent;box-shadow:none;font-size:12.5px;color:var(--ink-m);cursor:pointer;}
 #side-dock .dock-tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--ink);}
-#side-dock .dock-tools{display:flex;justify-content:flex-end;gap:6px;padding:8px 12px 0;flex-shrink:0;}
+#side-dock .dock-tools{display:flex;justify-content:flex-end;gap:6px;padding:8px 18px 0 24px;flex-shrink:0;}
 #side-dock .dock-tools button{height:25px;padding:0 10px;font-size:11px;}
 #side-dock .dock-panes{flex:1;min-height:0;position:relative;}
-#side-dock .dock-pane{display:none;position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 14px 22px;}
+#side-dock .dock-pane{display:none;position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;padding:12px 20px 24px 28px;}
 #side-dock .dock-pane.on{display:block;}
 #search-panel.docked{position:static !important;display:block !important;width:auto !important;max-height:none !important;overflow:visible !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;background:transparent !important;}
 #side-dock .ask-puddl-body{overflow:visible;padding:0;}
@@ -1585,7 +1585,8 @@ let showNodeLabels=true;
 let LABEL_THIN=true;
 let _labelSet=null;             // ids whose name is drawn this frame; null means all of them
 let _labelOrder=null, _labelOrderKey='';
-function _labelOn(n){ return showNodeLabels&&(!_labelSet||_labelSet.has(n.id)); }
+function _hasName(n){ return String(n.label==null?'':n.label).trim()!==''; }
+function _labelOn(n){ return showNodeLabels&&_hasName(n)&&(!_labelSet||_labelSet.has(n.id)); }
 // A name that is kept is drawn big enough to read: when the map is zoomed out a name would otherwise be a smudge.
 function _lblScale(n){
   if(!LABEL_THIN||!showNodeLabels||_simpleNow) return 1;
@@ -1620,6 +1621,7 @@ function _computeLabelSet(vb,hasHL){
   // No more names than the screen can carry comfortably; the first few by importance always get one
   const cap=Math.max(12,Math.floor(W*H/(190*190))); let kept=0, rank=0;
   const consider=(n,force)=>{
+    if(!_hasName(n)) return;
     if(_dateHidden.size&&_dateHidden.has(n.id)) return;
     if(_focusHidden.size&&_focusHidden.has(n.id)) return;
     if(n.x<vb.x0||n.x>vb.x1||n.y<vb.y0||n.y>vb.y1) return;
@@ -3011,6 +3013,59 @@ function fitAll(){
   zoom=Math.max(minZoomAllowed(),Math.min(2,Math.min(W/b.cw,H/b.ch)));
   panX=W/2-(b.minX+b.maxX)/2*zoom;panY=H/2-(b.minY+b.maxY)/2*zoom;draw();
 }
+function _focusRecompute(){
+  _focusHidden.clear();
+  if(!FOCUS_VIEW) return;
+  const adj=new Map();
+  const link=(a,b)=>{ if(!adj.has(a)) adj.set(a,[]); adj.get(a).push(b); };
+  edges.forEach(e=>{ const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target; link(a,b); link(b,a); });
+  const seen=new Map([[FOCUS_VIEW.id,0]]); let ring=[FOCUS_VIEW.id];
+  for(let step=1;step<=FOCUS_VIEW.depth&&ring.length;step++){
+    const next=[];
+    ring.forEach(a=>(adj.get(a)||[]).forEach(b=>{ if(!seen.has(b)){ seen.set(b,step); next.push(b); } }));
+    ring=next;
+  }
+  nodes.forEach(n=>{ if(!seen.has(n.id)) _focusHidden.add(n.id); });
+  FOCUS_VIEW.shown=nodes.length-_focusHidden.size;
+}
+function _focusFit(){
+  const vis=nodes.filter(n=>!_focusHidden.has(n.id)); if(!vis.length){ draw(); return; }
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  vis.forEach(n=>{ const r=nodeBaseRadius(n)+14; x0=Math.min(x0,n.x-r); x1=Math.max(x1,n.x+r); y0=Math.min(y0,n.y-r); y1=Math.max(y1,n.y+r); });
+  const pad=90, top=64, cw=x1-x0+pad*2, ch=y1-y0+pad*2;      // top: room for the Focus bar
+  zoom=Math.max(minZoomAllowed(),Math.min(1.6,W/cw,(H-top)/ch));
+  panX=W/2-(x0+x1)/2*zoom; panY=top+(H-top)/2-(y0+y1)/2*zoom;
+  draw();
+}
+function focusStep(delta){
+  if(!FOCUS_VIEW) return;
+  const d=Math.max(1,Math.min(6,FOCUS_VIEW.depth+delta));
+  if(d===FOCUS_VIEW.depth) return;
+  FOCUS_VIEW.depth=d; _focusRecompute(); _focusFit(); _focusViewBar();
+}
+function exitFocusMode(){
+  if(!FOCUS_VIEW) return;
+  FOCUS_VIEW=null; _focusHidden.clear(); _focusViewBar();
+  fitAll();
+}
+function _focusViewBar(){
+  const area=document.getElementById('canvas-area'); if(!area) return;
+  let bar=document.getElementById('focus-bar');
+  if(!FOCUS_VIEW){ if(bar) bar.style.display='none'; return; }
+  if(!bar){
+    bar=document.createElement('div'); bar.id='focus-bar';
+    bar.style.cssText='position:absolute;top:calc(12px + var(--demo-banner-offset,0px));max-width:calc(100% - 240px);left:50%;transform:translateX(-50%);z-index:17;display:flex;align-items:center;gap:8px;background:var(--surf);border:1px solid var(--bdr);border-radius:10px;box-shadow:var(--shadow-lg);padding:6px 8px 6px 12px;font-size:12px;color:var(--ink);max-width:calc(100% - 200px);white-space:nowrap;font-family:\'DM Sans\',sans-serif;';
+    area.appendChild(bar);
+  }
+  const n=nodes.find(x=>x.id===FOCUS_VIEW.id), d=FOCUS_VIEW.depth;
+  const btn='height:26px;padding:0 9px;font-size:11.5px;';
+  bar.innerHTML=`<span style="font-weight:700;">Focus</span><span style="overflow:hidden;text-overflow:ellipsis;max-width:240px;">${escHtml(n?n.label:'')}</span>`+
+    `<span style="color:var(--ink-h);">${d} step${d===1?'':'s'} out, ${FOCUS_VIEW.shown} of ${nodes.length} shown</span>`+
+    `<button onclick="focusStep(-1)" title="Narrow: fewer steps out" style="${btn}width:28px;padding:0;"${d<=1?' disabled':''}>−</button>`+
+    `<button onclick="focusStep(1)" title="Widen: one more step out" style="${btn}width:28px;padding:0;"${d>=6?' disabled':''}>+</button>`+
+    `<button onclick="exitFocusMode()" style="${btn}">Show everything</button>`;
+  bar.style.display='flex';
+}
 function _applyFiltersCore(){
   const q=document.getElementById('search-input').value.trim().toLowerCase();
   // Multi-select: get arrays of selected values
@@ -3139,6 +3194,14 @@ function toggleSearchPanel(){
   }
   if(open) setTimeout(()=>document.getElementById('search-input').focus(),50);
 }
+const DOCK_TABS=['glance','ask','filter','report'];
+let _dock={open:(typeof innerWidth!=='undefined'&&innerWidth>=1100),tab:'glance',frac:0.30,popped:false,suspended:false};   // open the first time on a wide screen; after that it stays as left
+try{ const _d=JSON.parse(localStorage.getItem('puddl-dock')||'null'); if(_d&&typeof _d==='object'){
+  if(typeof _d.open==='boolean') _dock.open=_d.open;
+  if(DOCK_TABS.indexOf(_d.tab)>=0) _dock.tab=_d.tab;
+  if(_d.frac>=0.25&&_d.frac<=0.40) _dock.frac=_d.frac;
+  if(typeof _d.popped==='boolean') _dock.popped=_d.popped;
+} }catch(e){}
 let isViewMode=false;
 let hoverPanelEnabled=true; // toggle for info popups
 
@@ -5155,6 +5218,8 @@ function clearSearch(){
     if(a){ a.textContent='▸'; const btn=a.closest('button'); if(btn) btn.setAttribute('aria-expanded','false'); }
   });
   _insOpen={}; try{ localStorage.setItem('puddl-ins-open','{}'); }catch(e){}
+  // In the side panel At a glance is a tab, not a dropdown: closing the dropdown must not leave an open tab empty
+  { const _ins=document.getElementById('sec-insights-body'); if(_ins&&typeof _dock!=='undefined'&&_dock.open&&!_dock.suspended&&_dock.tab==='glance'){ _ins.style.display='block'; try{ renderInsights(); }catch(e){} } }
 }
 function clearHighlight(){
   clearKnock();
@@ -5430,7 +5495,10 @@ function clearAll(){
   if(sim) sim.stop();
   rebuildTagList();updateColourLegend();saveState();draw();
 }
+let _insBuiltKey='', _insBuiltTimer=null;
 function updateMapInfoBar(){
+  { const k=nodes.length+'|'+edges.length;
+    if(k!==_insBuiltKey){ _insBuiltKey=k; clearTimeout(_insBuiltTimer); _insBuiltTimer=setTimeout(function(){ try{ if(typeof refreshInsightsIfOpen==='function') refreshInsightsIfOpen(); }catch(e){} },250); } }
   const total=nodes.filter(n=>n.type!=='centre').length;
   const connCount=edges.length;
   document.getElementById('node-count-display').textContent=
@@ -6439,6 +6507,8 @@ function computeKnock(originId){
 function ctxKnockOn(){
   const id=ctxMenuNodeId; closeNodeCtxMenu();
   const n=nodes.find(x=>x.id===id); if(!n) return;
+  // Only one of the two top bars at a time: starting a ripple ends Focus (the view stays where it is)
+  if(FOCUS_VIEW){ FOCUS_VIEW=null; _focusHidden.clear(); _focusViewBar(); }
   const r=computeKnock(id);
   highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
   highlightIds.add(id);
