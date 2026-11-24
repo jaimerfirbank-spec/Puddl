@@ -1580,6 +1580,61 @@ let SIZE_BY='';                  // '' | 'connections' | 'field:<id>'
 let COLOUR_BY='';                // '' | 'connections' | 'field:<id>'
 let _degCache=null;             // node id -> connection count, rebuilt each frame
 let showNodeLabels=true;
+let LABEL_THIN=true;
+let _labelSet=null;             // ids whose name is drawn this frame; null means all of them
+let _labelOrder=null, _labelOrderKey='';
+function _labelOn(n){ return showNodeLabels&&(!_labelSet||_labelSet.has(n.id)); }
+// A name that is kept is drawn big enough to read: when the map is zoomed out a name would otherwise be a smudge.
+function _lblScale(n){
+  if(!LABEL_THIN||!showNodeLabels||_simpleNow) return 1;
+  const fs=nodeDims(n).FS||11;
+  return Math.max(1,Math.min(3.5,8.5/(fs*zoom)));
+}
+function _labelPriority(){
+  const key=nodes.length+'|'+edges.length+'|'+SIZE_BY;
+  if(_labelOrder&&key===_labelOrderKey) return _labelOrder;
+  const deg=new Map();
+  edges.forEach(e=>{ const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target; deg.set(a,(deg.get(a)||0)+1); deg.set(b,(deg.get(b)||0)+1); });
+  _labelOrder=nodes.filter(n=>n.type!=='centre').map(n=>({n,r:nodeDims(n).r||40,d:deg.get(n.id)||0}))
+    .sort((x,y)=>(y.r-x.r)||(y.d-x.d)||(x.n.id-y.n.id)).map(x=>x.n);
+  _labelOrderKey=key; return _labelOrder;
+}
+function _computeLabelSet(vb,hasHL){
+  if(!LABEL_THIN||!showNodeLabels){ _labelSet=null; return; }
+  const set=new Set(), grid=new Map(), ngrid=new Map(), m=7/zoom, cell=140/zoom;
+  const cellsOf=B=>{ const out=[]; for(let gx=Math.floor((B.x0-m)/cell);gx<=Math.floor((B.x1+m)/cell);gx++) for(let gy=Math.floor((B.y0-m)/cell);gy<=Math.floor((B.y1+m)/cell);gy++) out.push(gx+','+gy); return out; };
+  const hits=B=>{ for(const k of cellsOf(B)){ const l=grid.get(k); if(l) for(const o of l) if(B.x0-m<o.x1&&B.x1+m>o.x0&&B.y0-m<o.y1&&B.y1+m>o.y0) return true; } return false; };
+  const keep=B=>{ for(const k of cellsOf(B)){ if(!grid.has(k)) grid.set(k,[]); grid.get(k).push(B); } };
+  // Items are obstacles too: a name should not sit on top of another item
+  nodes.forEach(n=>{
+    if(_dateHidden.size&&_dateHidden.has(n.id)) return;
+    if(_focusHidden.size&&_focusHidden.has(n.id)) return;
+    const r=(nodeDims(n).r||40)+2/zoom, B={x0:n.x-r,x1:n.x+r,y0:n.y-r,y1:n.y+r,id:n.id};
+    if(B.x1<vb.x0-300/zoom||B.x0>vb.x1+300/zoom||B.y1<vb.y0-300/zoom||B.y0>vb.y1+300/zoom) return;
+    for(const k of cellsOf({x0:B.x0+m,x1:B.x1-m,y0:B.y0+m,y1:B.y1-m})){ if(!ngrid.has(k)) ngrid.set(k,[]); ngrid.get(k).push(B); }
+  });
+  const onItem=(B,id)=>{ for(const k of cellsOf(B)){ const l=ngrid.get(k); if(l) for(const o of l) if(o.id!==id&&B.x0<o.x1&&B.x1>o.x0&&B.y0<o.y1&&B.y1>o.y0) return true; } return false; };
+  const forced=(hasHL&&highlightIds.size<=60)?highlightIds:null;
+  // No more names than the screen can carry comfortably; the first few by importance always get one
+  const cap=Math.max(12,Math.floor(W*H/(190*190))); let kept=0, rank=0;
+  const consider=(n,force)=>{
+    if(_dateHidden.size&&_dateHidden.has(n.id)) return;
+    if(_focusHidden.size&&_focusHidden.has(n.id)) return;
+    if(n.x<vb.x0||n.x>vb.x1||n.y<vb.y0||n.y>vb.y1) return;
+    const d=nodeDims(n);
+    if(insideLabel(n)){ if(force||(d.r||40)*zoom>=13) set.add(n.id); return; }       // inside the shape: only when the shape is big enough to hold it
+    const sc=_lblScale(n);
+    if(!force&&d.FS*zoom*sc<6) return;                                                // too small to be read even enlarged
+    const B=labelBelowBox(n,sc);
+    if(!force){ if(kept>=cap) return; if(hits(B)||(rank>=6&&onItem(B,n.id))) return; kept++; }
+    set.add(n.id); keep(B);
+  };
+  nodes.forEach(n=>{ if(n.type==='centre') set.add(n.id); });
+  if(forced) nodes.forEach(n=>{ if(forced.has(n.id)) consider(n,true); });
+  if(hoverPanelNodeId!==null&&hoverPanelNodeId!==undefined){ const h=nodes.find(x=>x.id===hoverPanelNodeId); if(h) consider(h,true); }
+  _labelPriority().forEach(n=>{ if(!set.has(n.id)){ consider(n,false); rank++; } });
+  _labelSet=set;
+}
 function toggleNodeLabels(){
   showNodeLabels=!showNodeLabels;
   syncLabelsBtn(); draw(); saveState(); markUnsaved();
@@ -1796,7 +1851,7 @@ function snap(includeVersions=true){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
-    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,linkedSheet:LINKED_SHEET||null,
+    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,linkedSheet:LINKED_SHEET||null,labelThin:LABEL_THIN,
     askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
@@ -1898,6 +1953,7 @@ function restoreSnap(s,keepVersions){
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
   LINKED_SHEET=d.linkedSheet||null;
+  LABEL_THIN=d.labelThin!==false; { const lt=document.getElementById('settings-label-thin'); if(lt) lt.checked=LABEL_THIN; }
   EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
   if(typeof d.nodeSpacing==='number') NODE_BREATHING=d.nodeSpacing;
   ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
@@ -1963,14 +2019,15 @@ function wrapLabel(c,text,maxW,maxLines){
   return lines;
 }
 let _lblBoxCache=new Map(), _bgColNow='#ffffff';
-function labelBelowBox(n){
-  const _c=_lblBoxCache.get(n.id); if(_c&&_c.nx===n.x&&_c.ny===n.y) return _c;
-  const d=nodeDims(n), r=d.r||40, fs=d.FS;
+function labelBelowBox(n,sc){
+  sc=sc||1;
+  const _c=_lblBoxCache.get(n.id); if(_c&&_c.nx===n.x&&_c.ny===n.y&&_c.sc===sc) return _c;
+  const d=nodeDims(n), r=d.r||40, fs=d.FS*sc;
   ctx.save();
   ctx.font=`400 ${fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
   const sh=n.shape||'circle';
   const bottom=sh==='triangle'?n.y+r*0.5:sh==='rectangle'?n.y+r*0.85:sh==='pill'?n.y+r*0.65:sh==='star'?n.y+r*0.81:sh==='hexagon'?n.y+r*0.87:n.y+r;
-  const top=bottom+5/zoom, maxW=r*3.5, lh=fs+2;
+  const top=bottom+5/zoom, maxW=r*3.5*sc, lh=fs+2*sc;
   let lines=[n.label||''];
   if(ctx.measureText(n.label||'').width>maxW&&String(n.label).includes(' ')){
     const w=n.label.split(' '), mid=Math.ceil(w.length/2);
@@ -1979,7 +2036,7 @@ function labelBelowBox(n){
   const tw=Math.min(maxW,Math.max(...lines.map(t=>ctx.measureText(t).width)));
   ctx.restore();
   const pad=3/zoom;
-  const box={x0:n.x-tw/2-pad,x1:n.x+tw/2+pad,y0:top-pad*0.6,y1:top+lines.length*lh+pad*0.4,lines,lh,top,maxW,fs,nx:n.x,ny:n.y};
+  const box={x0:n.x-tw/2-pad,x1:n.x+tw/2+pad,y0:top-pad*0.6,y1:top+lines.length*lh+pad*0.4,lines,lh,top,maxW,fs,nx:n.x,ny:n.y,sc};
   _lblBoxCache.set(n.id,box);
   return box;
 }
@@ -2148,8 +2205,8 @@ function draw(){
   // Like nodeEdgePt, but if the line would run through the node's own label, it stops at the label's edge instead
   function edgePtClearOfLabel(node,tx,ty){
     const p=nodeEdgePt(node,tx,ty);
-    if(!showNodeLabels||node.type==='centre'||insideLabel(node)) return p;
-    const B=labelBelowBox(node);
+    if(!_labelOn(node)||node.type==='centre'||insideLabel(node)) return p;
+    const B=labelBelowBox(node,_lblScale(node));
     const dx=tx-node.x, dy=ty-node.y, L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L;
     let t0=-Infinity, t1=Infinity;
     const slab=(o,u,lo,hi)=>{ if(Math.abs(u)<1e-9){ if(o<lo||o>hi){ t0=Infinity; t1=-Infinity; } return; } let a=(lo-o)/u, b=(hi-o)/u; if(a>b){ const t=a; a=b; b=t; } t0=Math.max(t0,a); t1=Math.min(t1,b); };
@@ -2533,6 +2590,8 @@ function draw(){
     ctx.restore();
   });
 
+  // Names: decide which are drawn this frame
+  if(_simpleNow) _labelSet=null; else _computeLabelSet(_viewBounds(0),hasHL);
   // Nodes
   if(_simpleNow) drawSimpleNodes(hasHL,_dark);
   nodes.forEach(n=>{
@@ -2688,10 +2747,12 @@ function draw(){
       ctx.restore();
     }
     // ── Label: below or inside node ──────────────────────────────────────────
-    if(showNodeLabels && !insideLabel(n)){
+    const _lblOn=_labelOn(n);
+    if(_lblOn && !insideLabel(n)){
     ctx.save();
+    const _sc=_lblScale(n);
     { // Backing in the background colour so connectors never show through the label
-      const B=labelBelowBox(n);
+      const B=labelBelowBox(n,_sc);
       ctx.fillStyle=_bgColNow;
       const _ga=ctx.globalAlpha; ctx.globalAlpha=_ga*0.9;
       ctx.beginPath(); rr(ctx,B.x0,B.y0,B.x1-B.x0,B.y1-B.y0,3/zoom); ctx.fill();
@@ -2700,13 +2761,13 @@ function draw(){
     ctx.textAlign='center';ctx.textBaseline='top';
     const _dark2=document.documentElement.getAttribute('data-theme')==='dark';
     ctx.fillStyle=_dark2?'#ffffff':'#1a1a1a';
-    const _fs=d.FS;
+    const _fs=d.FS*_sc;
     ctx.font=`400 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
     const _sh=n.shape||'circle';
     const _shapeBottom=_sh==='triangle'?n.y+r*0.5:_sh==='rectangle'?n.y+r*0.85:_sh==='pill'?n.y+r*0.65:_sh==='star'?n.y+r*0.81:_sh==='hexagon'?n.y+r*0.87:n.y+r;
     const _labelY=_shapeBottom+5/zoom;
-    const _maxW=r*3.5;
-    const _lh=_fs+2;
+    const _maxW=r*3.5*_sc;
+    const _lh=_fs+2*_sc;
     if(ctx.measureText(n.label).width>_maxW&&n.label.includes(' ')){
       const _words=n.label.split(' ');
       const _mid=Math.ceil(_words.length/2);
@@ -2716,7 +2777,7 @@ function draw(){
       ctx.fillText(n.label,Math.round(n.x),Math.round(_labelY),_maxW);
     }
     ctx.restore();
-    } else if(showNodeLabels) {
+    } else if(_lblOn) {
     ctx.save();
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=n.outline?(_dark?'#ffffff':'#18181b'):getTextColour(nodeCol);
