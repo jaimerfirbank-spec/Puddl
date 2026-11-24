@@ -130,8 +130,11 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
 - `templates/partnership-map-collection.xlsx`: the sheet partners fill in. Rebuild it with
   `python3 tools/make-collection-template.py`. It imports cleanly into Puddl.
 - All of this data is invented. Keep it that way. Do not put real organisations' names against invented relationships.
-- There is no test suite for `index.html`. Claude tested in headless Chromium (Playwright). Things to know:
-  the sandbox blocks the CDNs, so fetch `d3@7.9.0` and `xlsx@0.18.5` with `npm pack` and answer the CDN
+- Tests now live in `tests/` (see `tests/README.md`) and run on every pull request through `.github/workflows/tests.yml`:
+  `checks` (Ask golden and phrasing tests, browser tests in headless Chromium, Codex's reliability tests, and a check that
+  `viewer.html` is not stale) and `database` (real Postgres 16 running `tests/sql/`, a stub of Supabase's auth plus the real
+  `supabase/schema.sql` and migrations). It is real Postgres, not Supabase itself. Run `bash tests/sql/run.sh` locally with Postgres.
+- When testing by hand in a sandbox: the sandbox blocks the CDNs, so fetch `d3@7.9.0` and `xlsx@0.18.5` with `npm pack` and answer the CDN
   requests from disk; stub the Supabase client; hide `#auth-modal` and `#who-modal-bg`; `#canvas-area` is
   `display:none` until the start flow runs, so set it to `block` before taking a screenshot of the panels;
   `page.screenshot` does not capture the canvas, so read it with `canvas.toDataURL`.
@@ -172,8 +175,10 @@ plain question and then appears in Ask, At a glance and the report. It is not in
    one named organisation.
 4. **Data side:** a kind-of-relationship field with a filter, filter by any field, a data table inside the app, one
    Excel table of figures per organisation, saved views.
-5. **Shared workspace for a team:** one shared map, named members, view and edit roles, a warning when someone else is
-   editing, a change history, backups, comments. Scope it before building.
+5. **Shared workspace for a team** (Jaime said yes to starting; invites for the first customer will be sent by hand, Supabase plan
+   is Basic for now). Slice 1 done (PR #72). Next: 2 view/edit roles and removing a member (members added by hand in the Supabase
+   SQL editor), 3 "last edited by" and a friendlier conflict message, 4 history and restore, 5 comments. The team and owner
+   may not exist in the live database yet; check first (read-only queries). Keep customer names out of the repo.
 6. Smaller: a bottleneck infographic (100-dot grid); the "Connection matrix" tab repeats the sector grid on maps over
    60 nodes; accessibility (the map is a canvas; offer the table as the accessible version).
 7. Known gaps: see below.
@@ -182,7 +187,10 @@ plain question and then appears in Ask, At a glance and the report. It is not in
 
 - Splitting a merged node back into two. The merge record says what was joined, but not which connections
   belonged to which spelling. It would need each edge tagged at import with the spelling it came from.
-- Shared team maps (see next jobs). Maps belong to one account today; there is no guest or shared access.
+- Shared workspace slices 2 to 5 (see next jobs). Slice 1 is merged (PR #72): a map's maker can Share it with their team and
+  Make private again, and My maps lists the team's shared maps. It depends on `supabase/migrations/20261124_share_maps.sql`,
+  which is NOT applied; until it is, the Share button says a database update is needed. That migration builds on 20261117
+  (also NOT applied). Apply both together, in order, only after a backup and a staging check, on Jaime's say-so.
 - Refresh does not remove a connection that has been deleted from the spreadsheet; it only adds new ones. Matching is by
   organisation name, so a rename in the sheet looks like a new item plus a missing one unless the near-duplicate
   review catches it.
