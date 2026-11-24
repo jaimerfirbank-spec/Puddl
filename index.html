@@ -17534,13 +17534,57 @@ async function cloudInit(){
 
 async function cloudListMaps(){
   if (!_cloudReady) return [];
-  const { data, error } = await supabaseClient
+  // updated_by (who last saved) needs supabase/migrations/20261126_edited_by.sql; ask without it if that is not applied yet
+  let { data, error } = await supabaseClient
     .from('maps')
-    .select('id, title, kind, updated_at, scope, owner_id')
+    .select('id, title, kind, updated_at, scope, owner_id, updated_by')
     .order('updated_at', { ascending: false });
+  if (error) {
+    ({ data, error } = await supabaseClient
+      .from('maps')
+      .select('id, title, kind, updated_at, scope, owner_id')
+      .order('updated_at', { ascending: false }));
+  }
   if (error) return [];
   // The rules return your own private maps and every map shared with your team
   return (data || []).map(function(m){ return Object.assign({}, m, { mine: m.owner_id === (_authUser && _authUser.id) }); });
+}
+
+// Who is who in the team, by account id, for "last saved by". Empty if the team list is not available.
+async function cloudTeamNames(){
+  const names = {};
+  if (!_cloudReady || !_cloudTeam || !_cloudTeam.team_id) return names;
+  try {
+    const { data, error } = await supabaseClient.rpc('team_roster', { p_team: _cloudTeam.team_id });
+    if (!error && data) data.forEach(function(p){ names[p.user_id] = p.email; });
+  } catch (_) {}
+  return names;
+}
+function cloudWhoName(id, names){
+  if (!id) return '';
+  if (_authUser && id === _authUser.id) return 'you';
+  return names[id] || 'someone no longer in the team';
+}
+
+// Two people saved the same map. Say who got in first and what to do, once, instead of failing quietly every few seconds.
+let _cloudConflictFor = null;
+async function cloudExplainConflict(mapId){
+  let who = '', when = '';
+  try {
+    let r = await supabaseClient.from('maps').select('updated_at, updated_by').eq('id', mapId).maybeSingle();
+    if (r.error) r = await supabaseClient.from('maps').select('updated_at').eq('id', mapId).maybeSingle();
+    if (r.data) {
+      when = new Date(r.data.updated_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      if (r.data.updated_by) who = cloudWhoName(r.data.updated_by, await cloudTeamNames());
+    }
+  } catch (_) {}
+  const key = mapId + '|' + (_cloudUpdatedAt || '');
+  const line = (who && who !== 'you' ? who : 'Someone (or another tab of yours)') + ' saved changes to this map' + (when ? ' at ' + when : '') + ', after you opened it.';
+  if (_cloudConflictFor === key) { showStatus('Your latest changes are not saved. ' + line); return; }
+  _cloudConflictFor = key;
+  if (window.confirm(line + '\n\nYour changes have not been saved, so nothing of theirs has been overwritten.\n\nPress OK to download a copy of your version now. Then reload the page and open the map again to get their version. Your version is also kept in this browser under Your maps.')) {
+    try { saveFile(false); } catch (_) {}
+  }
 }
 
 // One save path for both a brand-new map and an existing one, so nothing has
@@ -17578,7 +17622,8 @@ async function cloudSaveCurrent(){
       }
       if(generation!==_cloudGeneration||!_authUser||owner!==_authUser.id) return false;
       if(response.error||!response.data){
-        showStatus(response.error?'Could not save online. Your browser copy is kept; try again before switching maps.':'This map changed in another tab. Export your work before reopening the online copy.');
+        if(response.error) showStatus('Could not save online. Your browser copy is kept; try again before switching maps.');
+        else { try { saveRecovery(); } catch(_) {} cloudExplainConflict(mapId); }
         return false;
       }
       _cloudMapId=response.data.id;
@@ -17893,6 +17938,7 @@ async function openMyMaps(){
   bg.style.display = 'flex';
 
   const maps = await cloudListMaps();
+  const names = maps.some(function(m){ return m.scope === 'team' && m.updated_by; }) ? await cloudTeamNames() : {};
   const count = document.getElementById('cloud-maps-count');
   if (count) count.textContent = maps.filter(function(m){ return m.scope==='personal'; }).length + ' of ' + (_cloudTeam?.maps_per_user || 25) + ' private' + (maps.some(function(m){ return m.scope==='team'; }) ? ', plus shared' : '');
 
@@ -17915,7 +17961,7 @@ async function openMyMaps(){
     const sub = document.createElement('div');
     sub.style.cssText = 'font-size:11px;color:var(--ink-m);margin-top:2px;';
     const kindLbl = (typeof MAP_TYPE_LABELS!=='undefined' && MAP_TYPE_LABELS[m.kind]) || 'General map';
-    sub.textContent = (isOpen ? 'Open now - ' : '') + kindLbl + (m.scope==='team' ? ' \u00b7 Shared with your team' + (m.mine ? ' (you made it)' : '') + (cloudIsViewer() ? ' \u00b7 view only' : '') : '') + ' \u00b7 last saved ' + when;
+    sub.textContent = (isOpen ? 'Open now - ' : '') + kindLbl + (m.scope==='team' ? ' \u00b7 Shared with your team' + (m.mine ? ' (you made it)' : '') + (cloudIsViewer() ? ' \u00b7 view only' : '') : '') + ' \u00b7 last saved ' + when + (m.scope === 'team' && m.updated_by ? ' by ' + cloudWhoName(m.updated_by, names) : '');
     name.appendChild(t); name.appendChild(sub);
     row.appendChild(name);
 
