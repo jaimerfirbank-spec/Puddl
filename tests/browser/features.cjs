@@ -165,4 +165,38 @@ test('view-only member: no editing buttons, nothing saved, and a plain notice; t
   assert.deepEqual(r.ownerRows.map(x=>[x.select,x.remove]),[[false,false],[true,true],[true,true]]);
   assert.deepEqual(r.calls.filter(c=>c[0]!=='team_roster'),[['set_member_role','ben','viewer'],['remove_team_member','ben','']]);
 });
+
+test('last saved by: shown on shared maps, and a clash says who saved first and asks once',async({page})=>{
+  await loadMap(page,CARRFIELD);
+  const r=await page.evaluate(async()=>{
+    const rows=[{id:'m1',title:'Mine',kind:'general',updated_at:'2026-11-24T10:00:00Z',scope:'personal',owner_id:'me',updated_by:'me'},
+                {id:'m2',title:'Shared by Ann',kind:'general',updated_at:'2026-11-24T10:00:00Z',scope:'team',owner_id:'ann',updated_by:'ben'},
+                {id:'m3',title:'Old shared',kind:'general',updated_at:'2026-11-24T10:00:00Z',scope:'team',owner_id:'ann',updated_by:'gone'},
+                {id:'m4',title:'Shared, nobody recorded',kind:'general',updated_at:'2026-11-24T10:00:00Z',scope:'team',owner_id:'ann',updated_by:null}];
+    let oldDb=false,clash=true;
+    const roster=[{user_id:'ann',email:'ann@x',role:'owner'},{user_id:'me',email:'me@x',role:'member'},{user_id:'ben',email:'ben@x',role:'member'}];
+    supabaseClient={from(){const q={select(c){q.cols=c;return q},order(){return Promise.resolve(oldDb&&/updated_by/.test(q.cols)?{data:null,error:{message:'column maps.updated_by does not exist'}}:{data:oldDb?rows.map(({updated_by,...r})=>r):rows,error:null})},
+        update(){q.upd=true;return q},eq(){return q},maybeSingle(){return Promise.resolve(q.upd?{data:clash?null:{id:'m2',updated_at:'v2'},error:null}:{data:{updated_at:'2026-11-24T14:32:00Z',updated_by:'ben'},error:null})}};return q;},
+      rpc(name){return Promise.resolve(name==='team_roster'?{data:roster,error:null}:{error:null});}};
+    _authUser={id:'me'};_cloudReady=true;_cloudTeam={team_id:'t',name:'T',role:'member',maps_per_user:25};
+    await openMyMaps();
+    const subs=[...document.querySelectorAll('#cloud-maps-list > div')].map(d=>d.querySelectorAll('div')[2]&&d.querySelectorAll('div')[2].textContent).filter(Boolean);
+    oldDb=true; await openMyMaps(); const subsOld=[...document.querySelectorAll('#cloud-maps-list > div')].map(d=>d.querySelectorAll('div')[2]&&d.querySelectorAll('div')[2].textContent).filter(Boolean);
+    // a clash on a shared map
+    let asked=[],saved=0; window.confirm=m=>{asked.push(m);return true;}; window.saveFile=()=>{saved++;};
+    _cloudMapId='m2';_cloudUpdatedAt='v1';_editRevision++;
+    const ok1=await cloudSaveCurrent(); await new Promise(r=>setTimeout(r,80));
+    _editRevision++; const ok2=await cloudSaveCurrent(); await new Promise(r=>setTimeout(r,80));
+    return {subs,subsOld,ok1,ok2,asked,saved};
+  });
+  assert.match(r.subs.find(x=>x.includes('Shared with your team')),/last saved .* by ben@x$/);
+  assert.ok(r.subs.some(x=>/by someone no longer in the team$/.test(x)));
+  assert.ok(r.subs.some(x=>/Shared with your team \(you made it\)/.test(x))===false);
+  assert.ok(r.subs.some(x=>/last saved [^b]*$/.test(x)&&x.includes('Shared with your team')),'no name when none was recorded');
+  assert.ok(r.subsOld.length===4&&r.subsOld.every(x=>!/ by /.test(x)),'still lists maps when the database update is missing');
+  assert.equal(r.ok1,false);assert.equal(r.ok2,false);
+  assert.equal(r.asked.length,1,'asks once, not on every retry');
+  assert.match(r.asked[0],/ben@x saved changes to this map at \d\d:\d\d, after you opened it/);
+  assert.equal(r.saved,1);
+});
 module.exports={tests};

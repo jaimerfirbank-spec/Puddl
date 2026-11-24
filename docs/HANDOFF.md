@@ -180,7 +180,10 @@ plain question and then appears in Ask, At a glance and the report. It is not in
    the database (`supabase/migrations/20261125_team_roles.sql`, NOT applied, needs 20261117 and 20261124 first). Owner can switch
    someone between can edit and view only, and remove them, from a Team button in Your maps; any member sees the team list.
    Viewers get a "View only" notice and nothing they do is saved. People are still added by hand in the Supabase SQL editor
-   (use `viewer` as the role for view-only). Removing someone keeps their private maps in the database, unseen. Next: 3 "last edited by" and a friendlier conflict message, 4 history and restore, 5 comments. The team and owner
+   (use `viewer` as the role for view-only). Removing someone keeps their private maps in the database, unseen. Slice 3 done: the database records who last saved a map (`updated_by`, set by the database so it cannot be forged;
+   `supabase/migrations/20261126_edited_by.sql`, NOT applied; the app still lists maps without it). Shared maps show "last saved by
+   ben@..." in Your maps, and a save clash now says who saved first and offers a copy download, once. Four migrations now wait
+   (20261117, 20261124, 20261125, 20261126), to be applied in that order after a backup. Next: 4 history and restore, 5 comments. The team and owner
    may not exist in the live database yet; check first (read-only queries). Keep customer names out of the repo.
 6. Smaller: a bottleneck infographic (100-dot grid); the "Connection matrix" tab repeats the sector grid on maps over
    60 nodes; accessibility (the map is a canvas; offer the table as the accessible version).
