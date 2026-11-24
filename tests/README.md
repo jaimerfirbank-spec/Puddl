@@ -20,3 +20,7 @@ accounts and concurrent transactions before applying it to production.
 ## Running everything
 
 GitHub runs all of these on every pull request and on `main` (`.github/workflows/tests.yml`): the saving and imported-data checks, a check that `viewer.html` is up to date, the Ask golden record, Ask matching, and ten browser checks of the 24 November features (`node tests/run-browser.cjs`, each in a fresh page). To run them locally you need Playwright (`npm install --no-save playwright`). Without internet, point `PUDDLE_D3_PATH` at a local `d3.min.js`.
+
+## Database access rules
+
+`tests/sql/run.sh` loads `supabase/schema.sql` and the migrations into a throwaway Postgres (with a small stand-in for Supabase's sign-in functions, `tests/sql/00-supabase-stub.sql`) and runs `tests/sql/shared-maps.test.sql`: three people in two teams, checking who can see, edit, share, make private and delete which maps, including attempts that must be refused. It is real Postgres and real policies, but it is not Supabase itself, so a staging check on the real thing is still needed before the migration goes on the live database. GitHub runs it on every change.

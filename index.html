@@ -17485,7 +17485,7 @@ async function cloudInit(){
   try {
     const { data, error } = await supabaseClient
       .from('team_members')
-      .select('team_id, teams(name, seats, maps_per_user, subscription_ends_at)')
+      .select('team_id, role, teams(name, seats, maps_per_user, subscription_ends_at)')
       .limit(1);
     if (error) {
       // The tables may not exist yet, or the network is down.
@@ -17499,6 +17499,7 @@ async function cloudInit(){
     const row = data[0];
     _cloudTeam = {
       team_id: row.team_id,
+      role: row.role || 'member',
       name: row.teams ? row.teams.name : '',
       maps_per_user: row.teams ? row.teams.maps_per_user : 25,
       subscription_ends_at: row.teams ? row.teams.subscription_ends_at : null
@@ -17515,11 +17516,11 @@ async function cloudListMaps(){
   if (!_cloudReady) return [];
   const { data, error } = await supabaseClient
     .from('maps')
-    .select('id, title, kind, updated_at')
-    .eq('scope', 'personal')
+    .select('id, title, kind, updated_at, scope, owner_id')
     .order('updated_at', { ascending: false });
   if (error) return [];
-  return data || [];
+  // The rules return your own private maps and every map shared with your team
+  return (data || []).map(function(m){ return Object.assign({}, m, { mine: m.owner_id === (_authUser && _authUser.id) }); });
 }
 
 // One save path for both a brand-new map and an existing one, so nothing has
@@ -17652,6 +17653,26 @@ async function cloudDeleteMap(id){
   return true;
 }
 
+// Share a map with the team, or take it back. The database does the checking (who made it, a live subscription);
+// the app cannot change a map's owner or kind itself. Needs supabase/migrations/20261124_share_maps.sql.
+async function cloudShareMap(id, on){
+  if (!_cloudReady) return false;
+  const { error } = await supabaseClient.rpc(on ? 'share_map' : 'unshare_map', { p_map: id });
+  if (error) {
+    const msg = String(error.message || '');
+    showStatus(/could not find the function|PGRST202|schema cache/i.test(msg + ' ' + (error.code || ''))
+      ? 'Sharing needs a database update that has not been applied yet.'
+      : msg || 'Could not change sharing.');
+    return false;
+  }
+  // The row's timestamp moved. For the map that is open, take the new one, or the next save would look like a clash.
+  if (id === _cloudMapId) {
+    const { data } = await supabaseClient.from('maps').select('updated_at').eq('id', id).maybeSingle();
+    if (data) _cloudUpdatedAt = data.updated_at;
+  }
+  showStatus(on ? 'Shared with your team.' : 'Made private.');
+  return true;
+}
 async function cloudRenameMap(id, title){
   if (!_cloudReady) return false;
   // A rename moves the row's timestamp. For the map that is open, take the new timestamp, or the next
@@ -17695,7 +17716,7 @@ function renderStartMaps(maps){
   const head=mk('div','display:flex;justify-content:space-between;align-items:baseline;gap:10px;');
   head.appendChild(mk('div','font-size:14px;font-weight:700;color:#18181b;letter-spacing:-0.02em;','Continue a saved map'));
   const cap=(typeof _cloudTeam!=='undefined'&&_cloudTeam&&_cloudTeam.maps_per_user)||25;
-  head.appendChild(mk('div','font-size:11px;color:#a1a1aa;flex-shrink:0;',maps.length+' of '+cap));
+  head.appendChild(mk('div','font-size:11px;color:#a1a1aa;flex-shrink:0;',maps.filter(function(m){ return m.scope!=='team'; }).length+' of '+cap));
   box.appendChild(head);
   box.appendChild(mk('p','font-size:12px;color:#71717a;margin:5px 0 14px;line-height:1.4;','Saved to your account. They open on any computer you sign in from.'));
   const list=mk('div','max-height:min(46vh,340px);overflow-y:auto;');
@@ -17707,7 +17728,7 @@ function renderStartMaps(maps){
     row.onmouseout=function(){ row.style.borderColor='rgba(0,0,0,0.10)'; };
     const txt=mk('div','flex:1;min-width:0;');
     txt.appendChild(mk('div','font-size:13px;font-weight:700;color:#18181b;letter-spacing:-0.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;',m.title||'Untitled map'));
-    txt.appendChild(mk('div','font-size:10.5px;color:#a1a1aa;margin-top:2px;white-space:nowrap;',kind+' · last saved '+when));
+    txt.appendChild(mk('div','font-size:10.5px;color:#a1a1aa;margin-top:2px;white-space:nowrap;',kind+(m.scope==='team'?' · Shared with your team':'')+' · last saved '+when));
     const btn=mk('button','background:#18181b;color:#fff;border:none;font-size:12px;font-weight:700;border-radius:7px;padding:6px 12px;flex-shrink:0;cursor:pointer;font-family:inherit;','Open →');
     btn.type='button';
     let busy=false;
@@ -17774,7 +17795,7 @@ async function openMyMaps(){
 
   const maps = await cloudListMaps();
   const count = document.getElementById('cloud-maps-count');
-  if (count) count.textContent = maps.length + ' of ' + (_cloudTeam?.maps_per_user || 25);
+  if (count) count.textContent = maps.filter(function(m){ return m.scope==='personal'; }).length + ' of ' + (_cloudTeam?.maps_per_user || 25) + ' private' + (maps.some(function(m){ return m.scope==='team'; }) ? ', plus shared' : '');
 
   if (!maps.length) {
     list.innerHTML = '<div style="color:var(--ink-m);font-size:13px;padding:8px 0;">Nothing saved yet. Start a new map and it will appear here.</div>';
@@ -17795,7 +17816,7 @@ async function openMyMaps(){
     const sub = document.createElement('div');
     sub.style.cssText = 'font-size:11px;color:var(--ink-m);margin-top:2px;';
     const kindLbl = (typeof MAP_TYPE_LABELS!=='undefined' && MAP_TYPE_LABELS[m.kind]) || 'General map';
-    sub.textContent = (isOpen ? 'Open now - ' : '') + kindLbl + ' \u00b7 last saved ' + when;
+    sub.textContent = (isOpen ? 'Open now - ' : '') + kindLbl + (m.scope==='team' ? ' \u00b7 Shared with your team' + (m.mine ? ' (you made it)' : '') : '') + ' \u00b7 last saved ' + when;
     name.appendChild(t); name.appendChild(sub);
     row.appendChild(name);
 
@@ -17824,7 +17845,17 @@ async function openMyMaps(){
         openMyMaps();
       }
     }));
-    row.appendChild(mk('Delete', 'Delete this map for good', async function(){
+    const teamName = (_cloudTeam && _cloudTeam.name) || 'your team';
+    if (m.scope === 'personal' && m.mine) row.appendChild(mk('Share', 'Let everyone in ' + teamName + ' open and edit this map', async function(){
+      if (!window.confirm('Share "' + (m.title||'Untitled map') + '" with ' + teamName + '?\n\nEveryone in the team will be able to open it and change it. You can make it private again later.')) return;
+      if (await cloudShareMap(m.id, true)) openMyMaps();
+    }));
+    if (m.scope === 'team' && (m.mine || (_cloudTeam && _cloudTeam.role === 'owner'))) row.appendChild(mk('Make private', 'Take this map back from the team', async function(){
+      if (!window.confirm('Make "' + (m.title||'Untitled map') + '" private again?\n\nOnly its maker will see it' + (m.mine ? '' : ', and it will disappear from your list') + '.')) return;
+      if (await cloudShareMap(m.id, false)) openMyMaps();
+    }));
+    const canDelete = (m.scope === 'personal' && m.mine) || (m.scope === 'team' && _cloudTeam && _cloudTeam.role === 'owner');
+    if (canDelete) row.appendChild(mk('Delete', 'Delete this map for good', async function(){
       if (!window.confirm('Delete "' + (m.title||'Untitled map') + '"?\n\nThis cannot be undone.')) return;
       if (await cloudDeleteMap(m.id)) openMyMaps();
     }));

@@ -100,4 +100,30 @@ test('report: choosing questions shows only those, and the full report switch wo
   const r=await page.evaluate(async()=>{openAskMap();for(const q of ['Who is isolated?','Who holds this map together?']){document.getElementById('ask-map-input').value=q;runAskMap();}openReport();const heads=()=>[...document.querySelectorAll('#report-body h4, #report-body summary')].map(h=>h.textContent.trim());const a=heads();setReportMode(false);const b=heads();return {a,b};});
   assert.ok(r.a.some(h=>/Your selected questions/.test(h)));assert.ok(!r.a.some(h=>/Key charts/.test(h)));assert.ok(r.b.some(h=>/Key charts/.test(h)));
 });
+test('shared maps list: badges, who sees Share, Make private and Delete, and a friendly message if the database update is missing',async({page})=>{
+  await loadMap(page,CARRFIELD);
+  const r=await page.evaluate(async()=>{
+    const rows=[{id:'m1',title:'My private',kind:'general',updated_at:'2026-11-24T10:00:00Z',scope:'personal',owner_id:'me'},
+                {id:'m2',title:'I shared this',kind:'general',updated_at:'2026-11-24T10:00:00Z',scope:'team',owner_id:'me'},
+                {id:'m3',title:'A colleague shared this',kind:'general',updated_at:'2026-11-24T10:00:00Z',scope:'team',owner_id:'ben'}];
+    const calls=[];let missing=false;
+    supabaseClient={from(){return {select(){return this},order(){return Promise.resolve({data:rows,error:null})},eq(){return this},maybeSingle(){return Promise.resolve({data:{updated_at:'2026-11-24T11:00:00Z'},error:null})}};},
+      rpc(name,args){calls.push([name,args.p_map]);return Promise.resolve(missing?{error:{message:'Could not find the function public.share_map',code:'PGRST202'}}:{error:null});}};
+    _authUser={id:'me'};_cloudReady=true;window.confirm=()=>true;
+    const buttonsFor=async role=>{_cloudTeam={team_id:'t',name:'Team One',role,maps_per_user:25};await openMyMaps();return [...document.querySelectorAll('#cloud-maps-list > div')].filter(d=>d.querySelector('button')).map(d=>({title:d.querySelectorAll('div')[1].textContent,sub:d.querySelectorAll('div')[2].textContent,buttons:[...d.querySelectorAll('button')].map(b=>b.textContent)}));};
+    const asMember=await buttonsFor('member'), asOwner=await buttonsFor('owner');
+    const ok=await cloudShareMap('m1',true);const ok2=await cloudShareMap('m2',false);
+    missing=true;const bad=await cloudShareMap('m1',true);const status=(document.getElementById('status-text')||{}).textContent||'';
+    return {asMember,asOwner,ok,ok2,bad,calls,count:document.getElementById('cloud-maps-count').textContent};
+  });
+  const by=(list,t)=>list.find(x=>x.title===t);
+  assert.deepEqual(by(r.asMember,'My private').buttons.filter(b=>b!=='Open'&&b!=='Rename'),['Share','Delete']);
+  assert.deepEqual(by(r.asMember,'I shared this').buttons.filter(b=>b!=='Open'&&b!=='Rename'),['Make private']);
+  assert.deepEqual(by(r.asMember,'A colleague shared this').buttons.filter(b=>b!=='Open'&&b!=='Rename'),[]);
+  assert.match(by(r.asMember,'I shared this').sub,/Shared with your team \(you made it\)/);
+  assert.deepEqual(by(r.asOwner,'A colleague shared this').buttons.filter(b=>b!=='Open'&&b!=='Rename'),['Make private','Delete']);
+  assert.equal(r.ok,true);assert.equal(r.ok2,true);assert.equal(r.bad,false);
+  assert.deepEqual(r.calls.slice(0,2),[['share_map','m1'],['unshare_map','m2']]);
+  assert.match(r.count,/1 of 25 private, plus shared/);
+});
 module.exports={tests};
