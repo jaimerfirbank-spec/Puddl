@@ -5907,7 +5907,7 @@ const ASK_REGISTRY=[
    words:[["go-between", 5], ["go between", 5], ["bottleneck", 5], ["between others", 4], ["routes", 3], ["route", 2], ["broker", 3], ["gatekeeper", 4], ["bridge", 2], ["pass through", 3], ["middle", 2]],
    meaning:["Mixed", "A bottleneck can coordinate activity, but it can also slow or interrupt the network if too much depends on it.", "The items sitting on the most routes are highlighted."],
    how:"For every pair of items Puddle finds the shortest routes between them, then counts how many pass through each item. The percentage is that count against all pairs.",
-   next:["holds", "quiet"],
+   next:["holds", "quiet", "lose3"],
    answer(c,id,from,to){
     const {I,F,np,labels,nodeFocus,linkedFocus,result}=c;
       if(I.betweennessCapped) return result('This map is too large to calculate bottleneck scores all at once.',`Filter it below ${BETWEENNESS_CAP} ${np} and ask again.`);
@@ -6083,6 +6083,42 @@ const ASK_REGISTRY=[
     return result(`${pairs.length} pair${pairs.length===1?'':'s'} of ${np} share ${need} or more partners but are not connected. The strongest: ${nm(best.a)} and ${nm(best.b)}, with ${best.shared.length} in common.`,
       `They both work with ${names}.`+(top.length>1?' Next: '+top.slice(1).map(p=>`${nm(p.a)} and ${nm(p.b)} (${p.shared.length})`).join('; ')+'.':''),
       {label:'Suggested introductions',ids,pairs:pr,sec:[...sec].filter(x=>!ids.has(x))});
+   }}  ,
+  {id:"lose3",cat:"Stress tests",q:"What if we lost the three most relied-on?",
+   words:[["top three",5],["top 3",5],["lost the top",5],["lose the top",5],["lose three",5],["lose 3",5],["lost three",5],["if three",4],["remove three",4],["stress test",4],["several of them",3],["three most",4]],
+   meaning:["Concern","This is a what-if on the structure, not a prediction. Items that would be cut off may have other routes that are simply not recorded, or the items lost may be easy to replace.","The three items taken out, and the items that would be cut off, are highlighted."],
+   how:"Puddle takes the three items on the most routes between others (or the three best connected, on a very large map) out of the map, then follows connections from what is left to see who can still reach the main network.",
+   next:["holds","singles","introduce"],
+   answer(c){
+    const {I,np,result}=c;
+    if(I.pool.length<6) return result(`This map has only ${I.pool.length} ${np}, too few for a what-if.`,'Add more items and ask again.');
+    const G=_insGraph(I.pool), adj=G.adj, nm=id=>(G.nById.get(id)||{}).label||'?';
+    const byScore=I.betweenness&&!I.betweennessCapped?(n=>(I.betweenness.get(n.id)||0)):(n=>I.total.get(n.id)||0);
+    const top=[...I.pool].sort((x,y)=>byScore(y)-byScore(x)||String(x.label).localeCompare(String(y.label))).slice(0,3), gone=new Set(top.map(n=>n.id));
+    const comps=skip=>{ const seen=new Set(), out=[]; adj.forEach((_,id)=>{ if(seen.has(id)||skip.has(id)) return; const comp=[], st=[id]; seen.add(id); while(st.length){ const u=st.pop(); comp.push(u); adj.get(u).forEach(v=>{ if(!seen.has(v)&&!skip.has(v)){ seen.add(v); st.push(v); } }); } out.push(comp); }); return out.sort((a,b)=>b.length-a.length); };
+    const before=comps(new Set()).filter(g=>g.length>1).length, after=comps(gone);
+    const cut=after.slice(1).flat(), lonely=cut.length;
+    const alone=top.map(n=>({n,cut:comps(new Set([n.id])).slice(1).flat().length}));
+    const parts=after.filter(g=>g.length>1).length;
+    return result(lonely?`If ${top.map(n=>n.label).join(', ')} all left, ${lonely} more ${lonely===1?'item':np} would be cut off from the main network, leaving ${parts} separate part${parts===1?'':'s'}${before?` (now ${before})`:''}.`:`If ${top.map(n=>n.label).join(', ')} all left, everyone else could still reach the main network.`,
+      alone.map(x=>`${x.n.label} alone: ${x.cut} cut off`).join('. ')+'. Calculated on the connections in this view.',
+      {label:'If the top three left',ids:new Set(gone),pairs:[],sec:cut});
+   }},
+  {id:"singles",cat:"Stress tests",q:"Who depends on a single connection?",
+   words:[["single connection",8],["only one connection",8],["one link",5],["only connected to one",8],["depend on one",6],["hang off",5],["hangs off",5],["dangling",4],["just one",4],["rely on a single",7],["one connection",7]],
+   meaning:["Concern","An item with a single connection loses its place on the map if that one link ends. It may be a small specialist group, or a link that has not been fully recorded.","The items with a single connection, and the items they hang off, are highlighted."],
+   how:"Puddle finds every item with exactly one connection in this view and groups them by the item they hang off.",
+   next:["lose3","holds","introduce"],
+   answer(c){
+    const {I,np,result}=c, G=_insGraph(I.pool), adj=G.adj, nm=id=>(G.nById.get(id)||{}).label||'?';
+    const ones=I.pool.filter(n=>(adj.get(n.id)||new Set()).size===1);
+    if(!ones.length) return result('Nobody depends on a single connection in this view.','Every item has none, or two or more.');
+    const by=new Map(); ones.forEach(n=>{ const a=[...adj.get(n.id)][0]; if(!by.has(a)) by.set(a,[]); by.get(a).push(n.id); });
+    const rank=[...by.entries()].sort((x,y)=>y[1].length-x[1].length||nm(x[0]).localeCompare(nm(y[0])));
+    const top=rank.slice(0,3).map(([a,l])=>`${l.length} on ${nm(a)}`).join(', ');
+    return result(`${ones.length} ${ones.length===1?'item has':np+' have'} just one connection, hanging off ${by.size} ${by.size===1?'item':'different items'}. Most depend on ${nm(rank[0][0])} (${rank[0][1].length}).`,
+      `By the item they hang off: ${top}${rank.length>3?`, and ${rank.length-3} more`:''}.`,
+      {label:'Depend on a single connection',ids:new Set(ones.map(n=>n.id)),pairs:[],sec:[...by.keys()]});
    }}
 ];
 function _askContext(){
@@ -6132,7 +6168,8 @@ function _askTextMatches(raw){
 function _askDecide(text){
   const raw=String(text||'').trim();
   if(!raw) return {id:'overview',how:'exact',options:[]};
-  const exact=_askQuestions().find(x=>x.q.toLowerCase()===raw.toLowerCase());
+  const plain=t=>String(t).toLowerCase().replace(/[?.!,]+/g,' ').replace(/\s+/g,' ').trim();
+  const exact=_askQuestions().find(x=>plain(x.q)===plain(raw));
   if(exact) return {id:exact.id,how:'exact',options:[]};
   const r=_askRank(raw);
   const tm=_askTextMatches(raw);
