@@ -280,7 +280,47 @@ select{
   -webkit-appearance:menulist !important;
   -moz-appearance:menulist !important;
 }
-/* ── Splash logo drop + bounce ───────────────────────────────────────────── */
+/* ── Plush sheep opening animation ───────────────────────────────────────── */
+#splash-logo{display:none !important;}
+#splash-mascot-scene{position:relative;width:min(390px,78vw);height:min(300px,60vw);opacity:0;isolation:isolate;}
+#splash-mascot-scene.play{opacity:1;}
+#splash-sheep-wrap{position:absolute;z-index:3;inset:0;transform-origin:58% 82%;}
+#splash-sheep{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 13px 14px rgba(24,24,27,.18));}
+#splash-mouth{position:absolute;z-index:4;left:65.2%;top:39%;width:10px;height:3px;margin-left:-5px;border-radius:50%;background:#18181b;opacity:0;transform-origin:50% 0;}
+#splash-water{position:absolute;z-index:1;left:17%;right:8%;bottom:7%;height:18%;border-radius:50%;background:radial-gradient(ellipse at center,rgba(56,189,248,.42) 0,rgba(14,165,233,.20) 45%,rgba(14,165,233,0) 72%);opacity:0;}
+.splash-ripple{position:absolute;z-index:2;left:50%;bottom:13%;width:45%;height:10%;margin-left:-19%;border:3px solid rgba(14,165,233,.76);border-radius:50%;opacity:0;transform:scale(.35);}
+.splash-ripple.r2{bottom:10%;border-width:2px;}
+.splash-drop{position:absolute;z-index:5;left:54%;bottom:19%;width:7px;height:11px;border-radius:60% 60% 70% 70%;background:#38bdf8;opacity:0;}
+.splash-drop.d2{left:39%;width:6px;height:9px;}.splash-drop.d3{left:69%;width:5px;height:8px;}.splash-drop.d4{left:29%;width:5px;height:7px;}
+#splash-mascot-scene.play #splash-sheep-wrap{animation:plushSheepSequence 2.55s cubic-bezier(.2,.75,.3,1) both;}
+#splash-mascot-scene.play #splash-water{animation:plushWater 1.5s .72s ease-out both;}
+#splash-mascot-scene.play .splash-ripple.r1{animation:plushRipple .9s .82s ease-out both;}
+#splash-mascot-scene.play .splash-ripple.r2{animation:plushRipple 1.05s 1.02s ease-out both;}
+#splash-mascot-scene.play .splash-drop.d1{animation:plushDrop .7s .78s ease-out both;--dx:18px;--dy:-42px;}
+#splash-mascot-scene.play .splash-drop.d2{animation:plushDrop .66s .8s ease-out both;--dx:-28px;--dy:-35px;}
+#splash-mascot-scene.play .splash-drop.d3{animation:plushDrop .62s .82s ease-out both;--dx:30px;--dy:-29px;}
+#splash-mascot-scene.play .splash-drop.d4{animation:plushDrop .58s .84s ease-out both;--dx:-18px;--dy:-24px;}
+#splash-mascot-scene.play #splash-mouth{animation:plushMouth .62s 1.83s ease-in-out both;}
+@keyframes plushSheepSequence{
+  0%{opacity:0;transform:translateY(16px) scale(.94);}
+  12%{opacity:1;transform:translateY(0) scale(1);}
+  27%{transform:translateY(0) scale(1);}
+  42%{transform:translateY(-34px) rotate(-1deg) scale(1.015);}
+  54%{transform:translateY(0) rotate(0) scale(1.045,.94);}
+  62%{transform:translateY(-7px) scale(.985,1.02);}
+  70%{transform:translateY(0) scale(1);}
+  76%{transform:translateY(0) rotate(0);}
+  85%{transform:translateY(-3px) rotate(-7deg);}
+  94%{transform:translateY(-3px) rotate(-7deg);}
+  100%{transform:translateY(0) rotate(0);}
+}
+@keyframes plushWater{0%{opacity:0;transform:scale(.7)}18%{opacity:.95;transform:scale(1.08)}100%{opacity:.35;transform:scale(1)}}
+@keyframes plushRipple{0%{opacity:0;transform:scale(.3)}15%{opacity:.9}100%{opacity:0;transform:scale(1.75)}}
+@keyframes plushDrop{0%{opacity:0;transform:translate(0,0) scale(.6)}12%{opacity:1}65%{opacity:.9;transform:translate(var(--dx),var(--dy)) scale(1)}100%{opacity:0;transform:translate(calc(var(--dx) * 1.25),4px) scale(.55)}}
+@keyframes plushMouth{0%,100%{opacity:0;transform:scale(1,.2)}24%,76%{opacity:1;transform:scale(1.35,2.8)}}
+@media(prefers-reduced-motion:reduce){#splash-mascot-scene{opacity:1}#splash-sheep-wrap{animation:none!important}.splash-ripple,.splash-drop,#splash-mouth{display:none!important}#splash-water{opacity:.35!important;animation:none!important}}
+
+/* Previous logo animation retained for old saved files that still call it. */
 @keyframes logoDrop{
   0%   { opacity:0; transform:translateY(-70px) scale(0.92); }
   55%  { opacity:1; transform:translateY(8px)   scale(1.04); }
