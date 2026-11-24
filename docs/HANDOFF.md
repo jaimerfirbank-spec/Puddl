@@ -146,7 +146,6 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
   artwork). Its Ask work was merged through #47 and the old PR #45 is closed, so the branding has no pull request and
   conflicts with `main`. Codex will update it against `main` and open a fresh pull request when Jaime asks. Voice-to-text from that
   branch is not live.
-- Pull request #63: the Ask rebuild, step 1 (see Next jobs). Waiting for Jaime's yes.
 - Most older `claude/*` branches show as unmerged only because pull requests were squash-merged.
 
 ## Next jobs, in this order
@@ -158,13 +157,15 @@ plain question and then appears in Ask, At a glance and the report. It is not in
    (Google's cross-site rules; web reports disagree), build a small server-side relay that fetches only
    `docs.google.com` sheet addresses it builds itself from a validated id. There is no `api/` folder on `main` yet,
    and Codex's #13 adds one, so coordinate.
-2. **Ask rebuild, in progress.** Plan: `puddl-ask-rebuild-plan.md` (not in the repo; summary here). Step 1 is done in #63: every
-   question is one entry in `ASK_REGISTRY` and a golden record (`tests/ask-golden.cjs`, `tests/fixtures/ask-golden.json`) proves the answers are
-   unchanged. Next, in order: Batch 1 (what communities are there, who is quietly important, who should be introduced) with a
-   "how this was worked out" fold-out and "you might ask next" buttons; Batch 2 (lose the top three, what if one item leaves, who depends on
-   a single connection); the grouped picker with live suggestions and a test set of about 100 phrasings; Batch 3 (close to the
-   important people, reaches everyone fastest, look-alikes); named-item questions last. Jaime approved the plan; "you might ask next" yes,
-   named-item last. Re-run the golden test after every change to the list.
+2. **Ask rebuild: done** (PRs #63, #65, #66, #67, #68, #69). Every question is one entry in `ASK_REGISTRY` (wording, group, weighted phrases,
+   related words `syn`, meaning, `how` text, `next` follow-ups, `systems`/`noSystems`/`named` flags, answer function). 31 questions, including
+   communities, quietly important, introductions, lose the top three, single-connection dependence, well placed (eigenvector), reaches
+   everyone fastest (closeness), look-alikes, who gained the most, and three about named organisations (connected to, leaves, route between).
+   Matching scores listed phrases plus word stems weighted by rarity (`_askRank`), finds names loosely (`_askNames`), and shows live "did you mean".
+   **Two tests guard it:** `tests/ask-golden.cjs` (every answer, meaning and highlight on three demo maps must not change; add new questions
+   with `--write`) and `tests/ask-phrases.cjs` (231 typed phrasings, fails on a wrong guess). Honest accuracy: on 42 phrasings written fresh and
+   run before tuning, a third were answered directly and three quarters at least offered; the 231-set figures (86% / 99%) are flattering because
+   failures were added to it. Word matching has a ceiling. Ideas not done: a rules checker, gaps by field, reciprocity.
 3. The readability set (Focus, names, communities, arrows) is done. Original list for reference, to add as questions: who is close to the important people
    (eigenvector), who reaches everyone fastest (closeness), what communities exist, quiet influencers, suggested
    introductions, look-alike organisations, "if we lost the top three", before and after two dates, questions about
