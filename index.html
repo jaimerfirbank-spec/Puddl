@@ -6145,6 +6145,70 @@ const ASK_REGISTRY=[
     return result(`${ones.length} ${ones.length===1?'item has':np+' have'} just one connection, hanging off ${by.size} ${by.size===1?'item':'different items'}. Most depend on ${nm(rank[0][0])} (${rank[0][1].length}).`,
       `By the item they hang off: ${top}${rank.length>3?`, and ${rank.length-3} more`:''}.`,
       {label:'Depend on a single connection',ids:new Set(ones.map(n=>n.id)),pairs:[],sec:[...by.keys()]});
+   }}  ,
+  {id:"wellplaced",cat:"Influence",q:"Who is close to the important people?",
+   words:[["close to the important",8],["well placed",5],["well-placed",5],["connected to the right",6],["connected to important",6],["important connections",5],["who you know",5],["quality of connections",6],["influential connections",6],["connected to the best",6]],
+   syn:["eigenvector","prestige","status","right people","well connected to","best connected neighbours","important neighbours","powerful","connections that matter","important partners"],
+   meaning:["Neutral","Being linked to well-linked items can give access and visibility. A high score here is about position in the recorded connections, not about the real influence of an organisation.","The best-placed items are highlighted."],
+   how:"Puddle scores every item by the scores of the items it is connected to, round and round until the scores settle, so one link to a very well-connected item counts for more than several links to items on the edge. Only the largest connected group is scored.",
+   next:["connected","bottleneck","reach"],
+   answer(c){
+    const {I,np,result}=c, G=_insGraph(I.pool), adj=G.adj;
+    if(I.pool.length<8) return result(`This map has only ${I.pool.length} ${np}, too few for this to mean anything.`,'Add more items and ask again.');
+    const groups=[]; { const seen=new Set(); adj.forEach((_,id)=>{ if(seen.has(id)) return; const comp=[],st=[id]; seen.add(id); while(st.length){ const u=st.pop(); comp.push(u); adj.get(u).forEach(v=>{ if(!seen.has(v)){ seen.add(v); st.push(v); } }); } groups.push(comp); }); }
+    groups.sort((a,b)=>b.length-a.length); const main=groups[0]||[];
+    if(main.length<8) return result('No connected group in this view is large enough to score.','Add connections and ask again.');
+    let x=new Map(main.map(id=>[id,1]));
+    for(let it=0;it<200;it++){
+      const y=new Map(); let norm=0;
+      main.forEach(id=>{ let v=x.get(id); adj.get(id).forEach(n=>{ v+=x.get(n); }); y.set(id,v); norm+=v*v; });
+      norm=Math.sqrt(norm)||1; let diff=0; main.forEach(id=>{ const v=y.get(id)/norm; diff+=Math.abs(v-x.get(id)); y.set(id,v); });
+      x=y; if(diff<1e-9) break;
+    }
+    const best=Math.max(...x.values())||1, nm=id=>(G.nById.get(id)||{}).label||'?';
+    const top=[...main].sort((a,b)=>x.get(b)-x.get(a)||nm(a).localeCompare(nm(b))).slice(0,5);
+    const line=id=>`${nm(id)}: ${adj.get(id).size} connection${adj.get(id).size===1?'':'s'}, score ${Math.round(100*x.get(id)/best)}`;
+    return result(`${nm(top[0])} is best placed, closest to the well-connected parts of the map.`,top.map(line).join('. ')+`. Scored out of 100 within the largest connected group (${main.length} of ${I.pool.length} ${np}).`,
+      {label:'Close to the important people',ids:new Set(top),pairs:[],sec:[]});
+   }},
+  {id:"reach",cat:"Influence",q:"Who can reach everyone fastest?",
+   words:[["reach everyone",7],["reach everybody",7],["reach all",5],["fastest",5],["spread news",6],["spread information",6],["share news",6],["get a message",5],["how quickly",4],["fewest steps",6],["shortest",3],["closest to everyone",7],["most central",5]],
+   syn:["closeness","quickest","speedy","spread","broadcast","word gets round","information travel","reachable","steps"],
+   meaning:["Neutral","An item that can reach the rest in few steps is well placed to pass information on. It says nothing about whether it does, or whether the connections carry anything.","The items that reach the rest fastest are highlighted."],
+   how:"For every item Puddle counts the steps along connections to each item it can reach, and averages them. The fewer the steps, the faster it can reach everyone. Only maps with a connected group of at least 15 items are scored, because on small maps the result is just what you can already see.",
+   next:["wellplaced","bottleneck","holds"],
+   answer(c){
+    const {I,np,result}=c, G=_insGraph(I.pool), adj=G.adj;
+    const ids=[...adj.keys()]; if(ids.length>2500) return result('This map is too large to work out reach for every item at once.',`Filter it below about 2,500 ${np} and ask again.`);
+    const rows=[]; let biggest=0;
+    ids.forEach(s=>{ const d=new Map([[s,0]]), q=[s]; let sum=0; for(let i=0;i<q.length;i++){ const u=q[i]; adj.get(u).forEach(v=>{ if(!d.has(v)){ d.set(v,d.get(u)+1); sum+=d.get(v); q.push(v); } }); } const reached=d.size-1; biggest=Math.max(biggest,reached+1); rows.push({id:s,reached,avg:reached?sum/reached:Infinity}); });
+    if(biggest<15) return result('The biggest connected group in this view has fewer than 15 items, too few for this to tell you more than looking.','Add more items and ask again.');
+    // among items that reach most of the map, the one with the lowest average number of steps
+    const need=Math.floor(0.9*biggest), ok=rows.filter(r=>r.reached+1>=need).sort((a,b)=>a.avg-b.avg||(G.nById.get(a.id).label||'').localeCompare(G.nById.get(b.id).label||''));
+    const top=ok.slice(0,5), nm=id=>(G.nById.get(id)||{}).label||'?';
+    if(!top.length) return result('No item reaches most of the map.','The map is split into separate parts.');
+    return result(`${nm(top[0].id)} reaches everyone fastest: on average ${top[0].avg.toFixed(2)} steps to each of the ${top[0].reached} others it can reach.`,
+      top.map(r=>`${nm(r.id)}: ${r.avg.toFixed(2)} steps on average`).join('. ')+`. Only items that reach at least 90% of the largest connected group (${biggest} items) are compared.`,
+      {label:'Reach everyone fastest',ids:new Set(top.map(r=>r.id)),pairs:[],sec:[]});
+   }},
+  {id:"lookalike",cat:"Opportunities",q:"Which organisations look alike?",noSystems:true,
+   words:[["look alike",8],["look like each other",8],["similar to each other",6],["duplicate",5],["overlap",6],["overlapping",6],["doing the same",6],["same work",5],["same partners",4],["very similar",5],["twins",4],["alike",5],["lookalike",8],["look-alike",8]],
+   syn:["similar","similarity","same","duplication","redundant","redundancy","comparable","mirror","like each other"],
+   meaning:["Mixed","Two items with almost the same connections may be duplicating each other, or may be a natural pair to work together. Puddle can see the pattern, not which it is: that is a judgement for people who know the work.","The look-alike pairs are highlighted."],
+   how:"Puddle compares each pair of items by the partners they have in common as a share of all the partners they have between them. It shows pairs that share at least 60% and have at least 3 partners each.",
+   next:["introduce","communities","quiet"],
+   answer(c){
+    const {I,np,result}=c, G=_insGraph(I.pool), adj=G.adj, nm=id=>(G.nById.get(id)||{}).label||'?';
+    if(I.pool.length<6) return result(`This map has only ${I.pool.length} ${np}, too few to compare.`,'Add more items and ask again.');
+    const cand=new Set(); adj.forEach((nbs,v)=>{ const a=[...nbs]; for(let i=0;i<a.length;i++) for(let j=i+1;j<a.length;j++) cand.add(_pk(a[i],a[j])); });
+    if(cand.size>600000) return result('This map is too large to compare every pair at once.',`Filter it below about 1,500 ${np} and ask again.`);
+    const pairs=[]; cand.forEach(k=>{ const [x,y]=k.split('|').map(Number), A=adj.get(x), B=adj.get(y); if(!A||!B||A.size<3||B.size<3) return; let both=0; A.forEach(n=>{ if(B.has(n)) both++; }); const un=A.size+B.size-both-(A.has(y)?1:0)-(B.has(x)?1:0); const j=un?both/un:0; if(both>=3&&j>=0.6) pairs.push({a:x,b:y,both,j}); });
+    pairs.sort((p,q)=>q.j-p.j||q.both-p.both||p.a-q.a||p.b-q.b);
+    if(!pairs.length) return result(`No two ${np} have almost the same set of partners.`,'Looked for pairs sharing at least 60% of their partners, with at least 3 each.');
+    const top=pairs.slice(0,5), ids=new Set(); top.forEach(p=>{ ids.add(p.a); ids.add(p.b); });
+    return result(`${pairs.length} pair${pairs.length===1?'':'s'} of ${np} have almost the same partners. Closest: ${nm(top[0].a)} and ${nm(top[0].b)}, sharing ${Math.round(100*top[0].j)}% of their partners.`,
+      top.map(p=>`${nm(p.a)} and ${nm(p.b)}: ${p.both} partners in common (${Math.round(100*p.j)}%)`).join('. ')+'. This can mean overlap or a natural pairing; Puddle cannot tell which.',
+      {label:'Look-alikes',ids,pairs:[],sec:[]});
    }}
 ];
 function _askContext(){

@@ -667,6 +667,54 @@
   [
    "list organisations with a sole link",
    "singles"
+  ],
+  [
+   "who is close to the important people",
+   "wellplaced"
+  ],
+  [
+   "who has the best connections to the right people",
+   "wellplaced"
+  ],
+  [
+   "who is well placed",
+   "wellplaced"
+  ],
+  [
+   "which organisations are connected to the most influential ones",
+   "wellplaced"
+  ],
+  [
+   "who can reach everyone fastest",
+   "reach"
+  ],
+  [
+   "who could spread news quickest",
+   "reach"
+  ],
+  [
+   "which organisation is closest to everyone",
+   "reach"
+  ],
+  [
+   "who could get a message round the network fastest",
+   "reach"
+  ],
+  [
+   "which organisations look alike",
+   "lookalike"
+  ],
+  [
+   "are any organisations duplicating each other",
+   "lookalike"
+  ],
+  [
+   "who is doing the same work",
+   "lookalike"
+  ],
+  [
+   "is there any overlap between organisations",
+   "lookalike"
   ]
  ],
  "systems": [
