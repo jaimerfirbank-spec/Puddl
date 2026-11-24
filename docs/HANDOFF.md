@@ -1,4 +1,4 @@
-# Handoff note, updated 23 November 2026
+# Handoff note, updated 24 November 2026
 
 Written so another coding agent (Codex) can pick up if Claude Code is unavailable. It is a snapshot,
 not a status board. Git branches and pull requests are the source of truth for active work, so check
@@ -64,8 +64,45 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
   the rest dims. The faded outer ring (hover, a clicked insight, a filter's neighbours) is drawn in one muted
   gold (`OUTER_RING_COL`, PR #40) so it cannot be mistaken for the bright first ring.
 
+- Wording (PR #41, #46): "cross-sector links" (follows the grouping word), "one connected network" instead of
+  "group of 130", and a plain-words glossary. The product name is Puddle everywhere people see it.
+- Ask Puddle (PRs #47 to #49): questions are matched by scored everyday words (`_askRank`, `_askDecide`):
+  an exact answer, a "I took that to mean..." guess, a short list of close questions, or a list of everything.
+  Typing a word such as "connections" lists every question that mentions it. No microphone.
+- Shared and saved presentations (PRs #48, #49, #50): the shared file now drags the notes divider, and
+  "Explore the map" pans, zooms and hovers (Codex fixed `tools/build-viewer.py`). Presentation setup has a
+  Save presentation button that says it worked (`presSaveDraft`).
+- Report (PR #51): when questions are chosen in Ask, the report shows only those, with Selected questions and
+  Full report buttons (`REPORT_SELECTED_ONLY`). The charts section is renamed.
+- Side panel (PRs #52, #54): one docked panel at the left, about 30% of the screen (25% to 40%, dragged by the
+  grey bar, remembered per browser), with four tabs: At a glance, Ask, Filter, Report. Fold away hides it. The
+  top-left Panel button opens it. Pop out turns Ask back into the draggable floating box; Dock puts it back.
+  The old Search & filter pop-up is the Filter tab. At a glance is the short summary (counts, who the map
+  depends on, biggest go-betweens, top three findings); Show more opens the long lists (`_insFull`).
+  The panel is built by moving the existing elements in (`_dockBuild`), so their ids and code are unchanged.
+  It sits in `#workspace` beside `#canvas-area` and is hidden whenever the canvas area is hidden (start and
+  saved-maps screens) by a CSS sibling rule. It folds away during presentation editing, through a DOM event
+  (`puddl-presedit`) so the generated viewer never reaches panel code.
+- Look (PR #53): connections bow in proportion to their length (`EDGE_CURVE`, default 0.2), a Line strength
+  setting (`EDGE_OPACITY`), a Spread-out dial (`NODE_BREATHING`), and size by go-between score
+  (`setSizeBy('betweenness')`). All are saved with the map.
+- Refresh from spreadsheet (PR #55): a button at the foot of the Filter tab. The map remembers how the columns
+  were matched (`LINKED_SHEET`: key, file name, column roles). A refresh reuses the importer and goes straight
+  to a summary (`_refreshDiff`, `_refreshSummaryRows`): new, changed with old and new values, unchanged, back,
+  and no longer in the spreadsheet. The sheet wins for the columns it carries; blank cells never clear anything.
+  Items not in the file are marked (`missingSince`: dashed amber ring, hover line, At a glance tag, a list with
+  Dismiss in the Filter tab) and never deleted. Nodes carry `fromSheet` and `sheetKey`. A file that matches
+  almost nothing is flagged and the marking defaults to off. In Chrome and Edge the file handle is kept in
+  IndexedDB; elsewhere the file is picked each time. A OneDrive file synced to the computer is just a file.
+- Google Sheet link (PR #56): paste a link to a sheet shared as "Anyone with the link" (`loadGoogleSheet`). It is
+  read as CSV and handed to the same importer; the link is kept in `LINKED_SHEET.url` and Refresh then reads it
+  with no file to pick. Saved files drop the address and shared files drop the whole link. **Not verified
+  against live Google** (see below).
+
 ## Test assets
 
+- Note on the sector name: the demo files still say "Community and VCS". Jaime is renaming it to VCFS in his own
+  spreadsheets, so pull request #43 (data only) is parked and can be closed.
 - `demo/carrfield-neighbourhood.csv` and `.xlsx`: 130 invented organisations in an invented neighbourhood, dated
   across a year. Thirty small groups reach the rest only through the Volunteer Centre, so it cuts off 30 and
   the Academy cuts off 9. Regenerate the xlsx from the csv with openpyxl if the csv changes.
@@ -85,42 +122,46 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
 
 ## In progress, not merged
 
-- Pull request #41: wording only, "crossed a sector line" becomes "cross-sector links" (uses the grouping word, so
-  a map grouped by place reads "cross-place links"). Waiting for Jaime's yes.
-- Pull request #43 (branch `claude/vcfs-label`): renames the demo sector "Community and VCS" to "VCFS" in
-  the Carrfield files, the partner returns file and the collection template. Data only. Jaime asked for it.
-  Waiting for his yes.
-- Codex's draft pull requests #12 (saving and recovery), #13 (photo import) and #16 (Puddle Lens) are
-  untouched by Claude. #12 should be reviewed and tested before any customer puts real data in. The start
-  screen change (#36) is merged, so #16 will need to rebase onto it.
+- Pull request #43 (`claude/vcfs-label`): VCFS rename in the demo files. Parked, see above.
+- Codex's draft pull requests #12 (saving and recovery), #13 (photo import) and #16 (Puddle Lens) are untouched by
+  Claude. #12 should be reviewed and tested before any customer puts real data in. They were written before the
+  side panel, Refresh and the Google Sheet link, so expect conflicts in `index.html` and `viewer.html`.
+- Codex has also been pushing to a branch `codex/ask-the-map` (seen on 24 November). The Ask box now lives in the
+  side panel, so check that branch for overlap before touching Ask.
 - Most older `claude/*` branches show as unmerged only because pull requests were squash-merged.
 
 ## Next jobs, in this order
 
-1. **Shared and saved presentations do not work properly (fix first).** In the shared viewer file the notes
-   divider cannot be dragged, and "Explore the map" switches to the map but pan, zoom and hover do nothing.
-   Likely cause, not confirmed: `tools/build-viewer.py` keeps only code reachable from its entry points, and
-   the divider drag (the IIFE under "Draggable divider for split panel") and the canvas listeners
-   (`canvas.addEventListener('wheel'|'mousedown'|...)`) are stand-alone statements it leaves out. Fix by
-   emitting those pieces for the viewer (view-only parts only, never editing), then save a real presentation
-   with stops and open it as a recipient would. Do not weaken the `FORBIDDEN` check.
-2. A "Connection matrix" tab repeats the sector grid on maps over 60 nodes. Hide one or say it is the same view.
-3. The word "group" in Insights ("group of 130") means a connected network, which confuses people. Rename it
-   (for example "one connected network of 130").
-4. Analysis ideas to choose from, each a click not code: a menu of plain questions ("Who would we lose first?");
-   one Excel table per organisation (connections, strength mix, bottleneck score, group, cut-off count);
-   quiet influencers (few links, high bottleneck); suggested introductions (many shared partners, not linked);
-   look-alike organisations; confirmed versus one-sided connections; a before/after between two dates;
-   a bottleneck infographic (100-dot grid showing the share, with bars for the next four).
-5. Shared workspace for a team: one shared map, named members, view and edit roles, a warning when someone
-   else is editing, a change history, backups. Scope it before building; live co-editing is probably not needed.
-6. Known gaps: see below.
+The plan Jaime and Claude agreed is "about 80% of what Kumu does, without the code": each ability goes in once as a
+plain question and then appears in Ask, At a glance and the report. It is not in the repository; this is the summary.
+
+1. **Check the Google Sheet link with a real shared sheet** on the live site. If the browser blocks the read
+   (Google's cross-site rules; web reports disagree), build a small server-side relay that fetches only
+   `docs.google.com` sheet addresses it builds itself from a validated id. There is no `api/` folder on `main` yet,
+   and Codex's #13 adds one, so coordinate.
+2. **Make a busy map readable:** a Focus button (one item and its neighbours, plus and minus to widen), names thinned
+   to the biggest items until you zoom in, colour by community, arrow size, optional gradient lines.
+3. **Rebuild Ask on one list of questions** (the question, the everyday words that point at it, how to work it out,
+   what to light up, a plain sentence on what it means), then add: who is close to the important people
+   (eigenvector), who reaches everyone fastest (closeness), what communities exist, quiet influencers, suggested
+   introductions, look-alike organisations, "if we lost the top three", before and after two dates, questions about
+   one named organisation.
+4. **Data side:** a kind-of-relationship field with a filter, filter by any field, a data table inside the app, one
+   Excel table of figures per organisation, saved views.
+5. **Shared workspace for a team:** one shared map, named members, view and edit roles, a warning when someone else is
+   editing, a change history, backups, comments. Scope it before building.
+6. Smaller: a bottleneck infographic (100-dot grid); the "Connection matrix" tab repeats the sector grid on maps over
+   60 nodes; accessibility (the map is a canvas; offer the table as the accessible version).
+7. Known gaps: see below.
 
 ## Not built, and why
 
 - Splitting a merged node back into two. The merge record says what was joined, but not which connections
   belonged to which spelling. It would need each edge tagged at import with the spelling it came from.
 - Shared team maps (see next jobs). Maps belong to one account today; there is no guest or shared access.
+- Refresh does not remove a connection that has been deleted from the spreadsheet; it only adds new ones. Matching is by
+  organisation name, so a rename in the sheet looks like a new item plus a missing one unless the near-duplicate
+  review catches it.
 - Two-step loops (two things that affect each other) are not searched for, and Puddl keeps one line per pair,
   so opposite signs in two directions between the same pair cannot both be stored.
 - Name matching misses surname-first order, nicknames and abbreviations.
@@ -138,6 +179,12 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
 - `viewer.html` is generated. Run `python3 tools/build-viewer.py` after changing rendering, insights or the
   presentation. It refuses to write if editor code becomes reachable.
 - Never read `index.html` wholesale. Search for the symbol, then read the range.
+- A new field on a node is lost on save unless it is added to the node list inside `snap()`. `fromSheet`, `sheetKey`
+  and `missingSince` are there; `LINKED_SHEET` is saved as `linkedSheet`.
+- The generated viewer takes only the `#canvas-area` markup and the code reachable from its entry points. Anything
+  that sits outside `#canvas-area` (the side panel) is not in it. Do not reference panel functions from code the viewer
+  reaches; use a DOM event, as presentation editing does.
+- `freshMapPanels()` now also clears `LINKED_SHEET`, so a new or replaced map starts unlinked.
 - Vercel: `main` deploys to production; every branch gets a preview address; the previous production build
   can be promoted back from the Vercel dashboard.
 
