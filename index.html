@@ -1111,20 +1111,20 @@ body.share-mode #present-exit{display:none !important;}
 #workspace{flex:1;display:flex;min-height:0;min-width:0;position:relative;}
 #workspace:has(>#canvas-area[style*="display: none"]){display:none;}
 #workspace>#canvas-area{order:2;}
-#side-dock{order:0;display:none;flex-direction:column;flex:0 0 auto;width:30%;min-width:300px;min-height:0;background:var(--surf-2);font-family:'DM Sans',sans-serif;}
+#side-dock{order:0;display:none;flex-direction:column;flex:0 0 auto;width:30%;min-width:300px;min-height:0;background:var(--surf-2);border-left:1px solid var(--bdr-m);font-family:'DM Sans',sans-serif;}
 #side-dock.open{display:flex;}
 #dock-divider{order:1;display:none;width:8px;flex:0 0 8px;cursor:col-resize;background:var(--bdr);position:relative;touch-action:none;}
 #dock-divider.open{display:block;}
 #dock-divider:after{content:'';position:absolute;top:50%;left:1px;width:6px;height:44px;margin-top:-22px;border-radius:3px;background:var(--bdr-m);}
 #dock-divider:hover:after,#dock-divider.dragging:after{background:var(--ink-h);}
 #canvas-area[style*="display: none"]~#side-dock,#canvas-area[style*="display: none"]~#dock-divider{display:none !important;}
-#side-dock .dock-tabs{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;}
+#side-dock .dock-tabs{display:flex;background:var(--surf);border-bottom:1px solid var(--bdr);flex-shrink:0;padding-left:14px;}
 #side-dock .dock-tabs button{flex:1;height:42px;padding:0 4px;border:none;border-bottom:2px solid transparent;border-radius:0;background:transparent;box-shadow:none;font-size:12.5px;color:var(--ink-m);cursor:pointer;}
 #side-dock .dock-tabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--ink);}
-#side-dock .dock-tools{display:flex;justify-content:flex-end;gap:6px;padding:8px 12px 0;flex-shrink:0;}
+#side-dock .dock-tools{display:flex;justify-content:flex-end;gap:6px;padding:8px 18px 0 24px;flex-shrink:0;}
 #side-dock .dock-tools button{height:25px;padding:0 10px;font-size:11px;}
 #side-dock .dock-panes{flex:1;min-height:0;position:relative;}
-#side-dock .dock-pane{display:none;position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;padding:10px 14px 22px;}
+#side-dock .dock-pane{display:none;position:absolute;inset:0;overflow-y:auto;overscroll-behavior:contain;padding:12px 20px 24px 28px;}
 #side-dock .dock-pane.on{display:block;}
 #search-panel.docked{position:static !important;display:block !important;width:auto !important;max-height:none !important;overflow:visible !important;border:none !important;box-shadow:none !important;border-radius:0 !important;padding:0 !important;background:transparent !important;}
 #side-dock .ask-puddl-body{overflow:visible;padding:0;}
@@ -1189,7 +1189,6 @@ body.share-mode #present-exit{display:none !important;}
         <button onclick="exportPNGSnapshot();closeMenus()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg> Export image</button>
       </div>
     </div>
-    <button id="btn-ask-map" onclick="openAskMap()" title="Ask a calculated question about this map" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-m);">Ask the map</button>
     <div id="demo-save-btn" style="display:none;align-items:center;gap:6px;padding:0 14px;height:28px;border-radius:var(--radius);border:1px solid var(--bdr);background:var(--surf-3);color:var(--ink-h);font-size:11px;font-weight:600;cursor:default;" title="Save (inactive in demo)">⬇ Save file</div>
     <button id="btn-open-settings" onclick="openCustomizePanel()" title="Map settings" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-m);">Settings</button>
     <div style="width:1px;height:20px;background:var(--bdr);margin:0 4px;"></div>
@@ -2059,7 +2058,24 @@ window.addEventListener('load',()=>{ setTimeout(startSplash,60); });
 <div id="conn-strength-modal" style="display:none;position:fixed;inset:0;z-index:250;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);backdrop-filter:blur(4px);">
   <div style="background:var(--surf);border-radius:var(--radius-xl);padding:20px 22px;width:340px;box-shadow:var(--shadow-xl);font-family:'DM Sans',sans-serif;">
     <div style="font-size:15px;font-weight:700;color:var(--ink);margin-bottom:3px;letter-spacing:-0.02em;">Connection style</div>
-    <div style="font-size:11px;color:var(--ink-h);margin-bottom:14px;">Click a style to apply it instantly</div>
+    <div style="font-size:11px;color:var(--ink-h);margin-bottom:12px;" id="conn-modal-hint">Choose the arrow first, then click a style to add the connection</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <span style="font-size:12px;color:var(--ink);flex:1;">Arrow</span>
+      <div id="conn-arrow-btns" style="display:flex;gap:4px;">
+        <button data-arrow="none" onclick="setNewConnArrow('none')" title="Plain line" style="width:34px;height:28px;font-size:14px;padding:0;">—</button>
+        <button data-arrow="forward" onclick="setNewConnArrow('forward')" id="conn-arrow-fwd" title="Arrow to the second item" style="width:34px;height:28px;font-size:14px;padding:0;">→</button>
+        <button data-arrow="backward" onclick="setNewConnArrow('backward')" id="conn-arrow-back" title="Arrow back to the first item" style="width:34px;height:28px;font-size:14px;padding:0;">←</button>
+        <button data-arrow="both" onclick="setNewConnArrow('both')" title="Arrows both ways" style="width:34px;height:28px;font-size:14px;padding:0;">↔</button>
+      </div>
+    </div>
+    <div id="conn-pol-row" style="display:none;align-items:center;gap:8px;margin-bottom:12px;">
+      <span id="conn-pol-label" style="font-size:12px;color:var(--ink);flex:1;">Polarity</span>
+      <div id="conn-pol-btns" style="display:flex;gap:4px;">
+        <button data-polarity="" onclick="setNewConnPolarity('')" title="Not set yet" style="width:34px;height:28px;font-size:14px;padding:0;">?</button>
+        <button data-polarity="positive" onclick="setNewConnPolarity('positive')" id="conn-pol-pos" title="Same direction: cause up, effect up" style="width:34px;height:28px;font-size:16px;padding:0;">+</button>
+        <button data-polarity="negative" onclick="setNewConnPolarity('negative')" id="conn-pol-neg" title="Opposite direction: cause up, effect down" style="width:34px;height:28px;font-size:16px;padding:0;">&minus;</button>
+      </div>
+    </div>
 
     <!-- 6 type buttons with fixed colours -->
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;" id="conn-type-list">
@@ -2962,7 +2978,10 @@ function setLabelThin(v){
   LABEL_THIN=!!v; const c=document.getElementById('settings-label-thin'); if(c) c.checked=LABEL_THIN;
   draw(); saveState(); markUnsaved();
 }
-function _labelOn(n){ return showNodeLabels&&(!_labelSet||_labelSet.has(n.id)); }
+// A node with no name has nothing to draw. Without this it still got an empty white box under it, and lines that ran towards it
+// stopped at that box, so their arrowheads were cut off short of the node.
+function _hasName(n){ return String(n.label==null?'':n.label).trim()!==''; }
+function _labelOn(n){ return showNodeLabels&&_hasName(n)&&(!_labelSet||_labelSet.has(n.id)); }
 // A name that is kept is drawn big enough to read: when the map is zoomed out a name would otherwise be a smudge.
 function _lblScale(n){
   if(!LABEL_THIN||!showNodeLabels||_simpleNow) return 1;
@@ -3000,6 +3019,7 @@ function _computeLabelSet(vb,hasHL){
   // No more names than the screen can carry comfortably; the first few by importance always get one
   const cap=Math.max(12,Math.floor(W*H/(190*190))); let kept=0, rank=0;
   const consider=(n,force)=>{
+    if(!_hasName(n)) return;
     if(_dateHidden.size&&_dateHidden.has(n.id)) return;
     if(_focusHidden.size&&_focusHidden.has(n.id)) return;
     if(n.x<vb.x0||n.x>vb.x1||n.y<vb.y0||n.y>vb.y1) return;
@@ -4836,7 +4856,7 @@ function toggleSearchPanel(){
 // One panel, four tabs. The old Search & filter pop-up, At a glance, the Ask box and the report picks
 // all live in it. Nothing is rebuilt: the existing pieces are moved in, so their ids and code still work.
 const DOCK_TABS=['glance','ask','filter','report'];
-let _dock={open:false,tab:'glance',frac:0.30,popped:false,suspended:false};
+let _dock={open:(typeof innerWidth!=='undefined'&&innerWidth>=1100),tab:'glance',frac:0.30,popped:false,suspended:false};   // open the first time on a wide screen; after that it stays as left
 try{ const _d=JSON.parse(localStorage.getItem('puddl-dock')||'null'); if(_d&&typeof _d==='object'){
   if(typeof _d.open==='boolean') _dock.open=_d.open;
   if(DOCK_TABS.indexOf(_d.tab)>=0) _dock.tab=_d.tab;
@@ -4854,7 +4874,7 @@ function _dockBuild(){
   const ab=document.querySelector('#ask-puddl-widget .ask-puddl-body');
   if(ab){ ab.id='ask-puddl-body'; const rep=$('ask-puddl-report'); if(rep) $('dock-pane-report').insertBefore(rep,$('dock-report-empty')); if(!_dock.popped) $('dock-pane-ask').appendChild(ab); }
   const btn=$('btn-search-toggle');
-  if(btn){ btn.onclick=function(){ dockToggle(); }; btn.title='Open or fold away the side panel'; const lb=$('search-btn-label'); if(lb) lb.textContent='Panel'; }
+  if(btn){ btn.onclick=function(){ dockToggle(); }; btn.title='Open or fold away the side panel'; const lb=$('search-btn-label'); if(lb) lb.textContent='Explore'; }
 }
 function _dockSize(){
   const dock=document.getElementById('side-dock'), ws=document.getElementById('workspace'); if(!dock||!ws) return;
@@ -4877,6 +4897,7 @@ function _dockApply(){
   DOCK_TABS.forEach(t=>{ const b=$('dock-tab-'+t), p=$('dock-pane-'+t), on=t===_dock.tab; if(b){ b.classList.toggle('on',on); b.setAttribute('aria-selected',on?'true':'false'); } if(p) p.classList.toggle('on',on); });
   const pop=$('dock-popout'); if(pop) pop.style.display=(_dock.tab==='ask'&&!_dock.popped)?'':'none';
   const away=$('dock-ask-away'); if(away) away.style.display=_dock.popped?'block':'none';
+  const lau=$('ask-puddl-launcher'); if(lau) lau.style.display=(open&&!_dock.popped)?'none':'';   // the panel has Ask in it, so the floating button is only for when the panel is folded away
   const ins=$('sec-insights-body'), showGlance=open&&_dock.tab==='glance';
   if(ins){ ins.style.display=showGlance?'block':'none'; if(showGlance) renderInsights(); }
   if(open&&_dock.tab==='filter'){ syncDateFilterUI(); renderSheetLink(true); }
@@ -7804,6 +7825,8 @@ function clearSearch(){
     if(a){ a.textContent='▸'; const btn=a.closest('button'); if(btn) btn.setAttribute('aria-expanded','false'); }
   });
   _insOpen={}; try{ localStorage.setItem('puddl-ins-open','{}'); }catch(e){}
+  // In the side panel At a glance is a tab, not a dropdown: closing the dropdown must not leave an open tab empty
+  { const _ins=document.getElementById('sec-insights-body'); if(_ins&&typeof _dock!=='undefined'&&_dock.open&&!_dock.suspended&&_dock.tab==='glance'){ _ins.style.display='block'; try{ renderInsights(); }catch(e){} } }
 }
 // A different or brand-new map should not inherit the last one's open dropdowns or filters
 function freshMapPanels(){ try{ clearSearch(); }catch(e){} LINKED_SHEET=null; }
@@ -11705,8 +11728,36 @@ function renderConnectionStyleIcon(style) {
 }
 
 
+// Arrow direction and +/- for a connection being added. Chosen before a style is clicked, because clicking a style adds it.
+let _newConnArrow='none', _newConnPolarity='';
+function _renderNewConnBtns(){
+  const on=(b,yes)=>{ b.style.background=yes?'var(--ink)':'transparent'; b.style.color=yes?'var(--on-ink)':'var(--ink)'; b.style.border='1px solid '+(yes?'var(--ink)':'var(--bdr-m)'); b.style.borderRadius='6px'; b.style.cursor='pointer'; };
+  document.querySelectorAll('#conn-arrow-btns button').forEach(b=>on(b,b.dataset.arrow===_newConnArrow));
+  document.querySelectorAll('#conn-pol-btns button').forEach(b=>on(b,b.dataset.polarity===_newConnPolarity));
+}
+function setNewConnArrow(v){ _newConnArrow=v; _renderNewConnBtns(); }
+// On a systems map a +/- only means something with a direction, so choosing one on a plain line gives it the direction drawn in
+// (the same rule as editing a connection). A stakeholder alliance or friction sign is not forced to have a direction.
+function setNewConnPolarity(v){
+  _newConnPolarity=v;
+  if(v&&MAP_TYPE==='systems'&&_newConnArrow==='none') _newConnArrow='forward';
+  _renderNewConnBtns();
+}
 function openConnModal(){
   _connShowAll=false;
+  _newConnArrow='none'; _newConnPolarity='';
+  { const isArg=MAP_TYPE==='argument', isStake=MAP_TYPE==='stakeholder', isSys=MAP_TYPE==='systems';
+    const arrowRow=document.getElementById('conn-arrow-btns'); if(arrowRow&&arrowRow.parentElement) arrowRow.parentElement.style.display=isArg?'none':'flex';
+    const polRow=document.getElementById('conn-pol-row'); if(polRow) polRow.style.display=(isSys||isStake)?'flex':'none';
+    const lbl=document.getElementById('conn-pol-label'); if(lbl) lbl.textContent=isStake?'Alignment':'Polarity';
+    const pos=document.getElementById('conn-pol-pos'); if(pos) pos.title=isStake?'Alliance: trust, shared incentives, strong collaboration':'Same direction: cause up, effect up';
+    const neg=document.getElementById('conn-pol-neg'); if(neg) neg.title=isStake?'Friction: conflict, competing goals, distrust':'Opposite direction: cause up, effect down';
+    const hint=document.getElementById('conn-modal-hint'); if(hint) hint.textContent=isArg?'Click a style to add the connection':'Choose the arrow'+((isSys||isStake)?' and sign':'')+' first, then click a style to add the connection';
+    const na=pendingConnection&&nodes.find(n=>n.id===pendingConnection.from), nb=pendingConnection&&nodes.find(n=>n.id===pendingConnection.to);
+    const f=document.getElementById('conn-arrow-fwd'), b=document.getElementById('conn-arrow-back');
+    if(f&&na&&nb) f.title='Arrow from "'+na.label+'" to "'+nb.label+'"';
+    if(b&&na&&nb) b.title='Arrow from "'+nb.label+'" back to "'+na.label+'"';
+    _renderNewConnBtns(); }
   // Reset to default style
   const _ag=pendingConnection?argEdgeFor(pendingConnection.from,pendingConnection.to):null;
   const defaultStyle = CONNECTION_STYLES.find(s => s.id === (_ag?_ag.strength:'moderate')) || CONNECTION_STYLES[0];
@@ -11728,12 +11779,14 @@ function confirmConnectionFull(forceStrength){
   let {from,to}=pendingConnection;
   pendingConnection=null;
   const s=forceStrength||selectedConnType;
-  let _arrow='none';
+  let _arrow=MAP_TYPE==='argument'?'none':_newConnArrow, _pol=MAP_TYPE==='argument'?'':_newConnPolarity;
   if(MAP_TYPE==='argument'&&(s==='supports'||s==='opposes')){
     const g=argEdgeFor(from,to); if(g){ from=g.from; to=g.to; }
     _arrow='forward';
   }
-  edges.push({source:from,target:to,strength:s,colour:selectedConnColour,arrow:_arrow,twoWay:false,date:todayISO()});
+  const _e={source:from,target:to,strength:s,colour:selectedConnColour,arrow:_arrow,twoWay:_arrow==='both',date:todayISO()};
+  if(_pol) _e.polarity=_pol;
+  edges.push(_e);
   const na=nodes.find(n=>n.id===from),nb=nodes.find(n=>n.id===to);
   addLog(`connected "${na?na.label:from}" → "${nb?nb.label:to}" (${s})`);
   if(sim){buildSim();if(forceOn)sim.alpha(0.3).restart();}
@@ -11745,7 +11798,11 @@ function cancelConnection(){
 }
 
 // ── Map info bar ─────────────────────────────────────────────────────────────
+// The side panel is open when a map arrives (it now opens by default), so At a glance must fill in then, not only when someone presses a tab.
+let _insBuiltKey='', _insBuiltTimer=null;
 function updateMapInfoBar(){
+  { const k=nodes.length+'|'+edges.length;
+    if(k!==_insBuiltKey){ _insBuiltKey=k; clearTimeout(_insBuiltTimer); _insBuiltTimer=setTimeout(function(){ try{ if(typeof refreshInsightsIfOpen==='function') refreshInsightsIfOpen(); }catch(e){} },250); } }
   const total=nodes.filter(n=>n.type!=='centre').length;
   const connCount=edges.length;
   document.getElementById('node-count-display').textContent=
@@ -14835,7 +14892,7 @@ const WALK_STEPS=[
   },
   {
     title:'Search and filter',
-    text:"Use Panel in the top-left to open the side panel. It has four tabs: At a glance, Ask, Filter and Report. Under Filter you can search by name, or filter by category, area, tag and connection type. All filters combine, for example Health service + Strong connections.",
+    text:"Use Explore in the top-left to open or fold away the side panel. It has four tabs: At a glance, Ask, Filter and Report. Under Filter you can search by name, or filter by category, area, tag and connection type. All filters combine, for example Health service + Strong connections.",
     target:'search-toggle-wrap', pos:'below'
   },
   {

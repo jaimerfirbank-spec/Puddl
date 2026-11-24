@@ -6,7 +6,11 @@ const tests=[];const test=(name,fn)=>tests.push({name,fn});
 
 test('side panel: opens at 30%, four tabs, pop out and dock, fold away',async({page})=>{
   await loadMap(page,CARRFIELD);
-  await page.click('#btn-search-toggle');await page.waitForTimeout(400);
+  await page.waitForTimeout(400);
+  assert.ok(await page.evaluate(()=>document.getElementById('side-dock').classList.contains('open')),'open the first time on a wide screen');
+  await page.click('#btn-search-toggle');await page.waitForTimeout(300);   // fold it away
+  assert.equal(await page.evaluate(()=>document.getElementById('side-dock').getBoundingClientRect().width),0);
+  await page.click('#btn-search-toggle');await page.waitForTimeout(400);   // and bring it back
   const w=await page.evaluate(()=>Math.round(document.getElementById('side-dock').getBoundingClientRect().width/innerWidth*100));
   assert.equal(w,30);
   for(const t of ['ask','filter','report','glance']){await page.click('#dock-tab-'+t);assert.ok(await page.evaluate(t=>document.getElementById('dock-pane-'+t).classList.contains('on'),t));}
@@ -229,5 +233,67 @@ test('history: lists earlier versions with who and when, viewers cannot go back,
   assert.deepEqual(r.calls,[['restore_map_version','v2']]);
   assert.ok(r.hidden);assert.equal(r.opened,'m2','the map is reopened after going back');
   assert.match(r.noDb[0].t,/database update that has not been applied/);
+});
+
+test('one panel: Explore opens by default, no separate Ask button in the toolbar, floating Ask only when folded away',async({page})=>{
+  await loadMap(page,CARRFIELD);
+  const r=await page.evaluate(async()=>{
+    const q=id=>document.getElementById(id);
+    const askBtn=!!q('btn-ask-map'), label=q('search-btn-label').textContent;
+    const glanceLen=q('sec-insights-body').innerHTML.length, glanceShown=q('sec-insights-body').style.display;
+    const openAtStart=q('side-dock').classList.contains('open'), launcherOpen=getComputedStyle(q('ask-puddl-launcher')).display;
+    dockFold(); const launcherFolded=getComputedStyle(q('ask-puddl-launcher')).display;
+    openAskMap(); const tab=_dock.tab, openAfterAsk=q('side-dock').classList.contains('open');
+    const cs=getComputedStyle(document.querySelector('#side-dock .dock-pane')), tabs=getComputedStyle(document.querySelector('#side-dock .dock-tabs')), dock=getComputedStyle(q('side-dock'));
+    return {glanceLen,glanceShown,askBtn,label,openAtStart,launcherOpen,launcherFolded,tab,openAfterAsk,padL:parseFloat(cs.paddingLeft),tabsL:parseFloat(tabs.paddingLeft),border:dock.borderLeftWidth};
+  });
+  assert.equal(r.askBtn,false);assert.equal(r.label,'Explore');
+  assert.equal(r.openAtStart,true,'open the first time on a wide screen');
+  assert.ok(r.glanceShown==='block'&&r.glanceLen>1000,'At a glance is filled in when a map arrives with the panel already open');
+  assert.equal(r.launcherOpen,'none');assert.notEqual(r.launcherFolded,'none');
+  assert.equal(r.tab,'ask');assert.equal(r.openAfterAsk,true);
+  assert.ok(r.padL>=24&&r.tabsL>=12&&r.border==='1px','the panel has room on the left and a visible edge');
+});
+test('new connection: arrow direction, and + or - on a systems map; plain maps get no sign row',async({page})=>{
+  await loadMap(page,SYSTEMS,'systems');
+  const r=await page.evaluate(()=>{
+    const q=id=>document.getElementById(id);
+    const a=nodes[0].id,b=nodes[1].id,add=(arrow,pol)=>{ pendingConnection={from:a,to:b}; openConnModal();
+      const rows={pol:getComputedStyle(q('conn-pol-row')).display,arrow:getComputedStyle(q('conn-arrow-btns').parentElement).display};
+      if(arrow) setNewConnArrow(arrow); if(pol!==undefined) setNewConnPolarity(pol);
+      const n=edges.length; confirmConnectionFull('moderate'); const e=edges[edges.length-1]; return {rows,added:edges.length===n+1,arrow:e.arrow,pol:e.polarity||null,twoWay:e.twoWay}; };
+    return {def:add(), back:add('backward'), both:add('both'), plus:add(undefined,'positive'), minus:add('forward','negative')};
+  });
+  assert.equal(r.def.arrow,'none');assert.equal(r.def.pol,null);assert.equal(r.def.rows.pol,'flex');
+  assert.equal(r.back.arrow,'backward');assert.equal(r.both.arrow,'both');assert.equal(r.both.twoWay,true);
+  assert.deepEqual([r.plus.arrow,r.plus.pol],['forward','positive'],'a sign on a plain line gives it the direction it was drawn in');
+  assert.deepEqual([r.minus.arrow,r.minus.pol],['forward','negative']);
+});
+test('new connection on a plain map: arrow choice only, no sign row, old default kept',async({page})=>{
+  await loadMap(page,CARRFIELD);
+  const r=await page.evaluate(()=>{
+    const a=nodes[0].id,b=nodes[1].id; pendingConnection={from:a,to:b}; openConnModal();
+    const pol=getComputedStyle(document.getElementById('conn-pol-row')).display; confirmConnectionFull('moderate'); const e=edges[edges.length-1];
+    return {pol,arrow:e.arrow,has:'polarity' in e};
+  });
+  assert.equal(r.pol,'none');assert.equal(r.arrow,'none');assert.equal(r.has,false);
+});
+test('a node with no name leaves no white box, and a line to it reaches its edge with the arrowhead showing',async({page})=>{
+  await loadMap(page,CARRFIELD);
+  const r=await page.evaluate(()=>{
+    if(typeof sim!=='undefined'&&sim) sim.stop();
+    showNodeLabels=true; LABEL_THIN=false; _labelSet=null;
+    const base=nodes[0];
+    const A=Object.assign({},base,{id:9001,x:0,y:260,fx:0,fy:260,label:'Below',type:'process'}), B=Object.assign({},base,{id:9002,x:0,y:0,fx:0,fy:0,label:'',type:'process'});
+    nodes.length=0; edges.length=0; nodes.push(A,B); edges.push({source:9001,target:9002,strength:'strong',arrow:'forward',colour:'#d00000'});
+    zoom=1; panX=W/2; panY=H/2-60; _lblBoxCache.clear(); draw();
+    const named=_labelOn(A), blank=_labelOn(B), spaces=_labelOn(Object.assign({},B,{label:'   '}));
+    const r=nodeDims(B).r||40, c=document.getElementById('bg'), g=c.getContext('2d'), dpr=c.width/c.clientWidth;
+    // red pixels on the line, just outside the node's lower edge (where the box used to stop it)
+    let red=0; for(let y=r+4;y<=r+40;y+=2){ let hit=false; for(let x=-30;x<=30&&!hit;x++){ const d=g.getImageData(Math.round((panX+x)*dpr),Math.round((panY+y)*dpr),1,1).data; if(d[0]>150&&d[1]<80&&d[2]<80) hit=true; } if(hit) red++; }
+    return {named,blank,spaces,red};
+  });
+  assert.equal(r.named,true);assert.equal(r.blank,false);assert.equal(r.spaces,false);
+  assert.ok(r.red>=10,'the line and arrowhead are visible right up to the node ('+r.red+' of 19 samples)');
 });
 module.exports={tests};

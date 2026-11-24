@@ -115,6 +115,14 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
   strong/moderate/weak weighted 3/2/1; legend names each community after its best-connected member and clicking lights it up.
 - Arrow size and gradient lines (PR #62): `ARROW_SIZE` and `EDGE_GRADIENT` in Settings > Connections.
 
+- Panel tidy and connection options (this branch, after #77): the side panel button is now called **Explore**, the panel opens by default
+  the first time on a screen at least 1100px wide (then stays as left), the toolbar "Ask the map" button is gone (the floating Ask
+  Puddle button shows only while the panel is folded away), and the panel has more room on the left and a visible left edge. Adding a
+  connection now lets you choose arrow direction first (none, forward, back, both) and, on systems and stakeholder maps, a + or -
+  sign (a sign on a plain line gives it forward, as editing a connection already did). A node with no name no longer gets an empty
+  white box that stopped lines short of it. Also fixed: At a glance was left blank when a map was loaded with the panel open
+  (`clearSearch` collapsed the old dropdown).
+
 ## Test assets
 
 - Note on the sector name: the demo files still say "Community and VCS". Jaime is renaming it to VCFS in his own
