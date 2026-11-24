@@ -1476,6 +1476,9 @@ function ensureArgStyles(){
    {id:'opposes', label:'Opposes', colour:'#DC2626',lineWidth:2.4,dashPattern:[7,4],arrowScale:1.1}]
   .forEach(st=>{ if(!CONNECTION_STYLES.find(x=>x.id===st.id)) CONNECTION_STYLES.push(st); });
 }
+let EDGE_CURVE=0.2;              // how much a connection bows, as a share of its length (Kumu-style arcs: longer lines sweep more)
+let EDGE_OPACITY=0.8;            // how solid ordinary connections are; lit-up ones are always full
+function _curveOffset(dist){ return MAP_TYPE==='argument'?0:dist*EDGE_CURVE; }
 let EDGE_COLOUR_BY_STRENGTH=false; // when on, connections draw in their strength's colour
 function largeMapOn(){ return nodes.length>=LARGE_MAP_AT; }
 function nodeSizeScale(){ const m=NODE_SIZE_MODE; return (m==='always'||(m==='auto'&&largeMapOn()))?SMALLER_NODE_SCALE:1; }
@@ -1756,6 +1759,7 @@ function snap(){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
+    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,
     askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
@@ -1826,6 +1830,8 @@ function restoreSnap(s){
   }
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
+  EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
+  if(typeof d.nodeSpacing==='number') NODE_BREATHING=d.nodeSpacing;
   ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
   _askAnswer=null;
   SIZE_BY_CONNECTIONS=!!SIZE_BY;
@@ -2184,7 +2190,7 @@ function draw(){
     const bp=_arc?edgePtClearOfLabel(b,_arc.x,_arc.y):edgePtClearOfLabel(b,a.x,a.y);
 
     const dx=bp.x-ap.x,dy=bp.y-ap.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=MAP_TYPE==='argument'?0:Math.min(dist*0.18,45);
+    const curve=_curveOffset(dist);
     // For loop edges: P = 2·arcMid − midEdgePt
     // This is the exact control point that forces B(0.5) through the true arc midpoint
     // on the stored circle, regardless of node size. Works for any N.
@@ -2210,7 +2216,7 @@ function draw(){
     ctx.save();
     // Edges pass under nodes — no clipping needed (nodes drawn on top in render order)
 
-    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
+    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
     const _pc=_pinEdgeCols.size?_pinEdgeCols.get(i):null;
     const _pcs=_pc?_pc.map(ci=>loopColourOf(ci,_dark)):null;
     const _typeCol=isHl&&_ctFilterOn?(_dark?adaptColourForDark(style.colour):style.colour):null;
@@ -2295,7 +2301,7 @@ function draw(){
       // Arrowhead at source (backward or both)
       if(headS){
         ctx.save();
-        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:1);
+        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
         ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
@@ -5179,6 +5185,7 @@ function timelinePlay(){
     if(cur>=hi) timelineStop();
   },100);
 }
+let NODE_BREATHING=76;
 function updateColourLegend(){ _updateColourLegend(); syncLegendVisibility(); }
 function _updateColourLegend(){
   const el=document.getElementById('colour-legend');
@@ -6410,8 +6417,16 @@ function fieldStats(id){
 }
 function maxConnections(){ let m=0; nodes.forEach(n=>{ if(n.type!=='centre') m=Math.max(m,connectionCount(n)); }); return m; }
 // 0..1 position of a node on the current measure, or null when it has no value
+let _bwCache={sig:'',map:null,max:0};
+function _betweennessFor(n){
+  const sig=nodes.length+'|'+edges.length+'|'+(DATE_ASAT||'');
+  if(_bwCache.sig!==sig){ let m=null, mx=0; try{ const I=computeInsights(); if(I.betweenness){ m=I.betweenness; I.betweenness.forEach(v=>{ if(v>mx) mx=v; }); } }catch(e){} _bwCache={sig,map:m,max:mx}; }
+  if(!_bwCache.map||!_bwCache.max) return null;
+  const v=_bwCache.map.get(n.id); return v===undefined?0:v/_bwCache.max;
+}
 function _measure(n,key){
   if(key==='connections'){ const m=maxConnections(); return m?connectionCount(n)/m:0; }
+  if(key==='betweenness') return _betweennessFor(n);
   if(key&&key.startsWith('field:')){
     const id=key.slice(6), st=fieldStats(id); if(!st.numeric) return null;
     const x=_num(n.customFields&&n.customFields[id]); if(isNaN(x)) return null;
