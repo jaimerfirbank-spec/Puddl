@@ -1,0 +1,834 @@
+{
+ "general": [
+  [
+   "what are the main findings",
+   "overview"
+  ],
+  [
+   "give me a summary of this map",
+   "overview"
+  ],
+  [
+   "tell me about this map",
+   "overview"
+  ],
+  [
+   "what should I know",
+   "overview"
+  ],
+  [
+   "overview",
+   "overview"
+  ],
+  [
+   "what stands out",
+   "overview"
+  ],
+  [
+   "who holds this map together",
+   "holds"
+  ],
+  [
+   "who do we rely on most",
+   "holds"
+  ],
+  [
+   "which organisations are critical",
+   "holds"
+  ],
+  [
+   "who would we lose",
+   "holds"
+  ],
+  [
+   "who is essential to this network",
+   "holds"
+  ],
+  [
+   "what depends on whom",
+   "holds"
+  ],
+  [
+   "who is isolated",
+   "isolated"
+  ],
+  [
+   "who has no connections",
+   "isolated"
+  ],
+  [
+   "which organisations are not connected to anyone",
+   "isolated"
+  ],
+  [
+   "who is left out",
+   "isolated"
+  ],
+  [
+   "any unconnected groups or people",
+   "isolated"
+  ],
+  [
+   "who is on their own",
+   "isolated"
+  ],
+  [
+   "who is most connected",
+   "connected"
+  ],
+  [
+   "which organisation has the most connections",
+   "connected"
+  ],
+  [
+   "who is the biggest hub",
+   "connected"
+  ],
+  [
+   "most amount of connections",
+   "connected"
+  ],
+  [
+   "highest number of links",
+   "connected"
+  ],
+  [
+   "who is best connected",
+   "connected"
+  ],
+  [
+   "who is the most popular",
+   "connected"
+  ],
+  [
+   "who has the fewest connections",
+   "least"
+  ],
+  [
+   "least connected organisation",
+   "least"
+  ],
+  [
+   "who has the lowest number of links",
+   "least"
+  ],
+  [
+   "who is barely connected",
+   "least"
+  ],
+  [
+   "who sits on the most routes",
+   "bottleneck"
+  ],
+  [
+   "who is the biggest go-between",
+   "bottleneck"
+  ],
+  [
+   "where are the bottlenecks",
+   "bottleneck"
+  ],
+  [
+   "who is a gatekeeper",
+   "bottleneck"
+  ],
+  [
+   "who brokers between groups",
+   "bottleneck"
+  ],
+  [
+   "which organisation do most paths pass through",
+   "bottleneck"
+  ],
+  [
+   "where are the weak connections",
+   "weak"
+  ],
+  [
+   "show me the weak links",
+   "weak"
+  ],
+  [
+   "which relationships are weak",
+   "weak"
+  ],
+  [
+   "where are the strong connections",
+   "strong"
+  ],
+  [
+   "show the strong links",
+   "strong"
+  ],
+  [
+   "which relationships are strong",
+   "strong"
+  ],
+  [
+   "which parts of the map do not connect",
+   "groups"
+  ],
+  [
+   "are there separate islands",
+   "groups"
+  ],
+  [
+   "is the map in separate pieces",
+   "groups"
+  ],
+  [
+   "which clusters are cut off from the rest",
+   "groups"
+  ],
+  [
+   "what is the largest connected group",
+   "largestgroup"
+  ],
+  [
+   "how big is the biggest network",
+   "largestgroup"
+  ],
+  [
+   "largest connected network",
+   "largestgroup"
+  ],
+  [
+   "how connected is the map overall",
+   "density"
+  ],
+  [
+   "how dense is it",
+   "density"
+  ],
+  [
+   "what is the density",
+   "density"
+  ],
+  [
+   "how well connected is everything",
+   "density"
+  ],
+  [
+   "who has the most connections coming in",
+   "incoming"
+  ],
+  [
+   "who receives the most",
+   "incoming"
+  ],
+  [
+   "incoming connections",
+   "incoming"
+  ],
+  [
+   "who has the most connections going out",
+   "outgoing"
+  ],
+  [
+   "who drives the most",
+   "outgoing"
+  ],
+  [
+   "outgoing links",
+   "outgoing"
+  ],
+  [
+   "what changed between two dates",
+   "change"
+  ],
+  [
+   "what has changed over time",
+   "change"
+  ],
+  [
+   "how has the map grown",
+   "change"
+  ],
+  [
+   "what is different since last year",
+   "change"
+  ],
+  [
+   "what communities are there",
+   "communities"
+  ],
+  [
+   "what natural groups are there",
+   "communities"
+  ],
+  [
+   "which groups work together",
+   "communities"
+  ],
+  [
+   "how many communities",
+   "communities"
+  ],
+  [
+   "find the cliques",
+   "communities"
+  ],
+  [
+   "who is quietly important",
+   "quiet"
+  ],
+  [
+   "which small organisations are overlooked",
+   "quiet"
+  ],
+  [
+   "who is under the radar",
+   "quiet"
+  ],
+  [
+   "unsung connectors",
+   "quiet"
+  ],
+  [
+   "who has few connections but matters",
+   "quiet"
+  ],
+  [
+   "who should be introduced",
+   "introduce"
+  ],
+  [
+   "which organisations should meet",
+   "introduce"
+  ],
+  [
+   "who should work together but is not connected",
+   "introduce"
+  ],
+  [
+   "suggest introductions",
+   "introduce"
+  ],
+  [
+   "who shares partners but is not linked",
+   "introduce"
+  ],
+  [
+   "what if we lost the top three",
+   "lose3"
+  ],
+  [
+   "what happens if the three biggest left",
+   "lose3"
+  ],
+  [
+   "stress test the network",
+   "lose3"
+  ],
+  [
+   "remove the three most important",
+   "lose3"
+  ],
+  [
+   "who depends on a single connection",
+   "singles"
+  ],
+  [
+   "who only has one connection",
+   "singles"
+  ],
+  [
+   "which organisations hang off one link",
+   "singles"
+  ],
+  [
+   "who relies on just one connection",
+   "singles"
+  ],
+  [
+   "can you summarise the situation",
+   "overview"
+  ],
+  [
+   "what's going on here",
+   "overview"
+  ],
+  [
+   "key points please",
+   "overview"
+  ],
+  [
+   "which organisations would cause the most damage if they closed",
+   "holds"
+  ],
+  [
+   "who are we most dependent on",
+   "holds"
+  ],
+  [
+   "what is the single point of failure",
+   "holds"
+  ],
+  [
+   "who is cut off",
+   "isolated"
+  ],
+  [
+   "which ones have nobody linked to them",
+   "isolated"
+  ],
+  [
+   "orphans",
+   "isolated"
+  ],
+  [
+   "who knows the most people",
+   "connected"
+  ],
+  [
+   "who has the most partners",
+   "connected"
+  ],
+  [
+   "top connected organisations",
+   "connected"
+  ],
+  [
+   "who has hardly any links",
+   "least"
+  ],
+  [
+   "who is on the edge of the network",
+   "least"
+  ],
+  [
+   "who connects different parts of the network",
+   "bottleneck"
+  ],
+  [
+   "who is the middleman",
+   "bottleneck"
+  ],
+  [
+   "who controls the flow",
+   "bottleneck"
+  ],
+  [
+   "list the fragile relationships",
+   "weak"
+  ],
+  [
+   "which links are tenuous",
+   "weak"
+  ],
+  [
+   "who are our closest relationships",
+   "strong"
+  ],
+  [
+   "where are the tight links",
+   "strong"
+  ],
+  [
+   "are there disconnected clusters",
+   "groups"
+  ],
+  [
+   "does everything join up",
+   "groups"
+  ],
+  [
+   "how many are in the main network",
+   "largestgroup"
+  ],
+  [
+   "size of the biggest cluster",
+   "largestgroup"
+  ],
+  [
+   "how joined up is it",
+   "density"
+  ],
+  [
+   "is this a tightly knit network",
+   "density"
+  ],
+  [
+   "who gets the most arrows pointing at them",
+   "incoming"
+  ],
+  [
+   "who is relied on the most by arrows",
+   "incoming"
+  ],
+  [
+   "who initiates the most",
+   "outgoing"
+  ],
+  [
+   "who sends the most arrows",
+   "outgoing"
+  ],
+  [
+   "how has this grown this year",
+   "change"
+  ],
+  [
+   "compare march with october",
+   "change"
+  ],
+  [
+   "are there distinct neighbourhood groups",
+   "communities"
+  ],
+  [
+   "detect groups",
+   "communities"
+  ],
+  [
+   "segments of the network",
+   "communities"
+  ],
+  [
+   "who is a hidden connector",
+   "quiet"
+  ],
+  [
+   "small organisations with big impact",
+   "quiet"
+  ],
+  [
+   "who punches above their weight",
+   "quiet"
+  ],
+  [
+   "which two organisations have never met but know the same people",
+   "introduce"
+  ],
+  [
+   "who could we put in touch",
+   "introduce"
+  ],
+  [
+   "suggest partnerships",
+   "introduce"
+  ],
+  [
+   "what if the biggest hubs disappeared",
+   "lose3"
+  ],
+  [
+   "worst case scenario for the network",
+   "lose3"
+  ],
+  [
+   "how fragile is this network",
+   "lose3"
+  ],
+  [
+   "which organisations are only attached to one other",
+   "singles"
+  ],
+  [
+   "who is dangling",
+   "singles"
+  ],
+  [
+   "leaf nodes",
+   "singles"
+  ],
+  [
+   "what is the headline for this map",
+   "overview"
+  ],
+  [
+   "brief me on the network",
+   "overview"
+  ],
+  [
+   "whose departure would hurt us most",
+   "holds"
+  ],
+  [
+   "which partners are indispensable",
+   "holds"
+  ],
+  [
+   "is anyone not linked to anything",
+   "isolated"
+  ],
+  [
+   "list the loners",
+   "isolated"
+  ],
+  [
+   "who has the largest number of partners",
+   "connected"
+  ],
+  [
+   "which body is at the centre of most relationships",
+   "connected"
+  ],
+  [
+   "who is least linked in",
+   "least"
+  ],
+  [
+   "which organisation has the smallest number of connections",
+   "least"
+  ],
+  [
+   "who do paths run through",
+   "bottleneck"
+  ],
+  [
+   "which organisation joins the others together",
+   "bottleneck"
+  ],
+  [
+   "which relationships are the flimsiest",
+   "weak"
+  ],
+  [
+   "where are the deepest ties",
+   "strong"
+  ],
+  [
+   "is everyone reachable from everyone else",
+   "groups"
+  ],
+  [
+   "which bits are cut adrift",
+   "groups"
+  ],
+  [
+   "how many organisations are in the biggest connected cluster",
+   "largestgroup"
+  ],
+  [
+   "what is the extent of the main component",
+   "largestgroup"
+  ],
+  [
+   "how interlinked is the whole thing",
+   "density"
+  ],
+  [
+   "how many links exist out of all those possible",
+   "density"
+  ],
+  [
+   "who has the most links aimed at them",
+   "incoming"
+  ],
+  [
+   "who is on the receiving end most",
+   "incoming"
+  ],
+  [
+   "what is new since january",
+   "change"
+  ],
+  [
+   "show growth between two points in time",
+   "change"
+  ],
+  [
+   "are there distinct blocs",
+   "communities"
+  ],
+  [
+   "split the map into groups",
+   "communities"
+  ],
+  [
+   "who is influential despite being small",
+   "quiet"
+  ],
+  [
+   "which little players matter",
+   "quiet"
+  ],
+  [
+   "which two should be put in touch",
+   "introduce"
+  ],
+  [
+   "who would benefit from knowing each other",
+   "introduce"
+  ],
+  [
+   "what would happen if the main three went",
+   "lose3"
+  ],
+  [
+   "how resilient is this",
+   "lose3"
+  ],
+  [
+   "who is attached to the rest by a single thread",
+   "singles"
+  ],
+  [
+   "list organisations with a sole link",
+   "singles"
+  ]
+ ],
+ "systems": [
+  [
+   "which loops are reinforcing",
+   "reinforcing"
+  ],
+  [
+   "where are the vicious circles",
+   "reinforcing"
+  ],
+  [
+   "what snowballs",
+   "reinforcing"
+  ],
+  [
+   "amplifying loops",
+   "reinforcing"
+  ],
+  [
+   "which loops are balancing",
+   "balancing"
+  ],
+  [
+   "what is self-correcting",
+   "balancing"
+  ],
+  [
+   "where does the system resist change",
+   "balancing"
+  ],
+  [
+   "stabilising loops",
+   "balancing"
+  ],
+  [
+   "where are the signs missing",
+   "unsigned"
+  ],
+  [
+   "which links have no plus or minus",
+   "unsigned"
+  ],
+  [
+   "unsigned connections",
+   "unsigned"
+  ],
+  [
+   "what are the starting points",
+   "roots"
+  ],
+  [
+   "what are the root causes",
+   "roots"
+  ],
+  [
+   "where does it all start",
+   "roots"
+  ],
+  [
+   "what are the end results",
+   "outcomes"
+  ],
+  [
+   "what are the outcomes",
+   "outcomes"
+  ],
+  [
+   "where does it end up",
+   "outcomes"
+  ],
+  [
+   "which factors are in several loops",
+   "loops"
+  ],
+  [
+   "which feedback loops share factors",
+   "loops"
+  ],
+  [
+   "factors that appear in more than one loop",
+   "loops"
+  ],
+  [
+   "what are the feedback loops that grow",
+   "reinforcing"
+  ],
+  [
+   "runaway loops",
+   "reinforcing"
+  ],
+  [
+   "which loops keep things stable",
+   "balancing"
+  ],
+  [
+   "what keeps the system in check",
+   "balancing"
+  ],
+  [
+   "missing polarity",
+   "unsigned"
+  ],
+  [
+   "which arrows are unsigned",
+   "unsigned"
+  ],
+  [
+   "what drives everything",
+   "roots"
+  ],
+  [
+   "underlying causes",
+   "roots"
+  ],
+  [
+   "where does it all lead",
+   "outcomes"
+  ],
+  [
+   "final results",
+   "outcomes"
+  ],
+  [
+   "which factors sit in many loops",
+   "loops"
+  ],
+  [
+   "the busiest factor in the loops",
+   "loops"
+  ],
+  [
+   "which loops snowball",
+   "reinforcing"
+  ],
+  [
+   "where is there a vicious cycle",
+   "reinforcing"
+  ],
+  [
+   "which feedback keeps things in balance",
+   "balancing"
+  ],
+  [
+   "which loops push back",
+   "balancing"
+  ],
+  [
+   "connections without a polarity",
+   "unsigned"
+  ],
+  [
+   "what are the primary drivers",
+   "roots"
+  ],
+  [
+   "what do the arrows finally lead to",
+   "outcomes"
+  ],
+  [
+   "which factors are shared by lots of loops",
+   "loops"
+  ]
+ ]
+}

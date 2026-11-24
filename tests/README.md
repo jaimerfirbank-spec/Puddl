@@ -14,3 +14,5 @@ accounts and concurrent transactions before applying it to production.
 ## Ask Puddle answers
 
 `tests/ask-golden.cjs` compares every Ask question's answer, meaning and highlight, on the three demo maps, with a stored record (`tests/fixtures/ask-golden.json`). See the top of the file for how to run it. Run it after any change to the Ask question list. Existing answers must not change; new questions are allowed, then add them with `--write`.
+
+`tests/ask-phrases.cjs` measures how well typed wording reaches the right question, using the 207 phrasings in `tests/fixtures/ask-phrases.json`. It fails if a phrasing is answered with the wrong question. Read the numbers with care: the later phrasings were added after they failed once, so the rates on this set are higher than on wording nobody has seen. On 42 phrasings written fresh and measured before any tuning, about a third were answered directly and about three quarters had the right question offered.
