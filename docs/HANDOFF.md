@@ -1,4 +1,4 @@
-# Handoff note, updated 24 November 2026
+# Handoff note, updated 24 November 2026 (evening)
 
 Written so another coding agent (Codex) can pick up if Claude Code is unavailable. It is a snapshot,
 not a status board. Git branches and pull requests are the source of truth for active work, so check
@@ -99,6 +99,22 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
   with no file to pick. Saved files drop the address and shared files drop the whole link. **Not verified
   against live Google** (see below).
 
+- Saving and recovery (PR #58, Codex's #12 brought up to date with three fixes): saves wait for in-flight work and a
+  failed online save stops a map switch or logout; browser recovery copies per account and map; strict checks on loaded
+  map data (`validateMapSnapshot`); imported text escaped across the app. Fixes added: renaming the open map takes the new
+  row timestamp, named versions stay out of undo history, a full browser store no longer blocks the online save, and a map's
+  browser copy is dropped when it is safe online and left. **The database change (`supabase/migrations/20261117_reliable_map_limits.sql`)
+  is NOT applied.** It needs a backup and a staging check, and it stops the app changing a map's owner, team or scope, which
+  the shared team workspace will need to get around.
+- Focus (PR #59): hover-panel Focus button or right-click "Focus on this and its neighbours" hides everything further than
+  1 to 6 steps (`FOCUS_VIEW`, `_focusHidden`), with a bar to widen, narrow or Show everything. View only; At a glance and the
+  report still describe the whole map. Ends on restoring a map.
+- Names thinned on a busy map (PR #60): only names that fit are drawn, most important first (`_computeLabelSet`), scaled up to
+  be readable when zoomed out; hovered and lit-up items keep theirs. Setting `LABEL_THIN`, saved with the map.
+- Colour by community (PR #61): Settings > Map > Colour by > Community. Louvain modularity (`_communityRefresh`), deterministic,
+  strong/moderate/weak weighted 3/2/1; legend names each community after its best-connected member and clicking lights it up.
+- Arrow size and gradient lines (PR #62): `ARROW_SIZE` and `EDGE_GRADIENT` in Settings > Connections.
+
 ## Test assets
 
 - Note on the sector name: the demo files still say "Community and VCS". Jaime is renaming it to VCFS in his own
@@ -126,8 +142,11 @@ Everything below is merged and deployed. Pull requests #26 to #29 hold the detai
 - Codex's draft pull requests #12 (saving and recovery), #13 (photo import) and #16 (Puddle Lens) are untouched by
   Claude. #12 should be reviewed and tested before any customer puts real data in. They were written before the
   side panel, Refresh and the Google Sheet link, so expect conflicts in `index.html` and `viewer.html`.
-- Codex has also been pushing to a branch `codex/ask-the-map` (seen on 24 November). The Ask box now lives in the
-  side panel, so check that branch for overlap before touching Ask.
+- `codex/ask-the-map` now holds branding and opening-animation work only (plush logos, splash screen, header and map picker
+  artwork). Its Ask work was merged through #47 and the old PR #45 is closed, so the branding has no pull request and
+  conflicts with `main`. Codex will update it against `main` and open a fresh pull request when Jaime asks. Voice-to-text from that
+  branch is not live.
+- Pull request #63: the Ask rebuild, step 1 (see Next jobs). Waiting for Jaime's yes.
 - Most older `claude/*` branches show as unmerged only because pull requests were squash-merged.
 
 ## Next jobs, in this order
@@ -139,10 +158,14 @@ plain question and then appears in Ask, At a glance and the report. It is not in
    (Google's cross-site rules; web reports disagree), build a small server-side relay that fetches only
    `docs.google.com` sheet addresses it builds itself from a validated id. There is no `api/` folder on `main` yet,
    and Codex's #13 adds one, so coordinate.
-2. **Make a busy map readable:** a Focus button (one item and its neighbours, plus and minus to widen), names thinned
-   to the biggest items until you zoom in, colour by community, arrow size, optional gradient lines.
-3. **Rebuild Ask on one list of questions** (the question, the everyday words that point at it, how to work it out,
-   what to light up, a plain sentence on what it means), then add: who is close to the important people
+2. **Ask rebuild, in progress.** Plan: `puddl-ask-rebuild-plan.md` (not in the repo; summary here). Step 1 is done in #63: every
+   question is one entry in `ASK_REGISTRY` and a golden record (`tests/ask-golden.cjs`, `tests/fixtures/ask-golden.json`) proves the answers are
+   unchanged. Next, in order: Batch 1 (what communities are there, who is quietly important, who should be introduced) with a
+   "how this was worked out" fold-out and "you might ask next" buttons; Batch 2 (lose the top three, what if one item leaves, who depends on
+   a single connection); the grouped picker with live suggestions and a test set of about 100 phrasings; Batch 3 (close to the
+   important people, reaches everyone fastest, look-alikes); named-item questions last. Jaime approved the plan; "you might ask next" yes,
+   named-item last. Re-run the golden test after every change to the list.
+3. The readability set (Focus, names, communities, arrows) is done. Original list for reference, to add as questions: who is close to the important people
    (eigenvector), who reaches everyone fastest (closeness), what communities exist, quiet influencers, suggested
    introductions, look-alike organisations, "if we lost the top three", before and after two dates, questions about
    one named organisation.
