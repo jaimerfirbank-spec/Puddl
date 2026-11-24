@@ -1489,37 +1489,47 @@
    "most amount of connections": {
     "id": "connected",
     "how": "guess",
-    "options": []
+    "options": [
+     "incoming",
+     "outgoing",
+     "bottleneck"
+    ]
    },
    "highest number of connections": {
     "id": "connected",
     "how": "guess",
-    "options": []
+    "options": [
+     "least",
+     "isolated",
+     "weak"
+    ]
    },
    "disconnected": {
     "id": "isolated",
     "how": "guess",
-    "options": []
+    "options": [
+     "groups"
+    ]
    },
    "who do we rely on": {
     "id": "holds",
     "how": "guess",
-    "options": []
+    "options": [
+     "singles"
+    ]
    },
    "connections": {
     "id": "unknown",
-    "how": "list",
+    "how": "close",
     "options": [
+     "isolated",
      "connected",
      "least",
      "weak",
      "strong",
      "groups",
      "largestgroup",
-     "density",
-     "incoming",
-     "outgoing",
-     "singles"
+     "density"
     ]
    },
    "banana": {
@@ -1539,7 +1549,11 @@
    "weak links": {
     "id": "weak",
     "how": "guess",
-    "options": []
+    "options": [
+     "least",
+     "isolated",
+     "connected"
+    ]
    },
    "where are the strong ones": {
     "id": "strong",
@@ -1554,21 +1568,24 @@
    "largest group": {
     "id": "largestgroup",
     "how": "guess",
-    "options": []
+    "options": [
+     "communities",
+     "lose3"
+    ]
    },
    "how dense is it": {
-    "id": "unknown",
-    "how": "none",
-    "options": [
-     "holds",
-     "isolated",
-     "change"
-    ]
+    "id": "density",
+    "how": "guess",
+    "options": []
    },
    "who is the biggest go-between": {
     "id": "bottleneck",
     "how": "guess",
-    "options": []
+    "options": [
+     "change",
+     "connected",
+     "largestgroup"
+    ]
    },
    "bottleneck": {
     "id": "bottleneck",
@@ -1595,11 +1612,9 @@
    },
    "end result": {
     "id": "unknown",
-    "how": "none",
+    "how": "close",
     "options": [
-     "holds",
-     "isolated",
-     "change"
+     "incoming"
     ]
    },
    "reinforcing": {
@@ -1632,17 +1647,27 @@
    "who has most arrows coming in": {
     "id": "incoming",
     "how": "guess",
-    "options": []
+    "options": [
+     "outgoing",
+     "connected",
+     "bottleneck"
+    ]
    },
    "who drives the most": {
     "id": "outgoing",
     "how": "guess",
-    "options": []
+    "options": [
+     "connected",
+     "bottleneck",
+     "incoming"
+    ]
    },
    "tell me about this map": {
-    "id": "overview",
-    "how": "guess",
-    "options": []
+    "id": "unknown",
+    "how": "close",
+    "options": [
+     "overview"
+    ]
    },
    "summary": {
     "id": "overview",
@@ -1657,7 +1682,9 @@
    "clusters": {
     "id": "groups",
     "how": "guess",
-    "options": []
+    "options": [
+     "largestgroup"
+    ]
    },
    "who is alone": {
     "id": "isolated",
@@ -1667,25 +1694,37 @@
    "least connected": {
     "id": "least",
     "how": "guess",
-    "options": []
+    "options": [
+     "isolated",
+     "connected",
+     "bottleneck"
+    ]
    },
    "fewest links": {
     "id": "least",
     "how": "guess",
-    "options": []
+    "options": [
+     "isolated",
+     "connected",
+     "bottleneck"
+    ]
    },
    "what if we lost the centre": {
     "id": "unknown",
     "how": "close",
     "options": [
-     "holds",
-     "lose3"
+     "lose3",
+     "holds"
     ]
    },
    "how connected is it overall": {
     "id": "density",
     "how": "guess",
-    "options": []
+    "options": [
+     "isolated",
+     "connected",
+     "least"
+    ]
    },
    "": {
     "id": "overview",
@@ -1738,110 +1777,333 @@
     ]
    },
    "who is popular": {
-    "id": "unknown",
-    "how": "close",
-    "options": [
-     "connected"
-    ]
+    "id": "connected",
+    "how": "guess",
+    "options": []
    },
    "key organisation": {
     "id": "holds",
     "how": "guess",
-    "options": []
+    "options": [
+     "overview"
+    ]
    }
   },
   "rank": {
    "Who holds this map together?": [
     {
      "id": "holds",
-     "score": 6
+     "score": 13.48
+    },
+    {
+     "id": "communities",
+     "score": 2.99
+    },
+    {
+     "id": "introduce",
+     "score": 2.99
     }
    ],
    "most amount of connections": [
     {
      "id": "connected",
-     "score": 3
+     "score": 11.55
+    },
+    {
+     "id": "incoming",
+     "score": 4.06
+    },
+    {
+     "id": "outgoing",
+     "score": 4.06
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.35
+    },
+    {
+     "id": "lose3",
+     "score": 2.35
+    },
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "least",
+     "score": 1.7
+    },
+    {
+     "id": "weak",
+     "score": 1.7
+    },
+    {
+     "id": "strong",
+     "score": 1.7
+    },
+    {
+     "id": "quiet",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
     }
    ],
    "highest number of connections": [
     {
      "id": "connected",
-     "score": 3
+     "score": 12.72
+    },
+    {
+     "id": "least",
+     "score": 5.23
+    },
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "weak",
+     "score": 1.7
+    },
+    {
+     "id": "strong",
+     "score": 1.7
+    },
+    {
+     "id": "incoming",
+     "score": 1.7
+    },
+    {
+     "id": "outgoing",
+     "score": 1.7
+    },
+    {
+     "id": "quiet",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
     }
    ],
    "disconnected": [
     {
      "id": "isolated",
-     "score": 3
+     "score": 6.53
+    },
+    {
+     "id": "groups",
+     "score": 3.53
     }
    ],
    "who do we rely on": [
     {
      "id": "holds",
-     "score": 3
+     "score": 6.53
+    },
+    {
+     "id": "singles",
+     "score": 3.53
     }
    ],
-   "connections": [],
+   "connections": [
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "connected",
+     "score": 1.7
+    },
+    {
+     "id": "least",
+     "score": 1.7
+    },
+    {
+     "id": "weak",
+     "score": 1.7
+    },
+    {
+     "id": "strong",
+     "score": 1.7
+    },
+    {
+     "id": "incoming",
+     "score": 1.7
+    },
+    {
+     "id": "outgoing",
+     "score": 1.7
+    },
+    {
+     "id": "quiet",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
+    }
+   ],
    "banana": [],
    "Who is isolated?": [
     {
      "id": "isolated",
-     "score": 4
+     "score": 8.49
     }
    ],
    "weak links": [
     {
      "id": "weak",
-     "score": 4
+     "score": 9.35
+    },
+    {
+     "id": "least",
+     "score": 3.53
+    },
+    {
+     "id": "isolated",
+     "score": 1.82
+    },
+    {
+     "id": "connected",
+     "score": 1.82
+    },
+    {
+     "id": "bottleneck",
+     "score": 1.82
+    },
+    {
+     "id": "strong",
+     "score": 1.82
+    },
+    {
+     "id": "groups",
+     "score": 1.82
+    },
+    {
+     "id": "incoming",
+     "score": 1.82
+    },
+    {
+     "id": "singles",
+     "score": 1.82
     }
    ],
    "where are the strong ones": [
     {
      "id": "strong",
-     "score": 4
+     "score": 8.49
     }
    ],
    "what changed": [
     {
      "id": "change",
-     "score": 7
+     "score": 11.49
     }
    ],
    "largest group": [
     {
      "id": "largestgroup",
-     "score": 3
+     "score": 10.05
+    },
+    {
+     "id": "communities",
+     "score": 3.53
+    },
+    {
+     "id": "lose3",
+     "score": 3.53
     }
    ],
-   "how dense is it": [],
+   "how dense is it": [
+    {
+     "id": "density",
+     "score": 14.49
+    }
+   ],
    "who is the biggest go-between": [
     {
      "id": "bottleneck",
-     "score": 5
+     "score": 13.02
+    },
+    {
+     "id": "change",
+     "score": 3.53
+    },
+    {
+     "id": "connected",
+     "score": 2.99
+    },
+    {
+     "id": "largestgroup",
+     "score": 2.99
+    },
+    {
+     "id": "lose3",
+     "score": 2.99
     }
    ],
    "bottleneck": [
     {
      "id": "bottleneck",
-     "score": 5
+     "score": 9.49
     }
    ],
    "feedback loops": [],
    "root cause": [],
-   "end result": [],
+   "end result": [
+    {
+     "id": "incoming",
+     "score": 4.49
+    }
+   ],
    "reinforcing": [],
    "balancing": [],
    "missing signs": [],
    "who has most arrows coming in": [
     {
      "id": "incoming",
-     "score": 5
+     "score": 15.37
+    },
+    {
+     "id": "outgoing",
+     "score": 5.88
+    },
+    {
+     "id": "connected",
+     "score": 2.35
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.35
+    },
+    {
+     "id": "lose3",
+     "score": 2.35
     }
    ],
    "who drives the most": [
     {
      "id": "outgoing",
-     "score": 3
+     "score": 9.85
+    },
+    {
+     "id": "connected",
+     "score": 2.35
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.35
+    },
+    {
+     "id": "incoming",
+     "score": 2.35
+    },
+    {
+     "id": "lose3",
+     "score": 2.35
     }
    ],
    "tell me about this map": [
@@ -1853,49 +2115,153 @@
    "summary": [
     {
      "id": "overview",
-     "score": 4
+     "score": 8.49
     }
    ],
    "islands": [
     {
      "id": "groups",
-     "score": 3
+     "score": 7.49
     }
    ],
    "clusters": [
     {
      "id": "groups",
-     "score": 3
+     "score": 6.53
+    },
+    {
+     "id": "largestgroup",
+     "score": 3.53
     }
    ],
    "who is alone": [
     {
      "id": "isolated",
-     "score": 3
+     "score": 7.49
     }
    ],
    "least connected": [
     {
      "id": "least",
-     "score": 4
+     "score": 10.2
+    },
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "connected",
+     "score": 1.7
+    },
+    {
+     "id": "bottleneck",
+     "score": 1.7
+    },
+    {
+     "id": "groups",
+     "score": 1.7
+    },
+    {
+     "id": "largestgroup",
+     "score": 1.7
+    },
+    {
+     "id": "density",
+     "score": 1.7
+    },
+    {
+     "id": "introduce",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
     }
    ],
    "fewest links": [
     {
      "id": "least",
-     "score": 4
+     "score": 8.49
+    },
+    {
+     "id": "isolated",
+     "score": 1.82
+    },
+    {
+     "id": "connected",
+     "score": 1.82
+    },
+    {
+     "id": "bottleneck",
+     "score": 1.82
+    },
+    {
+     "id": "weak",
+     "score": 1.82
+    },
+    {
+     "id": "strong",
+     "score": 1.82
+    },
+    {
+     "id": "groups",
+     "score": 1.82
+    },
+    {
+     "id": "incoming",
+     "score": 1.82
+    },
+    {
+     "id": "singles",
+     "score": 1.82
     }
    ],
    "what if we lost the centre": [
     {
+     "id": "lose3",
+     "score": 8.02
+    },
+    {
      "id": "holds",
-     "score": 2
+     "score": 5.53
     }
    ],
    "how connected is it overall": [
     {
      "id": "density",
-     "score": 6
+     "score": 12.2
+    },
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "connected",
+     "score": 1.7
+    },
+    {
+     "id": "least",
+     "score": 1.7
+    },
+    {
+     "id": "bottleneck",
+     "score": 1.7
+    },
+    {
+     "id": "groups",
+     "score": 1.7
+    },
+    {
+     "id": "largestgroup",
+     "score": 1.7
+    },
+    {
+     "id": "introduce",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
     }
    ],
    "": [],
@@ -1907,13 +2273,17 @@
    "who is popular": [
     {
      "id": "connected",
-     "score": 2
+     "score": 6.49
     }
    ],
    "key organisation": [
     {
      "id": "holds",
-     "score": 3
+     "score": 6.53
+    },
+    {
+     "id": "overview",
+     "score": 3.53
     }
    ]
   }
@@ -2986,37 +3356,47 @@
    "most amount of connections": {
     "id": "connected",
     "how": "guess",
-    "options": []
+    "options": [
+     "incoming",
+     "outgoing",
+     "bottleneck"
+    ]
    },
    "highest number of connections": {
     "id": "connected",
     "how": "guess",
-    "options": []
+    "options": [
+     "least",
+     "isolated",
+     "weak"
+    ]
    },
    "disconnected": {
     "id": "isolated",
     "how": "guess",
-    "options": []
+    "options": [
+     "groups"
+    ]
    },
    "who do we rely on": {
     "id": "holds",
     "how": "guess",
-    "options": []
+    "options": [
+     "singles"
+    ]
    },
    "connections": {
     "id": "unknown",
-    "how": "list",
+    "how": "close",
     "options": [
+     "isolated",
      "connected",
      "least",
      "weak",
      "strong",
      "groups",
      "largestgroup",
-     "density",
-     "incoming",
-     "outgoing",
-     "singles"
+     "density"
     ]
    },
    "banana": {
@@ -3036,7 +3416,11 @@
    "weak links": {
     "id": "weak",
     "how": "guess",
-    "options": []
+    "options": [
+     "least",
+     "isolated",
+     "connected"
+    ]
    },
    "where are the strong ones": {
     "id": "strong",
@@ -3051,21 +3435,24 @@
    "largest group": {
     "id": "largestgroup",
     "how": "guess",
-    "options": []
+    "options": [
+     "communities",
+     "lose3"
+    ]
    },
    "how dense is it": {
-    "id": "unknown",
-    "how": "none",
-    "options": [
-     "holds",
-     "isolated",
-     "change"
-    ]
+    "id": "density",
+    "how": "guess",
+    "options": []
    },
    "who is the biggest go-between": {
     "id": "bottleneck",
     "how": "guess",
-    "options": []
+    "options": [
+     "change",
+     "connected",
+     "largestgroup"
+    ]
    },
    "bottleneck": {
     "id": "bottleneck",
@@ -3092,11 +3479,9 @@
    },
    "end result": {
     "id": "unknown",
-    "how": "none",
+    "how": "close",
     "options": [
-     "holds",
-     "isolated",
-     "change"
+     "incoming"
     ]
    },
    "reinforcing": {
@@ -3129,17 +3514,27 @@
    "who has most arrows coming in": {
     "id": "incoming",
     "how": "guess",
-    "options": []
+    "options": [
+     "outgoing",
+     "connected",
+     "bottleneck"
+    ]
    },
    "who drives the most": {
     "id": "outgoing",
     "how": "guess",
-    "options": []
+    "options": [
+     "connected",
+     "bottleneck",
+     "incoming"
+    ]
    },
    "tell me about this map": {
-    "id": "overview",
-    "how": "guess",
-    "options": []
+    "id": "unknown",
+    "how": "close",
+    "options": [
+     "overview"
+    ]
    },
    "summary": {
     "id": "overview",
@@ -3154,7 +3549,9 @@
    "clusters": {
     "id": "groups",
     "how": "guess",
-    "options": []
+    "options": [
+     "largestgroup"
+    ]
    },
    "who is alone": {
     "id": "isolated",
@@ -3164,25 +3561,37 @@
    "least connected": {
     "id": "least",
     "how": "guess",
-    "options": []
+    "options": [
+     "isolated",
+     "connected",
+     "bottleneck"
+    ]
    },
    "fewest links": {
     "id": "least",
     "how": "guess",
-    "options": []
+    "options": [
+     "isolated",
+     "connected",
+     "bottleneck"
+    ]
    },
    "what if we lost the centre": {
     "id": "unknown",
     "how": "close",
     "options": [
-     "holds",
-     "lose3"
+     "lose3",
+     "holds"
     ]
    },
    "how connected is it overall": {
     "id": "density",
     "how": "guess",
-    "options": []
+    "options": [
+     "isolated",
+     "connected",
+     "least"
+    ]
    },
    "": {
     "id": "overview",
@@ -3235,110 +3644,333 @@
     ]
    },
    "who is popular": {
-    "id": "unknown",
-    "how": "close",
-    "options": [
-     "connected"
-    ]
+    "id": "connected",
+    "how": "guess",
+    "options": []
    },
    "key organisation": {
     "id": "holds",
     "how": "guess",
-    "options": []
+    "options": [
+     "overview"
+    ]
    }
   },
   "rank": {
    "Who holds this map together?": [
     {
      "id": "holds",
-     "score": 6
+     "score": 13.48
+    },
+    {
+     "id": "communities",
+     "score": 2.99
+    },
+    {
+     "id": "introduce",
+     "score": 2.99
     }
    ],
    "most amount of connections": [
     {
      "id": "connected",
-     "score": 3
+     "score": 11.55
+    },
+    {
+     "id": "incoming",
+     "score": 4.06
+    },
+    {
+     "id": "outgoing",
+     "score": 4.06
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.35
+    },
+    {
+     "id": "lose3",
+     "score": 2.35
+    },
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "least",
+     "score": 1.7
+    },
+    {
+     "id": "weak",
+     "score": 1.7
+    },
+    {
+     "id": "strong",
+     "score": 1.7
+    },
+    {
+     "id": "quiet",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
     }
    ],
    "highest number of connections": [
     {
      "id": "connected",
-     "score": 3
+     "score": 12.72
+    },
+    {
+     "id": "least",
+     "score": 5.23
+    },
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "weak",
+     "score": 1.7
+    },
+    {
+     "id": "strong",
+     "score": 1.7
+    },
+    {
+     "id": "incoming",
+     "score": 1.7
+    },
+    {
+     "id": "outgoing",
+     "score": 1.7
+    },
+    {
+     "id": "quiet",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
     }
    ],
    "disconnected": [
     {
      "id": "isolated",
-     "score": 3
+     "score": 6.53
+    },
+    {
+     "id": "groups",
+     "score": 3.53
     }
    ],
    "who do we rely on": [
     {
      "id": "holds",
-     "score": 3
+     "score": 6.53
+    },
+    {
+     "id": "singles",
+     "score": 3.53
     }
    ],
-   "connections": [],
+   "connections": [
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "connected",
+     "score": 1.7
+    },
+    {
+     "id": "least",
+     "score": 1.7
+    },
+    {
+     "id": "weak",
+     "score": 1.7
+    },
+    {
+     "id": "strong",
+     "score": 1.7
+    },
+    {
+     "id": "incoming",
+     "score": 1.7
+    },
+    {
+     "id": "outgoing",
+     "score": 1.7
+    },
+    {
+     "id": "quiet",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
+    }
+   ],
    "banana": [],
    "Who is isolated?": [
     {
      "id": "isolated",
-     "score": 4
+     "score": 8.49
     }
    ],
    "weak links": [
     {
      "id": "weak",
-     "score": 4
+     "score": 9.35
+    },
+    {
+     "id": "least",
+     "score": 3.53
+    },
+    {
+     "id": "isolated",
+     "score": 1.82
+    },
+    {
+     "id": "connected",
+     "score": 1.82
+    },
+    {
+     "id": "bottleneck",
+     "score": 1.82
+    },
+    {
+     "id": "strong",
+     "score": 1.82
+    },
+    {
+     "id": "groups",
+     "score": 1.82
+    },
+    {
+     "id": "incoming",
+     "score": 1.82
+    },
+    {
+     "id": "singles",
+     "score": 1.82
     }
    ],
    "where are the strong ones": [
     {
      "id": "strong",
-     "score": 4
+     "score": 8.49
     }
    ],
    "what changed": [
     {
      "id": "change",
-     "score": 7
+     "score": 11.49
     }
    ],
    "largest group": [
     {
      "id": "largestgroup",
-     "score": 3
+     "score": 10.05
+    },
+    {
+     "id": "communities",
+     "score": 3.53
+    },
+    {
+     "id": "lose3",
+     "score": 3.53
     }
    ],
-   "how dense is it": [],
+   "how dense is it": [
+    {
+     "id": "density",
+     "score": 14.49
+    }
+   ],
    "who is the biggest go-between": [
     {
      "id": "bottleneck",
-     "score": 5
+     "score": 13.02
+    },
+    {
+     "id": "change",
+     "score": 3.53
+    },
+    {
+     "id": "connected",
+     "score": 2.99
+    },
+    {
+     "id": "largestgroup",
+     "score": 2.99
+    },
+    {
+     "id": "lose3",
+     "score": 2.99
     }
    ],
    "bottleneck": [
     {
      "id": "bottleneck",
-     "score": 5
+     "score": 9.49
     }
    ],
    "feedback loops": [],
    "root cause": [],
-   "end result": [],
+   "end result": [
+    {
+     "id": "incoming",
+     "score": 4.49
+    }
+   ],
    "reinforcing": [],
    "balancing": [],
    "missing signs": [],
    "who has most arrows coming in": [
     {
      "id": "incoming",
-     "score": 5
+     "score": 15.37
+    },
+    {
+     "id": "outgoing",
+     "score": 5.88
+    },
+    {
+     "id": "connected",
+     "score": 2.35
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.35
+    },
+    {
+     "id": "lose3",
+     "score": 2.35
     }
    ],
    "who drives the most": [
     {
      "id": "outgoing",
-     "score": 3
+     "score": 9.85
+    },
+    {
+     "id": "connected",
+     "score": 2.35
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.35
+    },
+    {
+     "id": "incoming",
+     "score": 2.35
+    },
+    {
+     "id": "lose3",
+     "score": 2.35
     }
    ],
    "tell me about this map": [
@@ -3350,49 +3982,153 @@
    "summary": [
     {
      "id": "overview",
-     "score": 4
+     "score": 8.49
     }
    ],
    "islands": [
     {
      "id": "groups",
-     "score": 3
+     "score": 7.49
     }
    ],
    "clusters": [
     {
      "id": "groups",
-     "score": 3
+     "score": 6.53
+    },
+    {
+     "id": "largestgroup",
+     "score": 3.53
     }
    ],
    "who is alone": [
     {
      "id": "isolated",
-     "score": 3
+     "score": 7.49
     }
    ],
    "least connected": [
     {
      "id": "least",
-     "score": 4
+     "score": 10.2
+    },
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "connected",
+     "score": 1.7
+    },
+    {
+     "id": "bottleneck",
+     "score": 1.7
+    },
+    {
+     "id": "groups",
+     "score": 1.7
+    },
+    {
+     "id": "largestgroup",
+     "score": 1.7
+    },
+    {
+     "id": "density",
+     "score": 1.7
+    },
+    {
+     "id": "introduce",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
     }
    ],
    "fewest links": [
     {
      "id": "least",
-     "score": 4
+     "score": 8.49
+    },
+    {
+     "id": "isolated",
+     "score": 1.82
+    },
+    {
+     "id": "connected",
+     "score": 1.82
+    },
+    {
+     "id": "bottleneck",
+     "score": 1.82
+    },
+    {
+     "id": "weak",
+     "score": 1.82
+    },
+    {
+     "id": "strong",
+     "score": 1.82
+    },
+    {
+     "id": "groups",
+     "score": 1.82
+    },
+    {
+     "id": "incoming",
+     "score": 1.82
+    },
+    {
+     "id": "singles",
+     "score": 1.82
     }
    ],
    "what if we lost the centre": [
     {
+     "id": "lose3",
+     "score": 8.02
+    },
+    {
      "id": "holds",
-     "score": 2
+     "score": 5.53
     }
    ],
    "how connected is it overall": [
     {
      "id": "density",
-     "score": 6
+     "score": 12.2
+    },
+    {
+     "id": "isolated",
+     "score": 1.7
+    },
+    {
+     "id": "connected",
+     "score": 1.7
+    },
+    {
+     "id": "least",
+     "score": 1.7
+    },
+    {
+     "id": "bottleneck",
+     "score": 1.7
+    },
+    {
+     "id": "groups",
+     "score": 1.7
+    },
+    {
+     "id": "largestgroup",
+     "score": 1.7
+    },
+    {
+     "id": "introduce",
+     "score": 1.7
+    },
+    {
+     "id": "singles",
+     "score": 1.7
     }
    ],
    "": [],
@@ -3404,13 +4140,17 @@
    "who is popular": [
     {
      "id": "connected",
-     "score": 2
+     "score": 6.49
     }
    ],
    "key organisation": [
     {
      "id": "holds",
-     "score": 3
+     "score": 6.53
+    },
+    {
+     "id": "overview",
+     "score": 3.53
     }
    ]
   }
@@ -4117,38 +4857,47 @@
    "most amount of connections": {
     "id": "connected",
     "how": "guess",
-    "options": []
+    "options": [
+     "incoming",
+     "outgoing",
+     "bottleneck"
+    ]
    },
    "highest number of connections": {
     "id": "connected",
     "how": "guess",
-    "options": []
+    "options": [
+     "least",
+     "isolated",
+     "weak"
+    ]
    },
    "disconnected": {
     "id": "isolated",
     "how": "guess",
-    "options": []
+    "options": [
+     "groups"
+    ]
    },
    "who do we rely on": {
     "id": "holds",
     "how": "guess",
-    "options": []
+    "options": [
+     "singles"
+    ]
    },
    "connections": {
     "id": "unknown",
-    "how": "list",
+    "how": "close",
     "options": [
+     "isolated",
      "connected",
      "least",
      "weak",
      "strong",
      "groups",
      "largestgroup",
-     "density",
-     "incoming",
-     "outgoing",
-     "unsigned",
-     "singles"
+     "density"
     ]
    },
    "banana": {
@@ -4168,7 +4917,11 @@
    "weak links": {
     "id": "weak",
     "how": "guess",
-    "options": []
+    "options": [
+     "least",
+     "isolated",
+     "connected"
+    ]
    },
    "where are the strong ones": {
     "id": "strong",
@@ -4183,21 +4936,24 @@
    "largest group": {
     "id": "largestgroup",
     "how": "guess",
-    "options": []
+    "options": [
+     "communities",
+     "lose3"
+    ]
    },
    "how dense is it": {
-    "id": "unknown",
-    "how": "none",
-    "options": [
-     "reinforcing",
-     "unsigned",
-     "roots"
-    ]
+    "id": "density",
+    "how": "guess",
+    "options": []
    },
    "who is the biggest go-between": {
     "id": "bottleneck",
     "how": "guess",
-    "options": []
+    "options": [
+     "change",
+     "connected",
+     "largestgroup"
+    ]
    },
    "bottleneck": {
     "id": "bottleneck",
@@ -4207,7 +4963,10 @@
    "feedback loops": {
     "id": "loops",
     "how": "guess",
-    "options": []
+    "options": [
+     "reinforcing",
+     "balancing"
+    ]
    },
    "root cause": {
     "id": "roots",
@@ -4217,7 +4976,9 @@
    "end result": {
     "id": "outcomes",
     "how": "guess",
-    "options": []
+    "options": [
+     "incoming"
+    ]
    },
    "reinforcing": {
     "id": "reinforcing",
@@ -4237,17 +4998,27 @@
    "who has most arrows coming in": {
     "id": "incoming",
     "how": "guess",
-    "options": []
+    "options": [
+     "outgoing",
+     "connected",
+     "bottleneck"
+    ]
    },
    "who drives the most": {
     "id": "outgoing",
     "how": "guess",
-    "options": []
+    "options": [
+     "roots",
+     "connected",
+     "bottleneck"
+    ]
    },
    "tell me about this map": {
-    "id": "overview",
-    "how": "guess",
-    "options": []
+    "id": "unknown",
+    "how": "close",
+    "options": [
+     "overview"
+    ]
    },
    "summary": {
     "id": "overview",
@@ -4262,7 +5033,9 @@
    "clusters": {
     "id": "groups",
     "how": "guess",
-    "options": []
+    "options": [
+     "largestgroup"
+    ]
    },
    "who is alone": {
     "id": "isolated",
@@ -4272,25 +5045,37 @@
    "least connected": {
     "id": "least",
     "how": "guess",
-    "options": []
+    "options": [
+     "isolated",
+     "connected",
+     "bottleneck"
+    ]
    },
    "fewest links": {
     "id": "least",
     "how": "guess",
-    "options": []
+    "options": [
+     "isolated",
+     "connected",
+     "bottleneck"
+    ]
    },
    "what if we lost the centre": {
     "id": "unknown",
     "how": "close",
     "options": [
-     "holds",
-     "lose3"
+     "lose3",
+     "holds"
     ]
    },
    "how connected is it overall": {
     "id": "density",
     "how": "guess",
-    "options": []
+    "options": [
+     "isolated",
+     "connected",
+     "least"
+    ]
    },
    "": {
     "id": "overview",
@@ -4307,11 +5092,9 @@
     ]
    },
    "sign": {
-    "id": "unknown",
-    "how": "close",
-    "options": [
-     "unsigned"
-    ]
+    "id": "unsigned",
+    "how": "guess",
+    "options": []
    },
    "source of the problem": {
     "id": "roots",
@@ -4329,140 +5112,382 @@
     "options": []
    },
    "who is popular": {
-    "id": "unknown",
-    "how": "close",
-    "options": [
-     "connected"
-    ]
+    "id": "connected",
+    "how": "guess",
+    "options": []
    },
    "key organisation": {
     "id": "holds",
     "how": "guess",
-    "options": []
+    "options": [
+     "overview"
+    ]
    }
   },
   "rank": {
    "Who holds this map together?": [
     {
      "id": "holds",
-     "score": 6
+     "score": 14.68
+    },
+    {
+     "id": "communities",
+     "score": 3.85
     }
    ],
    "most amount of connections": [
     {
      "id": "connected",
-     "score": 3
+     "score": 12.3
+    },
+    {
+     "id": "incoming",
+     "score": 4.47
+    },
+    {
+     "id": "outgoing",
+     "score": 4.47
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.64
+    },
+    {
+     "id": "lose3",
+     "score": 2.64
+    },
+    {
+     "id": "isolated",
+     "score": 1.84
+    },
+    {
+     "id": "least",
+     "score": 1.84
+    },
+    {
+     "id": "weak",
+     "score": 1.84
+    },
+    {
+     "id": "strong",
+     "score": 1.84
+    },
+    {
+     "id": "unsigned",
+     "score": 1.84
+    },
+    {
+     "id": "quiet",
+     "score": 1.84
+    },
+    {
+     "id": "singles",
+     "score": 1.84
     }
    ],
    "highest number of connections": [
     {
      "id": "connected",
-     "score": 3
+     "score": 13.51
+    },
+    {
+     "id": "least",
+     "score": 5.68
+    },
+    {
+     "id": "isolated",
+     "score": 1.84
+    },
+    {
+     "id": "weak",
+     "score": 1.84
+    },
+    {
+     "id": "strong",
+     "score": 1.84
+    },
+    {
+     "id": "incoming",
+     "score": 1.84
+    },
+    {
+     "id": "outgoing",
+     "score": 1.84
+    },
+    {
+     "id": "unsigned",
+     "score": 1.84
+    },
+    {
+     "id": "quiet",
+     "score": 1.84
+    },
+    {
+     "id": "singles",
+     "score": 1.84
     }
    ],
    "disconnected": [
     {
      "id": "isolated",
-     "score": 3
+     "score": 6.85
+    },
+    {
+     "id": "groups",
+     "score": 3.85
     }
    ],
    "who do we rely on": [
     {
      "id": "holds",
-     "score": 3
+     "score": 6.85
+    },
+    {
+     "id": "singles",
+     "score": 3.85
     }
    ],
-   "connections": [],
+   "connections": [
+    {
+     "id": "isolated",
+     "score": 1.84
+    },
+    {
+     "id": "connected",
+     "score": 1.84
+    },
+    {
+     "id": "least",
+     "score": 1.84
+    },
+    {
+     "id": "weak",
+     "score": 1.84
+    },
+    {
+     "id": "strong",
+     "score": 1.84
+    },
+    {
+     "id": "incoming",
+     "score": 1.84
+    },
+    {
+     "id": "outgoing",
+     "score": 1.84
+    },
+    {
+     "id": "unsigned",
+     "score": 1.84
+    },
+    {
+     "id": "quiet",
+     "score": 1.84
+    },
+    {
+     "id": "singles",
+     "score": 1.84
+    }
+   ],
    "banana": [],
    "Who is isolated?": [
     {
      "id": "isolated",
-     "score": 4
+     "score": 8.83
     }
    ],
    "weak links": [
     {
      "id": "weak",
-     "score": 4
+     "score": 9.93
+    },
+    {
+     "id": "least",
+     "score": 3.85
+    },
+    {
+     "id": "isolated",
+     "score": 2.08
+    },
+    {
+     "id": "connected",
+     "score": 2.08
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.08
+    },
+    {
+     "id": "strong",
+     "score": 2.08
+    },
+    {
+     "id": "groups",
+     "score": 2.08
+    },
+    {
+     "id": "incoming",
+     "score": 2.08
+    },
+    {
+     "id": "singles",
+     "score": 2.08
     }
    ],
    "where are the strong ones": [
     {
      "id": "strong",
-     "score": 4
+     "score": 8.83
     }
    ],
    "what changed": [
     {
      "id": "change",
-     "score": 7
+     "score": 11.83
     }
    ],
    "largest group": [
     {
      "id": "largestgroup",
-     "score": 3
+     "score": 10.69
+    },
+    {
+     "id": "communities",
+     "score": 3.85
+    },
+    {
+     "id": "lose3",
+     "score": 3.85
     }
    ],
-   "how dense is it": [],
+   "how dense is it": [
+    {
+     "id": "density",
+     "score": 14.83
+    }
+   ],
    "who is the biggest go-between": [
     {
      "id": "bottleneck",
-     "score": 5
+     "score": 13.68
+    },
+    {
+     "id": "change",
+     "score": 3.85
+    },
+    {
+     "id": "connected",
+     "score": 3.3
+    },
+    {
+     "id": "largestgroup",
+     "score": 3.3
+    },
+    {
+     "id": "lose3",
+     "score": 3.3
     }
    ],
    "bottleneck": [
     {
      "id": "bottleneck",
-     "score": 5
+     "score": 9.83
     }
    ],
    "feedback loops": [
     {
      "id": "loops",
-     "score": 8
+     "score": 15.14
+    },
+    {
+     "id": "reinforcing",
+     "score": 7.14
+    },
+    {
+     "id": "balancing",
+     "score": 3.3
     }
    ],
    "root cause": [
     {
      "id": "roots",
-     "score": 5
+     "score": 14.66
     }
    ],
    "end result": [
     {
      "id": "outcomes",
-     "score": 5
+     "score": 13.68
+    },
+    {
+     "id": "incoming",
+     "score": 3.85
     }
    ],
    "reinforcing": [
     {
      "id": "reinforcing",
-     "score": 5
+     "score": 9.83
     }
    ],
    "balancing": [
     {
      "id": "balancing",
-     "score": 5
+     "score": 9.83
     }
    ],
    "missing signs": [
     {
      "id": "unsigned",
-     "score": 5
+     "score": 14.66
     }
    ],
    "who has most arrows coming in": [
     {
      "id": "incoming",
-     "score": 5
+     "score": 16.31
+    },
+    {
+     "id": "outgoing",
+     "score": 6.48
+    },
+    {
+     "id": "connected",
+     "score": 2.64
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.64
+    },
+    {
+     "id": "lose3",
+     "score": 2.64
     }
    ],
    "who drives the most": [
     {
      "id": "outgoing",
-     "score": 3
+     "score": 9.48
+    },
+    {
+     "id": "roots",
+     "score": 3.85
+    },
+    {
+     "id": "connected",
+     "score": 2.64
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.64
+    },
+    {
+     "id": "incoming",
+     "score": 2.64
+    },
+    {
+     "id": "lose3",
+     "score": 2.64
     }
    ],
    "tell me about this map": [
@@ -4474,49 +5499,145 @@
    "summary": [
     {
      "id": "overview",
-     "score": 4
+     "score": 8.83
     }
    ],
    "islands": [
     {
      "id": "groups",
-     "score": 3
+     "score": 7.83
     }
    ],
    "clusters": [
     {
      "id": "groups",
-     "score": 3
+     "score": 6.85
+    },
+    {
+     "id": "largestgroup",
+     "score": 3.85
     }
    ],
    "who is alone": [
     {
      "id": "isolated",
-     "score": 3
+     "score": 7.83
     }
    ],
    "least connected": [
     {
      "id": "least",
-     "score": 4
+     "score": 10.91
+    },
+    {
+     "id": "isolated",
+     "score": 2.08
+    },
+    {
+     "id": "connected",
+     "score": 2.08
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.08
+    },
+    {
+     "id": "groups",
+     "score": 2.08
+    },
+    {
+     "id": "largestgroup",
+     "score": 2.08
+    },
+    {
+     "id": "density",
+     "score": 2.08
+    },
+    {
+     "id": "singles",
+     "score": 2.08
     }
    ],
    "fewest links": [
     {
      "id": "least",
-     "score": 4
+     "score": 8.83
+    },
+    {
+     "id": "isolated",
+     "score": 2.08
+    },
+    {
+     "id": "connected",
+     "score": 2.08
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.08
+    },
+    {
+     "id": "weak",
+     "score": 2.08
+    },
+    {
+     "id": "strong",
+     "score": 2.08
+    },
+    {
+     "id": "groups",
+     "score": 2.08
+    },
+    {
+     "id": "incoming",
+     "score": 2.08
+    },
+    {
+     "id": "singles",
+     "score": 2.08
     }
    ],
    "what if we lost the centre": [
     {
+     "id": "lose3",
+     "score": 8.68
+    },
+    {
      "id": "holds",
-     "score": 2
+     "score": 5.85
     }
    ],
    "how connected is it overall": [
     {
      "id": "density",
-     "score": 6
+     "score": 12.91
+    },
+    {
+     "id": "isolated",
+     "score": 2.08
+    },
+    {
+     "id": "connected",
+     "score": 2.08
+    },
+    {
+     "id": "least",
+     "score": 2.08
+    },
+    {
+     "id": "bottleneck",
+     "score": 2.08
+    },
+    {
+     "id": "groups",
+     "score": 2.08
+    },
+    {
+     "id": "largestgroup",
+     "score": 2.08
+    },
+    {
+     "id": "singles",
+     "score": 2.08
     }
    ],
    "": [],
@@ -4524,37 +5645,41 @@
    "sign": [
     {
      "id": "unsigned",
-     "score": 2
+     "score": 6.83
     }
    ],
    "source of the problem": [
     {
      "id": "roots",
-     "score": 3
+     "score": 7.83
     }
    ],
    "vicious circle": [
     {
      "id": "reinforcing",
-     "score": 3
+     "score": 7.83
     }
    ],
    "self-correcting": [
     {
      "id": "balancing",
-     "score": 4
+     "score": 13.66
     }
    ],
    "who is popular": [
     {
      "id": "connected",
-     "score": 2
+     "score": 6.83
     }
    ],
    "key organisation": [
     {
      "id": "holds",
-     "score": 3
+     "score": 6.85
+    },
+    {
+     "id": "overview",
+     "score": 3.85
     }
    ]
   }
