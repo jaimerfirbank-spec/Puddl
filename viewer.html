@@ -1268,6 +1268,8 @@ body.share-mode #present-exit{display:none !important;}
       </button>
       <div id="sec-insights-body" style="display:none;margin-top:6px;font-size:12px;color:var(--ink);"></div>
     </div>
+    
+    <div id="sheet-link-status" style="font-size:10.5px;color:var(--ink-h);line-height:1.5;margin-top:6px;"></div>
     <!-- Hidden selects for compatibility with existing applyFilters() logic -->
     <select id="cat-filter" style="display:none;"></select>
     <select id="area-filter" style="display:none;"></select>
@@ -1760,7 +1762,7 @@ function snap(){
     };
   }
   return JSON.stringify({
-    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,mergedFrom:n.mergedFrom||[],outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
+    nodes:nodes.map(n=>({id:n.id,type:n.type,catId:n.catId||null,area:n.area||null,label:n.label,colour:n.colour,colourLabel:n.colourLabel,shape:n.shape||'circle',nodeSize:n.nodeSize||'medium',titleSize:n.titleSize||'medium',iconId:n.iconId||null,nodeImg:n.nodeImg||null,x:n.x,y:n.y,pinned:n.pinned,notes:n.notes||'',grants:n.grants||[],contacts:n.contacts||[],groupSize:n.groupSize||'',groupStatus:n.groupStatus||'',trainingCompleted:n.trainingCompleted||'',mainAreaOfDelivery:n.mainAreaOfDelivery||'',protectedCharacteristics:n.protectedCharacteristics||[],operationalTimetable:n.operationalTimetable||'',tags:n.tags||[],lastUpdated:n.lastUpdated||null,history:n.history||[],useWDLogo:n.useWDLogo||false,merged:n.merged||false,mergedFrom:n.mergedFrom||[],fromSheet:n.fromSheet||false,sheetKey:n.sheetKey||'',missingSince:n.missingSince||0,outline:n.outline||false,customFields:n.customFields||{},videoUrl:n.videoUrl||'',date:n.date||'',argPart:n.argPart||null,stakeRole:n.stakeRole||'',stakePower:n.stakePower||'',stakeInterest:n.stakeInterest||'',stakeStance:n.stakeStance||''})),
     edges:edges.map(e=>({from:typeof e.source==='object'?e.source.id:e.source,to:typeof e.target==='object'?e.target.id:e.target,strength:e.strength||'moderate',note:e.note||'',colour:e.colour||'',twoWay:e.twoWay||false,arrow:e.arrow||null,date:e.date||'',polarity:e.polarity||null,hasDelay:e.hasDelay||false})),
     colourLegendMap,
     categories:CATEGORIES,
@@ -1788,7 +1790,7 @@ function snap(){
     mapType:MAP_TYPE,
     mapNoun:MAP_NOUN,
     edgeColourByStrength:EDGE_COLOUR_BY_STRENGTH,
-    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,
+    edgeCurve:EDGE_CURVE,edgeOpacity:EDGE_OPACITY,nodeSpacing:NODE_BREATHING,linkedSheet:LINKED_SHEET||null,
     askedInsights:ASK_REPORT_ITEMS||[],
     mapFocus:MAP_FOCUS,
     nodeContrast:NODE_CONTRAST,
@@ -1859,6 +1861,7 @@ function restoreSnap(s){
   }
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
+  LINKED_SHEET=d.linkedSheet||null;
   EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
   if(typeof d.nodeSpacing==='number') NODE_BREATHING=d.nodeSpacing;
   ASK_REPORT_ITEMS=Array.isArray(d.askedInsights)?d.askedInsights:[];
@@ -2755,6 +2758,14 @@ function draw(){
       ctx.font=`600 ${Math.round(9/zoom)}px 'DM Sans',Segoe UI,sans-serif`;
       ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
       ctx.fillText(n.owners.length,bx,by);
+    }
+
+    // Not in the spreadsheet on the last refresh: a dashed amber ring
+    if(n.missingSince&&n.type!=='centre'){
+      ctx.save();
+      ctx.beginPath();ctx.arc(n.x,n.y,r+5/zoom,0,Math.PI*2);
+      ctx.setLineDash([5/zoom,4/zoom]);ctx.lineWidth=2/zoom;ctx.strokeStyle='#D97706';ctx.stroke();
+      ctx.restore();
     }
 
     // Merged node indicator: two overlapping small circles at bottom-right
@@ -3822,7 +3833,8 @@ function renderInsights(){
     g+=_focusBar();
     g+=`<div style="margin-top:8px;">${tag(noun(I.pool.length))}${tag(plural(I.edgesCount,'connection'))}`+
        (I.linked.length===1?tag('One connected network',whole):tag(plural(I.linked.length,'connected network')+(I.isolated?`, ${I.isolated} on their own`:''),false))+
-       (I.isolated?tag(`${noun(I.isolated)} with no connection`,false):tag(`Nobody cut off`,true))+`</div>`;
+       (I.isolated?tag(`${noun(I.isolated)} with no connection`,false):tag(`Nobody cut off`,true))+
+       (I.pool.some(n=>n.missingSince)?tag(`${I.pool.filter(n=>n.missingSince).length} not in the spreadsheet`,false):'')+`</div>`;
     const br=(I.bridges||[]).slice().sort((a,b)=>b.cutOff-a.cutOff).slice(0,3);
     if(br.length) g+=lab('Who the map depends on')+br.map(b=>row(b.node,`cuts off ${b.cutOff}`,'choke')).join('');
     if(I.betweenness&&I.topBetweenness.length) g+=lab('Biggest go-betweens')+I.topBetweenness.slice(0,3).map(n=>row(n,_bottleneckCell(n,Math.round(I.betweenness.get(n.id)),I.pool.length),'node',true)).join('');
@@ -5147,6 +5159,7 @@ function updateConnectivityScore(){
   el.style.display='inline-flex';
   el.title=`Connectivity: ${edges.length} connections across ${total} nodes (${score} per node)`;
 }
+let LINKED_SHEET=null;        // {key,name,cols:[{header,role,fname}],at}
 function edgeDateOf(e,a,b){
   if(e.date) return e.date;
   const da=(a&&a.date)||'', db=(b&&b.date)||'';
@@ -6617,6 +6630,7 @@ function renderHoverPanel(n){
 
   let html='';
 
+  if(n.missingSince) html+=`<div class="hp-row"><span class="hp-k" style="color:#B45309;">Spreadsheet</span><span class="hp-v">Not in the spreadsheet since ${new Date(n.missingSince).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</span></div>`;
   // Map fields (named by the user)
   FIELD_DEFS.forEach(f=>{
     const v=n.customFields&&n.customFields[f.id];
