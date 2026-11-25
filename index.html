@@ -286,20 +286,22 @@ select{
 #splash-mascot-scene.play{opacity:1;}
 #splash-sheep-wrap{position:absolute;z-index:3;left:7%;right:7%;top:4%;bottom:12%;transform-origin:50% 88%;}
 #splash-sheep{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 13px 14px rgba(24,24,27,.18));}
-#splash-mouth{position:absolute;z-index:5;left:67.5%;top:42.5%;width:20px;height:18px;margin-left:-10px;border:2px solid #09090b;border-radius:0;background:linear-gradient(135deg,#242428 0 48%,#111114 49% 100%);opacity:0;overflow:hidden;transform-origin:50% 0;box-shadow:inset 1px 1px 0 #3f3f46,inset -1px -1px 0 #000,0 1px 1px rgba(0,0,0,.28);}
-#splash-mouth::before{content:'';position:absolute;inset:1px;border:1px dashed rgba(113,113,122,.65);}
-#splash-mouth::after{content:'';position:absolute;left:3px;bottom:0;width:10px;height:7px;border-radius:0;background:linear-gradient(135deg,#ffb3c7 0 45%,#e8799a 46% 100%);box-shadow:inset 1px 1px 0 #ffd0dc,inset -1px -1px 0 #be5677;}
+#splash-mouth{position:absolute;z-index:5;left:72%;top:49%;width:15px;height:16px;margin-left:-7.5px;margin-top:-2px;border:1.5px solid #171719;border-radius:45% 45% 48% 48%;background:linear-gradient(90deg,#171719,#29292d 52%,#111113);opacity:0;overflow:hidden;transform:translateY(-2px) scale(.92,.06);transform-origin:50% 0;box-shadow:inset 1px 1px 2px rgba(255,255,255,.16),inset -1px -1px 2px rgba(0,0,0,.65),0 1px 1px rgba(0,0,0,.2);}
+#splash-mouth::before{content:'';position:absolute;inset:1px;border:1px dashed rgba(161,161,170,.5);border-radius:inherit;}
+#splash-mouth::after{content:'';position:absolute;left:3px;right:3px;bottom:1px;height:6px;border-radius:45% 45% 35% 35%;background:linear-gradient(#f3a2b9,#d96c8c);box-shadow:inset 0 1px 1px #ffd0dc,inset 0 -1px 1px #a83f60;}
 .puddle-pixel{position:absolute;z-index:4;width:8px;height:5px;background:#16c7eb;box-shadow:inset 1px 1px 0 #67e8f9,inset -1px -1px 0 #0891b2;opacity:0;}
 .puddle-pixel.p1{left:14%;bottom:14%}.puddle-pixel.p2{left:23%;bottom:9%}.puddle-pixel.p3{left:34%;bottom:15%}.puddle-pixel.p4{left:47%;bottom:8%}.puddle-pixel.p5{left:61%;bottom:13%}.puddle-pixel.p6{left:75%;bottom:9%}.puddle-pixel.p7{left:84%;bottom:15%}.puddle-pixel.p8{left:53%;bottom:17%}
 #splash-mascot-scene.play #splash-sheep-wrap{animation:plushSheepAppear .65s ease-out both;}
+#splash-mascot-scene.play #splash-sheep{animation:plushHeadLift .9s 1.12s cubic-bezier(.45,0,.25,1) both;transform-origin:72% 58%;}
 #splash-mascot-scene.play .puddle-pixel{animation:plushPixelRipple 1.4s ease-in-out infinite;}
 #splash-mascot-scene.play .puddle-pixel:nth-of-type(2n){animation-delay:.28s;animation-direction:reverse;}
 #splash-mascot-scene.play .puddle-pixel:nth-of-type(3n){animation-delay:.55s;}
-#splash-mascot-scene.play #splash-mouth{animation:plushMouth .72s 1.22s steps(3,end) both;}
+#splash-mascot-scene.play #splash-mouth{animation:plushMouth .78s 1.2s cubic-bezier(.4,0,.2,1) both;}
 @keyframes plushSheepAppear{0%{opacity:0;transform:scale(.96)}100%{opacity:1;transform:scale(1)}}
 @keyframes plushPixelRipple{0%,100%{opacity:.2;transform:translateX(-3px) scaleX(.8)}35%,65%{opacity:.85;transform:translateX(3px) scaleX(1.2)}}
-@keyframes plushMouth{0%,100%{opacity:0;transform:scaleY(.12)}25%,75%{opacity:1;transform:scaleY(1)}}
-@media(prefers-reduced-motion:reduce){#splash-mascot-scene{opacity:1}#splash-sheep-wrap{animation:none!important}.puddle-pixel,#splash-mouth{display:none!important}}
+@keyframes plushHeadLift{0%,100%{transform:rotate(0deg) translateY(0)}34%,66%{transform:rotate(-2.2deg) translateY(-1px)}}
+@keyframes plushMouth{0%,100%{opacity:0;transform:translateY(-2px) rotate(0deg) scale(.92,.06)}25%{opacity:.8}42%,65%{opacity:1;transform:translate(-1px,-2px) rotate(-2.2deg) scale(1,1)}82%{opacity:.7}}
+@media(prefers-reduced-motion:reduce){#splash-mascot-scene{opacity:1}#splash-sheep-wrap,#splash-sheep{animation:none!important}.puddle-pixel,#splash-mouth{display:none!important}}
 /* ── Splash logo drop + bounce ───────────────────────────────────────────── */
 @keyframes logoDrop{
   0%   { opacity:0; transform:translateY(-70px) scale(0.92); }

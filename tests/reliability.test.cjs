@@ -49,6 +49,12 @@ test('node and connection editors expose explicit appearance controls',()=>{
  assert.match(fn('openCustomizePanel'),/closeEdgeEditPopup\(\)/);
  assert.match(fn('closeEdgeEditPopup'),/Object\.assign\(edges\[edgeEditIdx\],edgeEditOriginal\)/);
 });
+test('opening sheep uses a centred plush mouth and smooth head lift',()=>{
+ assert.match(source,/#splash-mouth\{[^}]*left:72%;top:49%/s);
+ assert.match(source,/@keyframes plushHeadLift/);
+ assert.match(source,/#splash-sheep\{animation:plushHeadLift/);
+ assert.doesNotMatch(source,/animation:plushMouth[^;]*steps\(/);
+});
 test('feedback loops receive separate reinforcing and balancing numbers',()=>{
  const c=ctx({},['loopDisplayCodes']);
  assert.deepEqual(Array.from(c.loopDisplayCodes([{type:'R'},{type:'B'},{type:'R'},{type:'unassigned'},{type:'B'}])),['R1','B1','R2','?1','B2']);
