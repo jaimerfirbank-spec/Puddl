@@ -1162,7 +1162,7 @@ body.share-mode #present-exit{display:none !important;}
     <span style="font-size:11px;color:var(--ink-h);font-weight:500;letter-spacing:0.02em;text-transform:uppercase;">Project</span>
     <span id="header-project-name" onclick="startEditProjectName()" style="font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;cursor:pointer;border-bottom:1px dashed transparent;" onmouseenter="this.style.borderBottomColor='var(--bdr-m)'" onmouseleave="this.style.borderBottomColor='transparent'">—</span>
     <input id="header-project-name-input" type="text" onblur="commitProjectName()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}if(event.key==='Escape'){this.value=mapTitle||'';this.blur();}" style="display:none;font-size:14px;font-weight:700;color:var(--ink);letter-spacing:-0.02em;max-width:320px;background:var(--surf);border:1px solid var(--bdr-m);border-radius:var(--radius);padding:1px 6px;font-family:'DM Sans',sans-serif;outline:none;" />
-    <span id="header-map-type" title="Set in Settings" style="font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-h);background:var(--surf-3);border:1px solid var(--bdr);border-radius:999px;padding:3px 9px;white-space:nowrap;">General map</span>
+    <span id="header-map-type" title="Set in Map Editor" style="font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-h);background:var(--surf-3);border:1px solid var(--bdr);border-radius:999px;padding:3px 9px;white-space:nowrap;">General map</span>
   </div>
   <div class="toolbar-centre">
     <button id="btn-undo" onclick="undo()" disabled title="Undo" style="width:38px;height:38px;padding:0;font-size:20px;display:flex;align-items:center;justify-content:center;">↩</button>
@@ -1207,7 +1207,7 @@ body.share-mode #present-exit{display:none !important;}
       </div>
     </div>
     <div id="demo-save-btn" style="display:none;align-items:center;gap:6px;padding:0 14px;height:28px;border-radius:var(--radius);border:1px solid var(--bdr);background:var(--surf-3);color:var(--ink-h);font-size:11px;font-weight:600;cursor:default;" title="Save (inactive in demo)">⬇ Save file</div>
-    <button id="btn-open-settings" onclick="openCustomizePanel()" title="Map settings" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-m);">Settings</button>
+    <button id="btn-open-settings" onclick="openCustomizePanel()" title="Edit the map's appearance and structure" style="font-size:11px;height:28px;padding:0 12px;color:var(--ink-m);">Map Editor</button>
     <div style="width:1px;height:20px;background:var(--bdr);margin:0 4px;"></div>
     <button id="btn-pres-mode" onclick="togglePresentationEditMode()" style="font-size:11px;height:28px;padding:0 14px;font-weight:700;background:var(--ink);color:var(--surf);border-color:var(--ink);" title="Set up and run a presentation">▶ Present</button>
     <div class="dd-wrap" id="account-wrap">
@@ -1249,6 +1249,12 @@ body.share-mode #present-exit{display:none !important;}
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
     Reposition
   </button>
+  <button id="ctx-btn-cluster-auto" onclick="ctxCreateCluster(false)">Arrange exclusive neighbours as cluster</button>
+  <button id="ctx-btn-cluster-manual" onclick="ctxCreateCluster(true)">Cluster highlighted nodes here</button>
+  <button id="ctx-btn-cluster-lock" onclick="ctxToggleClusterLock()" style="display:none;">Unlock cluster</button>
+  <button id="ctx-btn-cluster-region" onclick="ctxToggleClusterRegion()" style="display:none;">Add shaded region</button>
+  <button id="ctx-btn-cluster-remove" onclick="ctxRemoveFromCluster()" style="display:none;">Remove from cluster</button>
+  <button id="ctx-btn-cluster-dissolve" onclick="ctxDissolveCluster()" style="display:none;">Dissolve cluster</button>
   <div class="ctx-sep"></div>
   <button onclick="ctxUploadImage()">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
@@ -1464,7 +1470,7 @@ body.share-mode #present-exit{display:none !important;}
       </button>
       <div id="sec-insights-body" style="display:none;margin-top:6px;font-size:12px;color:var(--ink);"></div>
     </div>
-    <button id="btn-sheet-refresh" onclick="startSheetRefresh()" title="Update this map from the spreadsheet it came from" style="width:100%;height:32px;font-size:12px;margin-top:12px;">Refresh from spreadsheet</button>
+    <button id="btn-sheet-refresh" onclick="startSheetRefresh()" style="width:100%;height:32px;font-size:12px;margin-top:12px;">Refresh from spreadsheet</button>
     <div id="sheet-link-status" style="font-size:10.5px;color:var(--ink-h);line-height:1.5;margin-top:6px;"></div>
     <!-- Hidden selects for compatibility with existing applyFilters() logic -->
     <select id="cat-filter" style="display:none;"></select>
@@ -2384,6 +2390,7 @@ function selectConnColour(col){
           </button>
         </div>
         <div id="import-mode-desc" style="margin-top:6px;font-size:11px;color:var(--ink-h);"></div>
+        <label style="display:flex;align-items:center;gap:7px;margin-top:10px;font-size:11px;color:var(--ink);cursor:pointer;"><input type="checkbox" id="import-auto-cluster"> Automatically arrange eligible clusters after import</label>
       </div>
 
       <!-- Step 2: Sheet selector -->
@@ -2571,7 +2578,7 @@ function selectConnColour(col){
 <div class="modal-bg hidden" id="customize-modal-bg">
   <div class="modal" style="width:800px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--bdr);flex-shrink:0;">
-      <h3 style="margin:0;font-size:18px;font-weight:700;color:var(--ink);">Settings</h3>
+      <h3 style="margin:0;font-size:18px;font-weight:700;color:var(--ink);">Map Editor</h3>
       <button onclick="closeCustomizePanel()" style="background:none;border:none;color:var(--ink-h);cursor:pointer;font-size:24px;line-height:1;padding:0;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;" title="Close">&times;</button>
     </div>
     
@@ -2677,6 +2684,16 @@ function selectConnColour(col){
           </div>
 
           <button onclick="addNewCategory()" style="padding:8px 16px;background:var(--accent-2);color:white;border:none;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;">+ Add Category</button>
+        </div>
+        <div style="margin-bottom:24px;padding-top:18px;border-top:1px solid var(--bdr);">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Clusters</h4>
+          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Arrange groups that connect only to one central node. Nothing is hidden or collapsed.</p>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <label style="font-size:12px;color:var(--ink);">Minimum peripheral nodes <input id="cluster-min-size" type="number" min="2" max="50" value="3" onchange="setClusterMinSize(this.value)" style="width:58px;height:30px;margin-left:5px;"></label>
+            <button onclick="autoClusterMap('radial')" style="height:30px;font-size:11px;">Find radial clusters</button>
+            <button onclick="autoClusterMap('fan')" style="height:30px;font-size:11px;">Find fan clusters</button>
+          </div>
+          <div id="cluster-settings-list" style="margin-top:10px;"></div>
         </div>
 
       </div>
@@ -2982,7 +2999,8 @@ function _usedStyleIds(){
 }
 function _legendSig(){
   const u=[..._usedStyleIds()].sort().join(',');
-  return u+'|'+document.documentElement.getAttribute('data-theme')+'|'+thinLinesOn()+'|'+CONNECTION_STYLES.map(st=>st.id+st.label+st.colour).join('');
+  const pol=edges.reduce((a,e)=>a+(e.polarity==='positive'?'+':e.polarity==='negative'?'-':''),'');
+  return u+'|'+MAP_TYPE+'|'+pol+'|'+document.documentElement.getAttribute('data-theme')+'|'+thinLinesOn()+'|'+CONNECTION_STYLES.map(st=>st.id+st.label+st.colour).join('');
 }
 // Connection key inside the Legend panel. Lists only the styles used on this map, and only when there are two or more.
 function syncStrengthLegend(){
@@ -2990,15 +3008,20 @@ function syncStrengthLegend(){
   if(!el) return;
   const used=_usedStyleIds();
   const list=CONNECTION_STYLES.filter(st=>st.id!=='loop'&&used.has(st.id));
-  if(list.length<2){ el.innerHTML=''; syncLegendVisibility(); return; }
   const thin=thinLinesOn(), dark=document.documentElement.getAttribute('data-theme')==='dark';
-  el.innerHTML=list.map(st=>{
+  let html=(list.length<2?'':list.map(st=>{
     const dash=(st.dashPattern&&st.dashPattern.length)?'dashed':'solid';
     const w=thin?thinWidth(st):Math.max(1.5,Math.min(3,(st.lineWidth||2)*0.6));
     const bw=st.isDouble?'3px double':w+'px '+dash;
     const sc=escHtml(dark?adaptColourForDark(st.colour):st.colour);
     return `<div class="l-row"><span style="width:30px;border-top:${bw} ${sc};display:inline-block;flex-shrink:0;"></span><span>${escHtml(st.label)}</span></div>`;
-  }).join('');
+  }).join(''));
+  if((MAP_TYPE==='systems'||MAP_TYPE==='stakeholder')&&edges.some(e=>e.polarity)){
+    const pos=MAP_TYPE==='systems'?'Move in the same direction':'Alliance';
+    const neg=MAP_TYPE==='systems'?'Move in opposite directions':'Friction';
+    html+=`<div class="l-row"><span style="width:18px;text-align:center;color:#16A34A;font-weight:800;">+</span><span>${pos}</span></div><div class="l-row"><span style="width:18px;text-align:center;color:#DC2626;font-weight:800;">−</span><span>${neg}</span></div>`;
+  }
+  el.innerHTML=html;
   syncLegendVisibility();
 }
 // Show each Legend section only when it has content; hide the Legend button when neither does.
@@ -3145,6 +3168,8 @@ const LOOP_COLOURS=['#E11D48','#2563EB','#16A34A','#D97706','#9333EA','#0D9488',
 const _pinColourIdx=new Map();  // loop key -> colour number
 let _pinEdgeCols=new Map(), _pinNodeCols=new Map();  // edge index / node id -> [colour numbers]
 let _loopCircle=null;           // {cx,cy,r,order:Map(id->position),n} while a loop is shown as a circle
+let CLUSTERS=[];
+let CLUSTER_MIN_SIZE=3;
 function loopColourOf(idx,dark){
   const c=LOOP_COLOURS[idx%LOOP_COLOURS.length];
   return {col:dark?adaptColourForDark(c):c, raw:c, dash:Math.floor(idx/LOOP_COLOURS.length)%2===1};
@@ -3155,7 +3180,22 @@ let modalMode='add',modalNodeId=null,modalNodeType='org';
 let colourLegendMap={};
 let lastMouse=null;
 let sim=null;
-let hoverPanelNodeId=null, hoverHideTimer=null, sidePanelNodeId=null;
+let hoverPanelNodeId=null, hoverEdgeIndex=null, hoverHideTimer=null, hoverShowTimer=null, hoverCandidateId=null, sidePanelNodeId=null;
+let HOVER_BLEND=1, hoverBlendFrame=null;
+function _focusAlpha(target){ return 1-(1-target)*HOVER_BLEND; }
+function _animateHoverFocus(){
+  if(hoverBlendFrame) cancelAnimationFrame(hoverBlendFrame);
+  HOVER_BLEND=0;
+  const started=performance.now(), duration=320;
+  const step=now=>{
+    const t=Math.min(1,(now-started)/duration);
+    HOVER_BLEND=1-Math.pow(1-t,3);
+    draw();
+    if(t<1) hoverBlendFrame=requestAnimationFrame(step);
+    else hoverBlendFrame=null;
+  };
+  hoverBlendFrame=requestAnimationFrame(step);
+}
 
 // ── Presentation Mode state ───────────────────────────────────────────────────
 let presMapOnly=false;           // hide notes: map fills the screen, controls float
@@ -3359,8 +3399,8 @@ function nodeAt(sx,sy){
   return null;
 }
 
-function edgeAt(sx,sy){
-  // Returns true if screen point (sx,sy) is close to any edge curve
+function edgeIndexAt(sx,sy){
+  // Returns the index of the closest edge curve under the pointer.
   const wx=(sx-panX)/zoom, wy=(sy-panY)/zoom;
   const thresh=8/zoom;
   for(let i=0;i<edges.length;i++){
@@ -3377,11 +3417,12 @@ function edgeAt(sx,sy){
     for(let t=0;t<=1;t+=0.05){
       const qx=(1-t)*(1-t)*a.x+2*(1-t)*t*mx+t*t*b.x;
       const qy=(1-t)*(1-t)*a.y+2*(1-t)*t*my+t*t*b.y;
-      if(Math.abs(qx-wx)<thresh&&Math.abs(qy-wy)<thresh) return true;
+      if(Math.abs(qx-wx)<thresh&&Math.abs(qy-wy)<thresh) return i;
     }
   }
-  return false;
+  return null;
 }
+function edgeAt(sx,sy){ return edgeIndexAt(sx,sy)!==null; }
 
 // ── History ───────────────────────────────────────────────────────────────────
 function snap(includeVersions=true){
@@ -3406,6 +3447,8 @@ function snap(includeVersions=true){
     mapTitle,
     currentMapMode,
     loops:loops||[],
+    clusters:CLUSTERS||[],
+    clusterMinSize:CLUSTER_MIN_SIZE,
     loopConnectionStyle:LOOP_CONNECTION_STYLE,
     connectionStyles:CONNECTION_STYLES,
     presentationStops:presentationStops||[],
@@ -3459,7 +3502,7 @@ function validateMapSnapshot(d){
     if(!e||!ids.has(e.from)||!ids.has(e.to)) throw new Error('A connection refers to a missing node.');
     if(!safeColour(e.colour)) throw new Error('Invalid connection colour.');
   }
-  for(const key of ['loops','categories','connectionStyles','presentationStops','savedPresentations','namedVersions','fieldDefs']){
+  for(const key of ['loops','clusters','categories','connectionStyles','presentationStops','savedPresentations','namedVersions','fieldDefs']){
     if(d[key]!==undefined&&!Array.isArray(d[key])) throw new Error('Invalid map '+key+'.');
   }
   // These IDs become control IDs and handler arguments in older settings UI.
@@ -3503,6 +3546,8 @@ function restoreSnap(s,keepVersions){
   if(d.mapTitle!==undefined&&d.mapTitle!==null) mapTitle=d.mapTitle;
   if(d.currentMapMode) currentMapMode=d.currentMapMode;
   if(d.loops) loops=d.loops; else loops=[];
+  CLUSTERS=Array.isArray(d.clusters)?d.clusters:[];
+  CLUSTER_MIN_SIZE=Math.max(2,Math.min(50,Number(d.clusterMinSize)||3));
   if(d.loopConnectionStyle) LOOP_CONNECTION_STYLE={...LOOP_CONNECTION_STYLE,...d.loopConnectionStyle};
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
   _retireConnStyles();
@@ -3689,7 +3734,7 @@ function drawSimpleEdges(hasHL,_dark){
     const style=CONNECTION_STYLES.find(s=>s.id===(e.strength||'moderate'))||CONNECTION_STYLES[1];
     let col=isHl?'#FF8C8C':(e.colour||style.colour);
     if(_dark&&!isHl) col=adaptColourForDark(col);
-    const alpha=knockEdgeAlpha(i,hasHL&&!isHl?DIM_EDGE_ALPHA:1);
+    const alpha=knockEdgeAlpha(i,hasHL&&!isHl?_focusAlpha(DIM_EDGE_ALPHA):1);
     const key=col+'|'+alpha+'|'+(isHl?1:0);
     let g=groups.get(key); if(!g){ g={col,alpha,hl:isHl,segs:[]}; groups.set(key,g); }
     g.segs.push(a.x,a.y,b.x,b.y);
@@ -3712,7 +3757,7 @@ function drawSimpleNodes(hasHL,_dark){
     if(_dateHidden.size&&_dateHidden.has(n.id)) return;
     if(_focusHidden.size&&_focusHidden.has(n.id)) return;
     const isHl=highlightIds.has(n.id), isSec=secondaryIds.has(n.id)&&!isHl;
-    ctx.globalAlpha=knockNodeAlpha(n,hasHL&&!isHl&&!isSec?DIM_ALPHA:isSec?DIM_SECONDARY:1);
+    ctx.globalAlpha=knockNodeAlpha(n,hasHL&&!isHl&&!isSec?_focusAlpha(DIM_ALPHA):isSec?_focusAlpha(DIM_SECONDARY):1);
     const r=Math.max(_simpleDrawR(n),2.2/zoom);
     ctx.fillStyle=nodeInk(n)||nodeFill(n);
     ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
@@ -3790,6 +3835,7 @@ function setSimpleMode(v){
 
 // ── Draw ──────────────────────────────────────────────────────────────────────
 function draw(){
+  refreshClusterCache();
   if((_pinnedLoops.size||_insightFocus)&&_pinEdgeSig!==edges.length) refreshLoopPins();
   _lblBoxCache=new Map();
   _checkLegend();
@@ -3821,6 +3867,25 @@ function draw(){
   ctx.scale(zoom,zoom);
 
   const hasHL=highlightIds.size>0;
+
+  // Shaded regions sit behind every connection and node. Attached regions
+  // follow their cluster; detached regions keep their last position.
+  CLUSTERS.forEach(c=>{
+    if(!c.region) return;
+    const r=c.region, b=r.detached&&Number.isFinite(r.cx)?r:clusterBounds(c);
+    ctx.save();
+    ctx.globalAlpha=Math.max(0.04,Math.min(0.55,Number(r.opacity)||0.16));
+    ctx.fillStyle=r.colour||'#60A5FA';
+    ctx.strokeStyle=r.colour||'#60A5FA';
+    ctx.lineWidth=2/zoom;
+    ctx.beginPath();
+    if(r.shape==='round') rr(ctx,b.cx-b.rx,b.cy-b.ry,b.rx*2,b.ry*2,Math.min(32,b.rx,b.ry));
+    else ctx.ellipse(b.cx,b.cy,b.rx,b.ry,0,0,Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    ctx.globalAlpha=0.8;
+    if(r.label){ ctx.fillStyle=_dark?'#ffffff':'#18181b'; ctx.font=`600 ${12/zoom}px 'DM Sans',sans-serif`; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText(r.label,b.cx,b.cy-b.ry-6/zoom); }
+    ctx.restore();
+  });
 
   // ── Edge helpers (defined once, outside loop) ──────────────────────────────
 
@@ -3983,7 +4048,7 @@ function draw(){
     ctx.save();
     // Edges pass under nodes — no clipping needed (nodes drawn on top in render order)
 
-    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
+    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?_focusAlpha(0.06):isSecondaryEdge?_focusAlpha(0.30):(isHl?1:EDGE_OPACITY));
     const _pc=_pinEdgeCols.size?_pinEdgeCols.get(i):null;
     const _pcs=_pc?_pc.map(ci=>loopColourOf(ci,_dark)):null;
     const _typeCol=isHl&&_ctFilterOn?(_dark?adaptColourForDark(style.colour):style.colour):null;
@@ -4076,7 +4141,7 @@ function draw(){
       // Arrowhead at source (backward or both)
       if(headS){
         ctx.save();
-        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
+        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?_focusAlpha(0.06):isSecondaryEdge?_focusAlpha(0.30):(isHl?1:EDGE_OPACITY));
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
         ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
@@ -4138,26 +4203,6 @@ function draw(){
       ctx.translate(arcTipX,arcTipY);ctx.rotate(ang);
       ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-as,-as*0.55);ctx.lineTo(-as,as*0.55);ctx.closePath();
       ctx.fillStyle=drawStroke;ctx.fill();
-      ctx.restore();
-    }
-
-    // Phase 5: edge note label
-    if(e.note&&e.note.trim()&&!dimmed){
-      ctx.save();
-      ctx.globalAlpha=0.85;
-      ctx.font=`${Math.max(9,10/zoom)}px 'DM Sans',sans-serif`;
-      ctx.textAlign='center';ctx.textBaseline='middle';
-      const noteText=e.note.length>28?e.note.slice(0,27)+'…':e.note;
-      const tw=ctx.measureText(noteText).width+8/zoom;
-      const th=13/zoom;
-      ctx.fillStyle='rgba(255,255,255,0.92)';
-      ctx.strokeStyle='rgba(0,0,0,0.10)';
-      ctx.lineWidth=0.5/zoom;
-      ctx.beginPath();
-      rr(ctx,mx-tw/2,my-th/2,tw,th,3/zoom);
-      ctx.fill();ctx.stroke();
-      ctx.fillStyle='#52525b';
-      ctx.fillText(noteText,mx,my);
       ctx.restore();
     }
 
@@ -4248,7 +4293,7 @@ function draw(){
     const isHl=highlightIds.has(n.id);
     const isSecondary=secondaryIds.has(n.id)&&!highlightIds.has(n.id)||false;
     const dimmed=hasHL&&!isHl&&!isSecondary;
-    ctx.globalAlpha=knockNodeAlpha(n,dimmed?DIM_ALPHA:isSecondary?DIM_SECONDARY:1);
+    ctx.globalAlpha=knockNodeAlpha(n,dimmed?_focusAlpha(DIM_ALPHA):isSecondary?_focusAlpha(DIM_SECONDARY):1);
 
     // ── Central event node: logo card ────────────────────────────────────────
     if(n.type==='centre'){
@@ -4261,7 +4306,7 @@ function draw(){
       const pad=7/zoom;
       ctx.beginPath();rr(ctx,cx2-pad,cy2-pad,cw+pad*2,ch+pad*2,(10/zoom)+pad);
       ctx.strokeStyle=_dark?'rgba(255,255,255,0.35)':centreCol;
-      ctx.globalAlpha=knockNodeAlpha(n,dimmed?DIM_ALPHA:isSecondary?DIM_SECONDARY:1)*0.40;
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?_focusAlpha(DIM_ALPHA):isSecondary?_focusAlpha(DIM_SECONDARY):1)*0.40;
       ctx.lineWidth=1.5/zoom;
       ctx.setLineDash([5/zoom,4/zoom]);
       ctx.stroke();
@@ -4325,6 +4370,21 @@ function draw(){
     // ── Regular nodes ────────────────────────────────────────────────────────
     const d=nodeDims(n);
     const r=d.r||40;
+    // Text-only nodes keep their place and connections, but do not draw a shape.
+    if((n.shape||'circle')==='none'){
+      ctx.save();
+      const _fs=Math.max(11,d.FS);
+      ctx.font=`500 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle=_dark?'#ffffff':'#3f3f46';
+      const _ls=wrapLabel(ctx,n.label,r*6,4);
+      const _lh=_fs+3;
+      const _y0=n.y-(_ls.length-1)*_lh/2;
+      _ls.forEach((t,i)=>ctx.fillText(t,Math.round(n.x),Math.round(_y0+i*_lh)));
+      ctx.restore();
+      ctx.globalAlpha=1;
+      return;
+    }
     // ── Node body — shape-aware fill ─────────────────────────────────────────
     if(isHl){ctx.shadowColor='rgba(0,0,0,0.18)';ctx.shadowBlur=18/zoom;}
     drawNodeShape(ctx,n.x,n.y,r,n.shape,zoom);
@@ -4431,12 +4491,21 @@ function draw(){
     const _fs=d.FS;
     ctx.font=`500 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
     const _isRect=(n.shape||'circle')==='rectangle';
-    const _maxW=_isRect?(r*2.6)|0:(r*2*0.80)|0;
+    const _maxW=_isRect?(r*3)|0:(r*3.1)|0;
     const _lh=_fs+2;
-    const _ls=wrapLabel(ctx,n.label,_maxW,_isRect?3:2);
+    const _ls=wrapLabel(ctx,n.label,_maxW,3);
     const _y0=n.y-(_ls.length-1)*_lh/2;
-    _ls.forEach((t,i)=>ctx.fillText(t,Math.round(n.x),Math.round(_y0+i*_lh),_maxW));
+    _ls.forEach((t,i)=>ctx.fillText(t,Math.round(n.x),Math.round(_y0+i*_lh)));
     ctx.restore();
+    }
+
+    const _cluster=clusterForNode(n.id);
+    if(_cluster&&clusterMemberFlagged(_cluster,n.id)){
+      ctx.save();
+      const bx=n.x+r*0.72, by=n.y-r*0.72, br=9/zoom;
+      ctx.beginPath(); ctx.arc(bx,by,br,0,Math.PI*2); ctx.fillStyle='#F59E0B'; ctx.fill();
+      ctx.fillStyle='#18181b'; ctx.font=`800 ${11/zoom}px 'DM Sans',sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('!',bx,by+0.5/zoom);
+      ctx.restore();
     }
 
     // ── Video badge ───────────────────────────────────────────
@@ -4469,7 +4538,7 @@ function draw(){
         : _shapeBot + 7/zoom;
       const _pilX=n.x-_spw/2;
       // pill background
-      ctx.globalAlpha=knockNodeAlpha(n,dimmed?0.10:isSecondary?0.45:0.88);
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?_focusAlpha(0.10):isSecondary?_focusAlpha(0.45):0.88);
       ctx.fillStyle=_dark?'rgba(59,130,246,0.25)':'rgba(59,130,246,0.12)';
       ctx.beginPath();
       const _pr=_sph/2;
@@ -4490,7 +4559,7 @@ function draw(){
       // pill text
       ctx.fillStyle=_dark?'rgba(147,197,253,1)':'rgba(29,78,216,1)';
       ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.globalAlpha=knockNodeAlpha(n,dimmed?DIM_ALPHA:isSecondary?DIM_SECONDARY:1);
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?_focusAlpha(DIM_ALPHA):isSecondary?_focusAlpha(DIM_SECONDARY):1);
       ctx.fillText(n.groupStatus,n.x,_pilY+_sph/2);
       ctx.restore();
     }
@@ -5691,6 +5760,14 @@ function classifySystemsLoop(loopNodes, edgeByPair){
   if(unknown>0) return {type:'unassigned',minus,unknown};
   return {type:(minus%2===0)?'R':'B',minus,unknown:0};
 }
+function loopDisplayCodes(classes){
+  const count={R:0,B:0,unassigned:0};
+  return (classes||[]).map(c=>{
+    const t=c&&c.type==='R'?'R':c&&c.type==='B'?'B':'unassigned';
+    count[t]++;
+    return t==='unassigned'?'?'+count[t]:t+count[t];
+  });
+}
 // Limits to Growth: an R loop and a B loop that share a node - that node is
 // the growth engine the B loop eventually pushes back on. Ranked by how
 // well-connected the shared node is (its degree in the whole pool), so the
@@ -6135,7 +6212,7 @@ const ASK_REGISTRY=[
     const top=list.slice(0,4).map(g=>`around ${g.hub} (${g.ids.length})`).join(', ');
     const clear=C.Q>=0.5?'The map splits clearly into groups.':C.Q>=0.3?'The map splits fairly clearly into groups.':'The map does not split clearly: the groups are only slightly more joined up inside than outside.';
     return result(list.length===1?`Everything with a connection forms one community, around ${list[0].hub}.`:`${list.length} communities found. The biggest ${list.length>4?'are':'are'} ${top}.`,
-      `${clear} To see them in colour: Settings, Map, Colour by, Community.`,
+      `${clear} To see them in colour: Map Editor, Map, Colour by, Community.`,
       {label:'Largest community',ids:new Set(list[0].ids),pairs:[],sec:[]});
    }},
   {id:"quiet",cat:"People and structure",q:"Who is quietly important?",
@@ -6821,10 +6898,11 @@ function renderInsights(){
         sub('Affected by the most',I.sinks,I.inDeg,'in'));
     }
     _insightLoops=I.loops;
-    const rbBadge=(cls)=>{
-      if(!cls||cls.type==='unassigned') return '<span style="display:inline-block;min-width:16px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:var(--surf-3);color:var(--ink-h);" title="One or more connections in this loop have no polarity yet">?</span>';
+    const loopCodes=loopDisplayCodes(I.loopClass);
+    const rbBadge=(cls,code)=>{
+      if(!cls||cls.type==='unassigned') return `<span style="display:inline-block;min-width:20px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:var(--surf-3);color:var(--ink-h);" title="One or more connections in this loop have no polarity yet">${code||'?'}</span>`;
       const isR=cls.type==='R';
-      return `<span style="display:inline-block;min-width:16px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:${isR?'#FEF3C7':'#DBEAFE'};color:${isR?'#92400E':'#1E40AF'};" title="${isR?'Reinforcing: '+cls.minus+' minus sign(s), compounds in one direction':'Balancing: '+cls.minus+' minus sign(s), seeks equilibrium'}">${cls.type}</span>`;
+      return `<span style="display:inline-block;min-width:20px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:${isR?'#FEF3C7':'#DBEAFE'};color:${isR?'#92400E':'#1E40AF'};" title="${isR?'Reinforcing: '+cls.minus+' minus sign(s), compounds in one direction':'Balancing: '+cls.minus+' minus sign(s), seeks equilibrium'}">${code||cls.type}</span>`;
     };
     const rCount=I.loopClass.filter(c=>c.type==='R').length, bCount=I.loopClass.filter(c=>c.type==='B').length, uCount=I.loopClass.filter(c=>c.type==='unassigned').length;
     let lh='';
@@ -6844,7 +6922,7 @@ function renderInsights(){
       lh += I.loops.map((L,li)=>{
         const on=_pinnedLoops.has(loopKey(L));
         const lc=on?loopColourOf(_pinColourIdx.get(loopKey(L))||0,document.documentElement.getAttribute('data-theme')==='dark').col:'';
-        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span>${rbBadge(I.loopClass[li])}<span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span>${(I.loopVariants&&I.loopVariants[li]>1)?`<span style="color:var(--ink-h);" title="Near-identical loops differing by a node or two, shown as this one">+${I.loopVariants[li]-1} similar</span>`:''}</span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
+        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span>${rbBadge(I.loopClass[li],loopCodes[li])}<span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span>${(I.loopVariants&&I.loopVariants[li]>1)?`<span style="color:var(--ink-h);" title="Near-identical loops differing by a node or two, shown as this one">+${I.loopVariants[li]-1} similar</span>`:''}</span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
       }).join('');
     } else lh += none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
     if(I.pool.length>LOOP_NODE_CAP)
@@ -7705,11 +7783,12 @@ function _systemsReportHTML(I){
   // Each loop
   if(loops.length){
     _insightLoops=loops;
+    const loopCodes=loopDisplayCodes(cls);
     const card=(L,i)=>{
       const t=cls[i].type, col=t==='R'?_R_COL:t==='B'?_B_COL:_U_COL, name=t==='R'?'Reinforcing':t==='B'?'Balancing':'Not yet classifiable';
       const more=I.loopVariants&&I.loopVariants[i]>1?` <span style="font-size:10.5px;color:var(--txt-m);">+${I.loopVariants[i]-1} similar</span>`:'';
       return `<div class="report-row" onclick="highlightLoopFromReport(${i})" style="display:block;cursor:pointer;border-left:4px solid ${col};padding:6px 10px;margin:6px 0;" title="Click to show this loop on the map">
-        <div style="font-size:10px;font-weight:700;letter-spacing:0.05em;color:${col};text-transform:uppercase;">${name} &middot; ${L.length} steps${more}</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.05em;color:${col};text-transform:uppercase;">${loopCodes[i]} &middot; ${name} &middot; ${L.length} steps${more}</div>
         ${_loopTrailHTML(L,steps[i]||[],t)}
         <div style="font-size:11.5px;color:var(--txt-m);line-height:1.5;">${_loopSentence(L,steps[i]||[],t)}</div></div>`;
     };
@@ -10016,7 +10095,7 @@ function confirmImport(){
 
   // --- Replace mode: clear canvas first ---
   if(_importMode==='replace'){
-    nodes.length=0; edges.length=0; loops.length=0; idCtr=0;
+    nodes.length=0; edges.length=0; loops.length=0; CLUSTERS.length=0; idCtr=0;
     freshMapPanels();
   }
   if(!MAP_NOUN){
@@ -10163,6 +10242,8 @@ function confirmImport(){
   if(mergedNodeCount) parts.push(`${mergedNodeCount} node${mergedNodeCount!==1?'s':''} identified as same`);
   const msg=parts.length?parts.join(', ')+'.':'Nothing new to import.';
   if(added){ layoutImportedNodes(nodes.slice(nodes.length-added)); untangleLayout(350); resolveOverlaps({silent:true}); }
+  const autoCluster=document.getElementById('import-auto-cluster');
+  if(autoCluster&&autoCluster.checked) autoClusterMap('radial');
   if(added||connsAdded||mergedCount||mergedNodeCount||changedCount||missingCount||backCount||_linkNow){
     addLog(`imported: ${msg}`);
     buildSim();if(typeof forceOn!=='undefined'&&forceOn&&sim) sim.alpha(0.4).restart();
@@ -10346,21 +10427,6 @@ function setEdgeDelay(on){
   if(edgeEditIdx===null) return;
   edges[edgeEditIdx].hasDelay=!!on;
   draw(); saveState(); markUnsaved();
-}
-
-function openEdgeNoteModal(edgeIdx){
-  selectedEdgeIdx=edgeIdx;
-  const e=edges[edgeIdx];
-  const a=nodes.find(n=>n.id===(typeof e.source==='object'?e.source.id:e.source));
-  const b=nodes.find(n=>n.id===(typeof e.target==='object'?e.target.id:e.target));
-  const note=e.note||'';
-  const val=prompt(`Note for connection: "${a?a.label:'?'}" ↔ "${b?b.label:'?'}"`,note);
-  if(val!==null){
-    edges[edgeIdx].note=val.trim();
-    saveState();markUnsaved();draw();
-    showStatus('Connection note saved.');
-  }
-  selectedEdgeIdx=null;
 }
 
 function updateColourLegend(){ _updateColourLegend(); syncLegendVisibility(); }
@@ -10811,7 +10877,7 @@ function renderNodeView(n, isCentre){
   document.getElementById('modal-edit-panel').style.display='none';
 
   const vp=document.getElementById('modal-view-content');
-  const shapeLabels={circle:'Circle',square:'Square',rectangle:'Wide',diamond:'Diamond',triangle:'Triangle',hexagon:'Hexagon',pill:'Pill',star:'Star'};
+  const shapeLabels={circle:'Circle',square:'Square',rectangle:'Wide',diamond:'Diamond',triangle:'Triangle',hexagon:'Hexagon',pill:'Pill',star:'Star',none:'Text only'};
   let html=`<div style="font-size:20px;font-weight:600;color:var(--ink);margin-bottom:12px;">${escHtml(n.label)}</div>`;
   html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">`;
   html+=`<span style="display:inline-block;width:16px;height:16px;border-radius:50%;background:${n.colour||'#ccc'};flex-shrink:0;"></span>`;
@@ -11064,7 +11130,8 @@ function confirmModal(){
 // ── Mouse events ──────────────────────────────────────────────────────────────
 canvas.addEventListener('wheel',e=>{
   e.preventDefault();
-  const f=e.deltaY<0?1.1:0.91,oz=zoom;
+  const step=Math.min(40,Math.abs(e.deltaY));
+  const f=Math.exp((e.deltaY<0?1:-1)*step*0.0018),oz=zoom;
   zoom=Math.max(minZoomAllowed(),Math.min(MAX_ZOOM,zoom*f));
   panX=e.offsetX-(e.offsetX-panX)*(zoom/oz);
   panY=e.offsetY-(e.offsetY-panY)*(zoom/oz);
@@ -11083,24 +11150,6 @@ canvas.addEventListener('dblclick',e=>{
     requestAnimationFrame(()=>switchToEditMode());
     return;
   }
-  // Phase 5: double-click on edge to add/edit note
-  const wx=(e.offsetX-panX)/zoom, wy=(e.offsetY-panY)/zoom;
-  let best=null, bestD=16/zoom;
-  edges.forEach((ed,i)=>{
-    const a=typeof ed.source==='object'?ed.source:nodes.find(nd=>nd.id===ed.source);
-    const b=typeof ed.target==='object'?ed.target:nodes.find(nd=>nd.id===ed.target);
-    if(!a||!b) return;
-    const dx=b.x-a.x,dy=b.y-a.y,dist=Math.sqrt(dx*dx+dy*dy)||1;
-    const curve=_curveOffset(dist);
-    const mx=(a.x+b.x)/2-dy/dist*curve, my=(a.y+b.y)/2+dx/dist*curve;
-    for(let t=0;t<=1;t+=0.04){
-      const qx=(1-t)**2*a.x+2*(1-t)*t*mx+t*t*b.x;
-      const qy=(1-t)**2*a.y+2*(1-t)*t*my+t*t*b.y;
-      const d=Math.sqrt((qx-wx)**2+(qy-wy)**2);
-      if(d<bestD){bestD=d;best=i;}
-    }
-  });
-  if(best!==null) openEdgeNoteModal(best);
 });
 
 canvas.addEventListener('mousedown',e=>{
@@ -11118,6 +11167,7 @@ canvas.addEventListener('mousedown',e=>{
     if(n){
       // Check if this node belongs to a locked loop → group drag
       const lockedLoop=loops.find(lp=>lp.locked&&lp.nodeIds.includes(n.id));
+      const lockedCluster=CLUSTERS.find(c=>c.locked&&(c.centerId===n.id||c.nodeIds.includes(n.id)));
       dragNode=n; dragMoving=false;
       dragStartSX=e.offsetX; dragStartSY=e.offsetY;
       canvas.style.cursor='grabbing';
@@ -11130,6 +11180,10 @@ canvas.addEventListener('mousedown',e=>{
           const nd=nodes.find(m=>m.id===id);
           if(nd) dragLoopInitPos[id]={x:nd.x,y:nd.y};
         });
+      } else if(lockedCluster){
+        dragLoopId=null;
+        dragGroupInit={};
+        [lockedCluster.centerId,...lockedCluster.nodeIds].forEach(id=>{ const nd=nodes.find(m=>m.id===id); if(nd) dragGroupInit[id]={x:nd.x,y:nd.y}; });
       } else {
         dragLoopId=null;
         if(sim) sim.alphaTarget(0);
@@ -11232,10 +11286,17 @@ canvas.addEventListener('mousemove',e=>{
     const n=nodeAt(e.offsetX,e.offsetY);
     if(n){
       if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
-      if(n.id!==hoverPanelNodeId||!document.getElementById('hover-panel').classList.contains('visible')) showHoverPanel(n.id);
+      if(n.id!==hoverPanelNodeId||!document.getElementById('hover-panel').classList.contains('visible')) scheduleHoverPanel(n.id);
     } else {
+      const edgeIdx=edgeIndexAt(e.offsetX,e.offsetY);
+      if(edgeIdx!==null){
+        if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
+        if(edgeIdx!==hoverEdgeIndex||!document.getElementById('hover-panel').classList.contains('visible')) scheduleEdgeHoverPanel(edgeIdx);
+        return;
+      }
+      if(hoverShowTimer){ clearTimeout(hoverShowTimer); hoverShowTimer=null; hoverCandidateId=null; }
       // Immediately clear highlight when cursor leaves any node
-      if(hoverPanelNodeId!==null){
+      if(hoverPanelNodeId!==null||hoverEdgeIndex!==null){
         // If a filter is active, restore filter highlights; otherwise clear
         const _si=document.getElementById('search-input');
         const _hasFilter=(_si&&_si.value.trim())||getMsValues('cat-filter').length||getMsValues('area-filter').length||getMsValues('tag-filter').length||getMsValues('conn-type-filter').length||getMsValues('member-filter').length;
@@ -11246,6 +11307,7 @@ canvas.addEventListener('mousemove',e=>{
             const panel=document.getElementById('hover-panel');
             panel.classList.remove('visible');
             hoverPanelNodeId=null;
+            hoverEdgeIndex=null;
             hoverHideTimer=null;
           }, 400);
         }
@@ -11280,11 +11342,12 @@ canvas.addEventListener('mouseup',e=>{
 
 // Hide hover panel when cursor leaves the canvas entirely
 canvas.addEventListener('mouseleave',()=>{
-  if(hoverPanelNodeId!==null&&!hoverHideTimer){
+  if((hoverPanelNodeId!==null||hoverEdgeIndex!==null)&&!hoverHideTimer){
     highlightIds.clear();highlightEdges.clear();secondaryIds.clear();draw();
     hoverHideTimer=setTimeout(()=>{
       document.getElementById('hover-panel').classList.remove('visible');
       hoverPanelNodeId=null;
+      hoverEdgeIndex=null;
       hoverHideTimer=null;
     },400);
   }
@@ -12422,7 +12485,7 @@ function saveNamedVersion(){
 function openVersionsModal(){
   const list=document.getElementById('versions-list');
   if(!namedVersions.length){
-    list.innerHTML=`<div style="color:var(--txt-m);padding:12px 0;">No saved versions yet. Save a version from the Report panel or Settings menu.</div>`;
+    list.innerHTML=`<div style="color:var(--txt-m);padding:12px 0;">No saved versions yet. Save a version from the Report panel or Map Editor.</div>`;
   } else {
     list.innerHTML=namedVersions.map((v,i)=>`
       <div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--bdr);gap:10px;">
@@ -14177,6 +14240,7 @@ function buildShapeSelector(){
     { id:'hexagon',   label:'Hexagon', svg:'<polygon points="21,12 16.5,19.8 7.5,19.8 3,12 7.5,4.2 16.5,4.2" stroke="currentColor" stroke-width="2" fill="none"/>' },
     { id:'pill',      label:'Pill',    svg:'<rect x="1" y="7" width="22" height="10" rx="5" stroke="currentColor" stroke-width="2" fill="none"/>' },
     { id:'star',      label:'Star',    svg:'<polygon points="12,2 14.6,8.7 21.8,9.2 16.3,13.8 18,20.8 12,17 6,20.8 7.7,13.8 2.2,9.2 9.4,8.7" stroke="currentColor" stroke-width="2" fill="none" stroke-linejoin="round"/>' },
+    { id:'none',      label:'Text only',svg:'<path d="M4 6h16M12 6v13M8 19h8" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>' },
   ];
   shapes.forEach(s=>{
     const btn=document.createElement('button');
@@ -14246,6 +14310,7 @@ function ctxDeleteNode(){
     return s!==ctxMenuNodeId&&t!==ctxMenuNodeId;
   });
   loops=loops.filter(l=>{ l.nodeIds=l.nodeIds.filter(id=>id!==ctxMenuNodeId); return l.nodeIds.length>=2; });
+  CLUSTERS=CLUSTERS.filter(c=>{ c.nodeIds=c.nodeIds.filter(id=>id!==ctxMenuNodeId); return c.centerId!==ctxMenuNodeId&&c.nodeIds.length>=2; });
   nodes=nodes.filter(nd=>nd.id!==ctxMenuNodeId);
   addLog('deleted node "'+n.label+'"');
   buildSim(); if(sim&&forceOn)sim.alpha(0.3).restart();
@@ -14424,6 +14489,101 @@ function clearKnock(){
   if(el) el.style.display='none';
 }
 // ── Node right-click context menu ────────────────────────────────────────────
+let _clusterByNode=new Map(), _clusterFlagged=new Set();
+function refreshClusterCache(){
+  _clusterByNode=new Map(); _clusterFlagged=new Set();
+  const deg=new Map(), neighbours=new Map();
+  edges.forEach(e=>{ const a=typeof e.source==='object'?e.source.id:e.source,b=typeof e.target==='object'?e.target.id:e.target; deg.set(a,(deg.get(a)||0)+1); deg.set(b,(deg.get(b)||0)+1); if(!neighbours.has(a)) neighbours.set(a,new Set()); if(!neighbours.has(b)) neighbours.set(b,new Set()); neighbours.get(a).add(b); neighbours.get(b).add(a); });
+  CLUSTERS.forEach(c=>{ _clusterByNode.set(c.centerId,c); c.nodeIds.forEach(id=>{ _clusterByNode.set(id,c); if((deg.get(id)||0)!==1||!(neighbours.get(id)||new Set()).has(c.centerId)) _clusterFlagged.add(id); }); });
+}
+function clusterForNode(id){ return _clusterByNode.get(id)||CLUSTERS.find(c=>c.centerId===id||c.nodeIds.includes(id))||null; }
+function clusterExclusiveMembers(centerId){
+  const deg=new Map(), linked=[];
+  edges.forEach(e=>{
+    const a=typeof e.source==='object'?e.source.id:e.source, b=typeof e.target==='object'?e.target.id:e.target;
+    deg.set(a,(deg.get(a)||0)+1); deg.set(b,(deg.get(b)||0)+1);
+    if(a===centerId) linked.push(b); else if(b===centerId) linked.push(a);
+  });
+  return [...new Set(linked)].filter(id=>(deg.get(id)||0)===1&&nodes.some(n=>n.id===id&&n.type!=='centre'));
+}
+function clusterMemberFlagged(c,id){
+  return id!==c.centerId&&_clusterFlagged.has(id);
+}
+function arrangeCluster(c){
+  const centre=nodes.find(n=>n.id===c.centerId); if(!centre) return;
+  const members=c.nodeIds.map(id=>nodes.find(n=>n.id===id)).filter(Boolean);
+  const gap=Number(c.spacing)||110, N=members.length;
+  members.forEach((n,i)=>{
+    const angle=c.layout==='fan' ? (-Math.PI*0.78+(N===1?0:i/(N-1))*Math.PI*1.56) : (-Math.PI/2+i*Math.PI*2/N);
+    n.x=centre.x+Math.cos(angle)*gap; n.y=centre.y+Math.sin(angle)*gap;
+    if(c.locked){ n.fx=n.x; n.fy=n.y; n.pinned=true; }
+  });
+  if(c.locked){ centre.fx=centre.x; centre.fy=centre.y; centre.pinned=true; }
+}
+function createCluster(centerId,memberIds,layout){
+  const ids=[...new Set(memberIds)].filter(id=>id!==centerId&&nodes.some(n=>n.id===id));
+  if(ids.length<CLUSTER_MIN_SIZE){ showStatus(`A cluster needs at least ${CLUSTER_MIN_SIZE} peripheral nodes.`); return null; }
+  CLUSTERS=CLUSTERS.filter(c=>c.centerId!==centerId&&!c.nodeIds.some(id=>ids.includes(id)));
+  const c={id:'cluster_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),centerId,nodeIds:ids,layout:layout||'radial',spacing:110,locked:true,region:null};
+  CLUSTERS.push(c); arrangeCluster(c); refreshClusterCache(); renderClusterSettings(); buildSim(); draw(); saveState(); markUnsaved();
+  return c;
+}
+function setClusterMinSize(v){ CLUSTER_MIN_SIZE=Math.max(2,Math.min(50,Number(v)||3)); const el=document.getElementById('cluster-min-size'); if(el) el.value=CLUSTER_MIN_SIZE; saveState(); markUnsaved(); }
+function autoClusterMap(layout){
+  let made=0;
+  nodes.forEach(n=>{ if(clusterForNode(n.id)) return; const ids=clusterExclusiveMembers(n.id); if(ids.length>=CLUSTER_MIN_SIZE){ createCluster(n.id,ids,layout); made++; } });
+  renderClusterSettings(); showStatus(made?`${made} cluster${made===1?'':'s'} arranged.`:'No new eligible clusters found.');
+}
+function updateCluster(id,key,value){
+  const c=CLUSTERS.find(x=>x.id===id); if(!c) return;
+  if(key==='spacing') c.spacing=Math.max(60,Math.min(260,Number(value)||110));
+  else if(key==='layout') c.layout=value==='fan'?'fan':'radial';
+  else if(key==='locked'){
+    c.locked=!!value;
+    [c.centerId,...c.nodeIds].forEach(nid=>{ const n=nodes.find(x=>x.id===nid); if(n){ n.pinned=c.locked; n.fx=c.locked?n.x:null; n.fy=c.locked?n.y:null; } });
+  }
+  if(key==='spacing'||key==='layout') arrangeCluster(c);
+  renderClusterSettings(); buildSim(); draw(); saveState(); markUnsaved();
+}
+function dissolveCluster(id){ CLUSTERS=CLUSTERS.filter(c=>c.id!==id); refreshClusterCache(); renderClusterSettings(); draw(); saveState(); markUnsaved(); showStatus('Cluster dissolved. Nodes and connections remain.'); }
+function setClusterRegion(id,on){
+  const c=CLUSTERS.find(x=>x.id===id); if(!c) return;
+  c.region=on?(c.region||{colour:'#60A5FA',opacity:0.16,shape:'ellipse',label:'',detached:false}):null;
+  renderClusterSettings(); draw(); saveState(); markUnsaved();
+}
+function updateClusterRegion(id,key,value){
+  const c=CLUSTERS.find(x=>x.id===id); if(!c||!c.region) return;
+  if(key==='opacity') c.region.opacity=Math.max(0.04,Math.min(0.55,Number(value)||0.16));
+  else if(key==='detached'){
+    c.region.detached=!!value;
+    if(c.region.detached){ const b=clusterBounds(c); c.region.cx=b.cx; c.region.cy=b.cy; c.region.rx=b.rx; c.region.ry=b.ry; }
+  } else c.region[key]=value;
+  draw(); saveState(); markUnsaved();
+}
+function nudgeClusterRegion(id,dx,dy){ const c=CLUSTERS.find(x=>x.id===id); if(!c||!c.region||!c.region.detached) return; c.region.cx+=dx; c.region.cy+=dy; draw(); saveState(); markUnsaved(); }
+function clusterBounds(c){
+  const ns=[c.centerId,...c.nodeIds].map(id=>nodes.find(n=>n.id===id)).filter(Boolean);
+  const xs=ns.map(n=>n.x), ys=ns.map(n=>n.y), pad=65;
+  const minX=Math.min(...xs)-pad,maxX=Math.max(...xs)+pad,minY=Math.min(...ys)-pad,maxY=Math.max(...ys)+pad;
+  return {cx:(minX+maxX)/2,cy:(minY+maxY)/2,rx:(maxX-minX)/2,ry:(maxY-minY)/2};
+}
+function renderClusterSettings(){
+  const el=document.getElementById('cluster-settings-list'); if(!el) return;
+  const min=document.getElementById('cluster-min-size'); if(min) min.value=CLUSTER_MIN_SIZE;
+  if(!CLUSTERS.length){ el.innerHTML='<div style="font-size:11px;color:var(--ink-h);">No clusters yet.</div>'; return; }
+  el.innerHTML=CLUSTERS.map(c=>{
+    const centre=nodes.find(n=>n.id===c.centerId), flagged=c.nodeIds.filter(id=>clusterMemberFlagged(c,id)).length, r=c.region;
+    return `<div style="border:1px solid var(--bdr);border-radius:8px;padding:9px;margin-top:7px;font-size:11px;"><div style="display:flex;gap:7px;align-items:center;"><strong style="flex:1;">${escHtml(centre?centre.label:'Cluster')} · ${c.nodeIds.length}</strong><button onclick="updateCluster('${c.id}','locked',${!c.locked})">${c.locked?'Unlock':'Lock'}</button><button onclick="dissolveCluster('${c.id}')">Dissolve</button></div><div style="display:flex;gap:7px;align-items:center;margin-top:7px;"><select onchange="updateCluster('${c.id}','layout',this.value)"><option value="radial" ${c.layout==='radial'?'selected':''}>Radial</option><option value="fan" ${c.layout==='fan'?'selected':''}>Fan</option></select><label>Spacing <input type="range" min="60" max="260" value="${c.spacing||110}" oninput="updateCluster('${c.id}','spacing',this.value)"></label><label><input type="checkbox" ${r?'checked':''} onchange="setClusterRegion('${c.id}',this.checked)"> Shaded region</label></div>${flagged?`<div style="color:#B45309;margin-top:6px;">${flagged} peripheral node${flagged===1?' has':'s have'} gained another connection.</div>`:''}${r?`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:7px;"><input type="color" value="${escHtml(r.colour)}" onchange="updateClusterRegion('${c.id}','colour',this.value)"><label>Opacity <input type="range" min="0.04" max="0.55" step="0.01" value="${r.opacity}" oninput="updateClusterRegion('${c.id}','opacity',this.value)"></label><select onchange="updateClusterRegion('${c.id}','shape',this.value)"><option value="ellipse" ${r.shape==='ellipse'?'selected':''}>Ellipse</option><option value="round" ${r.shape==='round'?'selected':''}>Rounded</option></select><input type="text" value="${escHtml(r.label||'')}" placeholder="Region label" onchange="updateClusterRegion('${c.id}','label',this.value)"><label><input type="checkbox" ${r.detached?'checked':''} onchange="updateClusterRegion('${c.id}','detached',this.checked)"> Detach</label>${r.detached?`<span>Move <button onclick="nudgeClusterRegion('${c.id}',-20,0)">←</button><button onclick="nudgeClusterRegion('${c.id}',0,-20)">↑</button><button onclick="nudgeClusterRegion('${c.id}',0,20)">↓</button><button onclick="nudgeClusterRegion('${c.id}',20,0)">→</button></span>`:''}</div>`:''}</div>`;
+  }).join('');
+}
+function ctxCreateCluster(manual){ const id=ctxMenuNodeId; closeNodeCtxMenu(); const ids=manual?[...highlightIds].filter(x=>x!==id):clusterExclusiveMembers(id); createCluster(id,ids,'radial'); }
+function ctxToggleClusterLock(){ const c=clusterForNode(ctxMenuNodeId); closeNodeCtxMenu(); if(c) updateCluster(c.id,'locked',!c.locked); }
+function ctxToggleClusterRegion(){ const c=clusterForNode(ctxMenuNodeId); closeNodeCtxMenu(); if(c) setClusterRegion(c.id,!c.region); }
+function ctxDissolveCluster(){ const c=clusterForNode(ctxMenuNodeId); closeNodeCtxMenu(); if(c) dissolveCluster(c.id); }
+function ctxRemoveFromCluster(){
+  const id=ctxMenuNodeId,c=clusterForNode(id); closeNodeCtxMenu(); if(!c||id===c.centerId) return;
+  c.nodeIds=c.nodeIds.filter(x=>x!==id); if(c.nodeIds.length<2) dissolveCluster(c.id); else { renderClusterSettings(); draw(); saveState(); markUnsaved(); }
+}
 let ctxMenuNodeId=null,_ctxClientX=0,_ctxClientY=0;
 canvas.addEventListener('contextmenu',e=>{
   _ctxClientX=e.clientX; _ctxClientY=e.clientY;
@@ -14438,6 +14598,15 @@ canvas.addEventListener('contextmenu',e=>{
   const vl=document.getElementById('ctx-video-label'); if(vl) vl.textContent=n.videoUrl?'Edit video link…':'Add video link…';
   const vr=document.getElementById('ctx-btn-video-remove'); if(vr) vr.style.display=n.videoUrl?'flex':'none';
   const fb=document.getElementById('ctx-btn-focus'); if(fb) fb.style.display=MAP_TYPE==='stakeholder'?'flex':'none';
+  const cluster=clusterForNode(n.id);
+  const autoBtn=document.getElementById('ctx-btn-cluster-auto'), manualBtn=document.getElementById('ctx-btn-cluster-manual');
+  if(autoBtn) autoBtn.style.display=!cluster&&clusterExclusiveMembers(n.id).length>=CLUSTER_MIN_SIZE?'flex':'none';
+  if(manualBtn) manualBtn.style.display=!cluster&&[...highlightIds].filter(id=>id!==n.id).length>=CLUSTER_MIN_SIZE?'flex':'none';
+  const lockBtn=document.getElementById('ctx-btn-cluster-lock'), regBtn=document.getElementById('ctx-btn-cluster-region'), remBtn=document.getElementById('ctx-btn-cluster-remove'), disBtn=document.getElementById('ctx-btn-cluster-dissolve');
+  if(lockBtn){ lockBtn.style.display=cluster?'flex':'none'; lockBtn.textContent=cluster?(cluster.locked?'Unlock cluster':'Lock cluster'):''; }
+  if(regBtn){ regBtn.style.display=cluster?'flex':'none'; regBtn.textContent=cluster?(cluster.region?'Remove shaded region':'Add shaded region'):''; }
+  if(remBtn) remBtn.style.display=cluster&&cluster.centerId!==n.id?'flex':'none';
+  if(disBtn) disBtn.style.display=cluster?'flex':'none';
   const menu=document.getElementById('node-ctx-menu');
   if(!menu) return;
   menu.style.display='block';
@@ -14995,7 +15164,7 @@ const WALK_STEPS=[
   },
   {
     title:'Import and settings',
-    text:'In Edit mode, the settings slider gives you import from spreadsheet, export, saved versions and more. Import reads Excel or CSV files — any column names — and maps them using a simple column picker.',
+    text:'In Edit mode, Map Editor gives you import from spreadsheet, export, saved versions and more. Import reads Excel or CSV files — any column names — and maps them using a simple column picker.',
     target:null, pos:'centre'
   },
 ];
@@ -15673,7 +15842,7 @@ function _executeReset(){
   _cloudUpdatedAt=null;
   _localMapKey=crypto.randomUUID();
   // Now wipe everything
-  nodes.length=0; edges.length=0; loops.length=0;
+  nodes.length=0; edges.length=0; loops.length=0; CLUSTERS.length=0;
   idCtr=0; history=[]; histIdx=-1;
   presentationStops=[]; savedPresentations=[]; namedVersions=[]; presMapOnly=false;
   if(presNarrationAudio) presNarrationAudio.pause();
@@ -15755,6 +15924,7 @@ function switchCustomizeTab(tab){
   if (tab === 'nodes') {
     renderSettingsFields();
     renderCategoriesList();
+    renderClusterSettings();
   } else {
     initLoopStyleDraft();
     initConnDraft();
@@ -16748,7 +16918,9 @@ function showHoverPanel(id){
   if(!n) return;
   if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
   hoverPanelNodeId=id;
+  hoverEdgeIndex=null;
   sidePanelNodeId=id;
+  { const fb=document.getElementById('hp-focus-btn'); if(fb) fb.style.display=''; }
 
   // Hover highlight: VIEW MODE ONLY — the node and its immediate connections bright, the next ring out faded, the rest dimmed
   const q=document.getElementById('search-input')?document.getElementById('search-input').value.trim():'';
@@ -16767,7 +16939,7 @@ function showHoverPanel(id){
       else if(near.has(b)&&!near.has(a)) outer.add(a);
     });
     outer.forEach(x=>secondaryIds.add(x));
-    draw();
+    _animateHoverFocus();
   }
 
   // Populate content
@@ -16776,6 +16948,48 @@ function showHoverPanel(id){
 
   const panel=document.getElementById('hover-panel');
   panel.classList.add('visible');
+}
+
+function scheduleHoverPanel(id){
+  const key='node:'+id;
+  if(!hoverPanelEnabled||key===hoverCandidateId) return;
+  if(hoverShowTimer) clearTimeout(hoverShowTimer);
+  hoverCandidateId=key;
+  hoverShowTimer=setTimeout(()=>{
+    hoverShowTimer=null;
+    const next=hoverCandidateId;
+    hoverCandidateId=null;
+    if(next) showHoverPanel(Number(next.slice(5)));
+  },650);
+}
+
+function scheduleEdgeHoverPanel(index){
+  const key='edge:'+index;
+  if(!hoverPanelEnabled||key===hoverCandidateId) return;
+  if(hoverShowTimer) clearTimeout(hoverShowTimer);
+  hoverCandidateId=key;
+  hoverShowTimer=setTimeout(()=>{
+    hoverShowTimer=null;
+    const next=hoverCandidateId;
+    hoverCandidateId=null;
+    if(next) showEdgeHoverPanel(Number(next.slice(5)));
+  },650);
+}
+
+function showEdgeHoverPanel(index){
+  const e=edges[index]; if(!e) return;
+  const aid=typeof e.source==='object'?e.source.id:e.source;
+  const bid=typeof e.target==='object'?e.target.id:e.target;
+  const a=nodes.find(n=>n.id===aid), b=nodes.find(n=>n.id===bid);
+  if(!a||!b) return;
+  hoverPanelNodeId=null; hoverEdgeIndex=index;
+  { const fb=document.getElementById('hp-focus-btn'); if(fb) fb.style.display='none'; }
+  highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
+  highlightIds.add(aid); highlightIds.add(bid); highlightEdges.add(index);
+  _animateHoverFocus();
+  document.getElementById('hover-panel-title').textContent='Connection';
+  document.getElementById('hover-panel-content').innerHTML=`<div class="hp-row"><div class="hp-k">From</div><div class="hp-v">${escHtml(a.label)}</div></div><div class="hp-row"><div class="hp-k">To</div><div class="hp-v">${escHtml(b.label)}</div></div><div class="hp-row"><div class="hp-k">Strength</div><div class="hp-v">${escHtml(e.strength||'Moderate')}</div></div>${e.polarity?`<div class="hp-row"><div class="hp-k">Effect</div><div class="hp-v">${e.polarity==='negative'?'Negative (−)':'Positive (+)'}</div></div>`:''}`;
+  document.getElementById('hover-panel').classList.add('visible');
 }
 
 function toggleHoverDock(force){
@@ -16819,10 +17033,11 @@ function hideHoverPanel(immediate){
     if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
   });
   hp.addEventListener('mouseleave',()=>{
-    if(hoverPanelNodeId!==null&&!hoverHideTimer){
+    if((hoverPanelNodeId!==null||hoverEdgeIndex!==null)&&!hoverHideTimer){
       hoverHideTimer=setTimeout(()=>{
         document.getElementById('hover-panel').classList.remove('visible');
         hoverPanelNodeId=null;
+        hoverEdgeIndex=null;
         hoverHideTimer=null;
       },300);
     }

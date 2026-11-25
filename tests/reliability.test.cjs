@@ -32,6 +32,25 @@ test('downloaded spreadsheet templates use the importer columns',()=>{
  c.MAP_TYPE='network'; c.downloadImportTemplate();
  assert.deepEqual(Array.from(rows[0]),['Name','Connected to','Connection type','Arrow','Date added','Connection date','Connected to main node','Notes','Area']);
 });
+test('map interaction improvements stay available in editor and viewer',()=>{
+ assert.ok(!source.includes('Update this map from the spreadsheet it came from'));
+ assert.ok(!source.includes('function openEdgeNoteModal('));
+ assert.match(source,/>Map Editor<\/button>/);
+ assert.match(source,/id:'none',\s+label:'Text only'/);
+ assert.match(source,/function scheduleEdgeHoverPanel\(/);
+ assert.match(viewerSource,/function showEdgeHoverPanel\(/);
+});
+test('feedback loops receive separate reinforcing and balancing numbers',()=>{
+ const c=ctx({},['loopDisplayCodes']);
+ assert.deepEqual(Array.from(c.loopDisplayCodes([{type:'R'},{type:'B'},{type:'R'},{type:'unassigned'},{type:'B'}])),['R1','B1','R2','?1','B2']);
+});
+test('clusters persist without hiding nodes or connections',()=>{
+ assert.match(fn('snap'),/clusters:CLUSTERS\|\|\[\]/);
+ assert.match(fn('dissolveCluster'),/Nodes and connections remain/);
+ assert.match(fn('clusterExclusiveMembers'),/===1/);
+ assert.match(source,/Automatically arrange eligible clusters after import/);
+ assert.match(source,/Shaded region/);
+});
 test('invalid snapshots are rejected before changing live map or history guard',()=>{
  const nodes=[{id:99}],c=ctx({nodes,skipSave:false},['validateMapSnapshot','restoreSnap']);
  for(const d of [{}, {...valid(),nodes:[{id:1,x:Infinity,y:0}]},{...valid(),edges:[{from:1,to:7}]},{...valid(),loops:{}}]){
