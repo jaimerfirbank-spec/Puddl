@@ -13,7 +13,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 OUT = os.path.join(os.path.dirname(__file__), '..', 'templates', 'partnership-map-collection.xlsx')
 
 # Edit these to suit the programme. They feed the drop-down lists on the first sheet.
-SECTORS = ['Education', 'Health', 'Council and statutory', 'Community and VCS',
+SECTORS = ['Education', 'Health', 'Council and statutory', 'VCFS',
            'Safe space or venue', 'Employment and housing']
 SERVES = ['Children and young people', 'Children and families', 'Under 5s', 'Young people',
           'Adults', 'Older adults', 'Unpaid carers', 'New arrivals', 'Whole neighbourhood']
@@ -104,7 +104,7 @@ r = line(r)
 r = line(r, 'An example', '', True, band_fill)
 ex_head = ['Organisation', 'Sector', 'Connected to', 'Connection type', 'Connection date']
 g.cell(row=r, column=1, value='Row 1').font = Font(color=GREY)
-g.cell(row=r, column=2, value='Carrfield Food Bank. Sector: Community and VCS. Date added: 12/01/2026. Connected to: St Aidan\'s Church, Carrfield Food Pantry. Connection type: Strong. Connection date: 12/01/2026.').alignment = Alignment(wrap_text=True, vertical='top'); r += 1
+g.cell(row=r, column=2, value='Carrfield Food Bank. Sector: VCFS. Date added: 12/01/2026. Connected to: St Aidan\'s Church, Carrfield Food Pantry. Connection type: Strong. Connection date: 12/01/2026.').alignment = Alignment(wrap_text=True, vertical='top'); r += 1
 g.cell(row=r, column=1, value='Row 2 (a different strength)').font = Font(color=GREY)
 g.cell(row=r, column=2, value='Carrfield Food Bank. Connected to: Carrfield Academy. Connection type: Weak. Connection date: 20/04/2026. (Nothing else filled in, because the organisation is already described in row 1.)').alignment = Alignment(wrap_text=True, vertical='top'); r += 2
 r = line(r, 'For the person collecting this', '', True, band_fill)
