@@ -2122,8 +2122,8 @@ window.addEventListener('load',()=>{ setTimeout(startSplash,60); });
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-top:10px;border-top:1px solid var(--bdr);">
       <span style="font-size:12px;color:var(--ink);flex:1;">Dotted connection</span>
       <div id="conn-dot-btns" style="display:flex;gap:4px;">
-        <button data-dotted="0" onclick="setNewConnDotted(false)" title="A solid connection" style="width:64px;height:28px;font-size:12px;padding:0;">Off</button>
-        <button data-dotted="1" onclick="setNewConnDotted(true)" title="An informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">On</button>
+        <button data-dotted="0" onclick="setNewConnDotted(false)" title="A solid connection" style="width:64px;height:28px;font-size:12px;padding:0;">Solid</button>
+        <button data-dotted="1" onclick="setNewConnDotted(true)" title="An informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">Dotted</button>
       </div>
     </div>
 
@@ -2319,8 +2319,8 @@ function selectConnColour(col){
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-top:8px;border-top:1px solid var(--bdr);">
     <span style="font-size:12px;color:var(--ink);flex:1;">Dotted connection</span>
     <div id="edge-dot-btns" style="display:flex;gap:4px;">
-      <button data-dotted="0" onclick="setEdgeDotted(false)" title="A solid connection" style="width:64px;height:28px;font-size:12px;padding:0;">Off</button>
-      <button data-dotted="1" onclick="setEdgeDotted(true)" title="An informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">On</button>
+      <button data-dotted="0" onclick="setEdgeDotted(false)" title="A solid connection" style="width:64px;height:28px;font-size:12px;padding:0;">Solid</button>
+      <button data-dotted="1" onclick="setEdgeDotted(true)" title="An informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">Dotted</button>
     </div>
   </div>
   <!-- Edge polarity (+/-). Meaning changes by map type: cause/effect direction
