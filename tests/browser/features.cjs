@@ -4,13 +4,12 @@ const assert=require('node:assert/strict'),path=require('node:path'),fs=require(
 const {open,loadMap,ROOT,CARRFIELD,YORKSHIRE,SYSTEMS}=require('./harness.cjs');
 const tests=[];const test=(name,fn)=>tests.push({name,fn});
 
-test('side panel: opens at 30%, four tabs, pop out and dock, fold away',async({page})=>{
+test('side panel: starts folded, opens at 30%, four tabs, pop out and dock, fold away',async({page})=>{
   await loadMap(page,CARRFIELD);
   await page.waitForTimeout(400);
-  assert.ok(await page.evaluate(()=>document.getElementById('side-dock').classList.contains('open')),'open the first time on a wide screen');
-  await page.click('#btn-search-toggle');await page.waitForTimeout(300);   // fold it away
+  assert.equal(await page.evaluate(()=>document.getElementById('side-dock').classList.contains('open')),false,'folded when a map opens');
   assert.equal(await page.evaluate(()=>document.getElementById('side-dock').getBoundingClientRect().width),0);
-  await page.click('#btn-search-toggle');await page.waitForTimeout(400);   // and bring it back
+  await page.click('#btn-search-toggle');await page.waitForTimeout(400);   // open Explore
   const w=await page.evaluate(()=>Math.round(document.getElementById('side-dock').getBoundingClientRect().width/innerWidth*100));
   assert.equal(w,30);
   for(const t of ['ask','filter','report','glance']){await page.click('#dock-tab-'+t);assert.ok(await page.evaluate(t=>document.getElementById('dock-pane-'+t).classList.contains('on'),t));}
@@ -235,21 +234,21 @@ test('history: lists earlier versions with who and when, viewers cannot go back,
   assert.match(r.noDb[0].t,/database update that has not been applied/);
 });
 
-test('one panel: Explore opens by default, and there is no separate Ask button, in the toolbar or floating',async({page})=>{
+test('one panel: Explore starts folded, and there is no separate Ask button, in the toolbar or floating',async({page})=>{
   await loadMap(page,CARRFIELD);
   const r=await page.evaluate(async()=>{
     const q=id=>document.getElementById(id);
     const askBtn=!!q('btn-ask-map'), label=q('search-btn-label').textContent;
-    const glanceLen=q('sec-insights-body').innerHTML.length, glanceShown=q('sec-insights-body').style.display;
     const openAtStart=q('side-dock').classList.contains('open'), launcherGone=!q('ask-puddl-launcher');
     dockFold(); const launcherFolded=!q('ask-puddl-launcher');
     openAskMap(); const tab=_dock.tab, openAfterAsk=q('side-dock').classList.contains('open');
+    dockShow('glance'); const glanceLen=q('sec-insights-body').innerHTML.length, glanceShown=q('sec-insights-body').style.display;
     const cs=getComputedStyle(document.querySelector('#side-dock .dock-pane')), tabs=getComputedStyle(document.querySelector('#side-dock .dock-tabs')), dock=getComputedStyle(q('side-dock'));
     return {glanceLen,glanceShown,askBtn,label,openAtStart,launcherGone,launcherFolded,tab,openAfterAsk,padL:parseFloat(cs.paddingLeft),tabsL:parseFloat(tabs.paddingLeft),border:dock.borderLeftWidth};
   });
   assert.equal(r.askBtn,false);assert.equal(r.label,'Explore');
-  assert.equal(r.openAtStart,true,'open the first time on a wide screen');
-  assert.ok(r.glanceShown==='block'&&r.glanceLen>1000,'At a glance is filled in when a map arrives with the panel already open');
+  assert.equal(r.openAtStart,false,'folded when a map opens');
+  assert.ok(r.glanceShown==='block'&&r.glanceLen>1000,'At a glance fills in when Explore is opened');
   assert.ok(r.launcherGone&&r.launcherFolded,'no floating Ask Puddle button, open or folded');
   assert.equal(r.tab,'ask');assert.equal(r.openAfterAsk,true);
   assert.ok(r.padL>=24&&r.tabsL>=12&&r.border==='1px','the panel has room on the left and a visible edge');
