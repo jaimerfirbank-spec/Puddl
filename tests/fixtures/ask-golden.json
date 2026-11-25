@@ -1181,7 +1181,7 @@
    },
    "communities": {
     "answer": "9 communities found. The biggest are around Carrfield Volunteer Centre (31), around Social Prescribing Link Worker (20), around Carrfield Academy (16), around Carrfield Family Hub (16).",
-    "evidence": "The map splits clearly into groups. To see them in colour: Settings, Map, Colour by, Community.",
+    "evidence": "The map splits clearly into groups. To see them in colour: Map Editor, Map, Colour by, Community.",
     "focus": {
      "label": "Largest community",
      "ids": [
@@ -3234,7 +3234,7 @@
    },
    "communities": {
     "answer": "5 communities found. The biggest are around Combined Authority (23), around Sheffield Place Partnership (23), around Rotherham Place Partnership (22), around Barnsley Place Partnership (22).",
-    "evidence": "The map splits clearly into groups. To see them in colour: Settings, Map, Colour by, Community.",
+    "evidence": "The map splits clearly into groups. To see them in colour: Map Editor, Map, Colour by, Community.",
     "focus": {
      "label": "Largest community",
      "ids": [
@@ -5122,7 +5122,7 @@
    },
    "communities": {
     "answer": "3 communities found. The biggest are around Quality of Care (8), around Caseload (4), around Reputation (3).",
-    "evidence": "The map splits fairly clearly into groups. To see them in colour: Settings, Map, Colour by, Community.",
+    "evidence": "The map splits fairly clearly into groups. To see them in colour: Map Editor, Map, Colour by, Community.",
     "focus": {
      "label": "Largest community",
      "ids": [
