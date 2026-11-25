@@ -1495,6 +1495,9 @@ let loopNodes=[],loopDirection='cw',loopAddingNode=false;
 let selectedLoopId=null;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
+let NODE_LABEL_OVERFLOW=false;   // allow inside labels to extend beyond the shape
+let DEFAULT_NODE_SHAPE='circle';
+let DEFAULT_CONNECTION_DOTTED=false;
 let MAP_NOUN='';                  // '' = the default word for the map type; or 'person', 'organisation', 'service', 'item'
 let SHOW_MERGE_MARKS=true;        // the small two-circle badge on nodes that were merged on import
 let FIELD_DEFS=[];
@@ -1912,6 +1915,9 @@ function snap(includeVersions=true){
     dateAsAt:DATE_ASAT,
     areas:AREAS,
     nodeLabelPosition:NODE_LABEL_POSITION,
+    nodeLabelOverflow:NODE_LABEL_OVERFLOW,
+    defaultNodeShape:DEFAULT_NODE_SHAPE,
+    defaultConnectionDotted:DEFAULT_CONNECTION_DOTTED,
     showMergeMarks:SHOW_MERGE_MARKS,
     sizeByConnections:SIZE_BY==='connections',
     sizeBy:SIZE_BY,
@@ -2025,6 +2031,9 @@ function restoreSnap(s,keepVersions){
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
   LINKED_SHEET=d.linkedSheet||null;
+  NODE_LABEL_OVERFLOW=d.nodeLabelOverflow===true;
+  DEFAULT_NODE_SHAPE=['circle','square','rectangle','diamond','triangle','hexagon','pill','star','none'].includes(d.defaultNodeShape)?d.defaultNodeShape:'circle';
+  DEFAULT_CONNECTION_DOTTED=d.defaultConnectionDotted===true;
   LABEL_THIN=d.labelThin!==false; { const lt=document.getElementById('settings-label-thin'); if(lt) lt.checked=LABEL_THIN; }
   EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
   ARROW_SIZE=typeof d.arrowSize==='number'&&d.arrowSize>0?d.arrowSize:1; EDGE_GRADIENT=d.edgeGradient===true;
@@ -2565,15 +2574,19 @@ function draw(){
           ctx.fillText(isPos?'+':'−',bx,by+0.5/zoom);
         }
         if(e.hasDelay){
-          const hx=apS.x+(mx-apS.x)*0.42, hy=apS.y+(my-apS.y)*0.42;
+          const ht=0.42, hu=1-ht;
+          const hx=hu*hu*apS.x+2*hu*ht*mx+ht*ht*bpS.x;
+          const hy=hu*hu*apS.y+2*hu*ht*my+ht*ht*bpS.y;
           const hl=9/zoom;
-          const hNx=-dy/dist, hNy=dx/dist; // perpendicular to the chord, close enough for a short hatch
+          const hTx=2*hu*(mx-apS.x)+2*ht*(bpS.x-mx), hTy=2*hu*(my-apS.y)+2*ht*(bpS.y-my);
+          const hTd=Math.hypot(hTx,hTy)||1, hUx=hTx/hTd, hUy=hTy/hTd;
+          const hNx=-hUy, hNy=hUx;
           ctx.strokeStyle=_dark?'#e4e4e7':'#27272a';
           ctx.lineWidth=1.6/zoom;
           [-2.5/zoom,2.5/zoom].forEach(off=>{
             ctx.beginPath();
-            ctx.moveTo(hx+hNx*hl+ (dx/dist)*off, hy+hNy*hl+ (dy/dist)*off);
-            ctx.lineTo(hx-hNx*hl+ (dx/dist)*off, hy-hNy*hl+ (dy/dist)*off);
+            ctx.moveTo(hx+hNx*hl+hUx*off,hy+hNy*hl+hUy*off);
+            ctx.lineTo(hx-hNx*hl+hUx*off,hy-hNy*hl+hUy*off);
             ctx.stroke();
           });
         }
@@ -2881,7 +2894,9 @@ function draw(){
     const _fs=d.FS;
     ctx.font=`500 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
     const _isRect=(n.shape||'circle')==='rectangle';
-    const _maxW=_isRect?(r*3)|0:(r*3.1)|0;
+    const _naturalW=ctx.measureText(n.label||'').width+8/zoom;
+    const _boundedW=_isRect?(r*3)|0:(r*3.1)|0;
+    const _maxW=NODE_LABEL_OVERFLOW?Math.max(_boundedW,Math.min(_naturalW,r*8)):_boundedW;
     const _lh=_fs+2;
     const _ls=wrapLabel(ctx,n.label,_maxW,3);
     const _y0=n.y-(_ls.length-1)*_lh/2;

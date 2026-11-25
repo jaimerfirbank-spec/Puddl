@@ -2105,13 +2105,6 @@ window.addEventListener('load',()=>{ setTimeout(startSplash,60); });
         <button data-arrow="both" onclick="setNewConnArrow('both')" title="Arrows both ways" style="width:34px;height:28px;font-size:14px;padding:0;">↔</button>
       </div>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-      <span style="font-size:12px;color:var(--ink);flex:1;">Line</span>
-      <div id="conn-dot-btns" style="display:flex;gap:4px;">
-        <button data-dotted="0" onclick="setNewConnDotted(false)" title="A solid line" style="width:64px;height:28px;font-size:12px;padding:0;">Solid</button>
-        <button data-dotted="1" onclick="setNewConnDotted(true)" title="A dotted line, for an informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">Dotted</button>
-      </div>
-    </div>
     <div id="conn-pol-row" style="display:none;align-items:center;gap:8px;margin-bottom:12px;">
       <span id="conn-pol-label" style="font-size:12px;color:var(--ink);flex:1;">Polarity</span>
       <div id="conn-pol-btns" style="display:flex;gap:4px;">
@@ -2126,8 +2119,17 @@ window.addEventListener('load',()=>{ setTimeout(startSplash,60); });
       <!-- Connection types will be rendered dynamically -->
     </div>
 
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-top:10px;border-top:1px solid var(--bdr);">
+      <span style="font-size:12px;color:var(--ink);flex:1;">Dotted connection</span>
+      <div id="conn-dot-btns" style="display:flex;gap:4px;">
+        <button data-dotted="0" onclick="setNewConnDotted(false)" title="A solid connection" style="width:64px;height:28px;font-size:12px;padding:0;">Off</button>
+        <button data-dotted="1" onclick="setNewConnDotted(true)" title="An informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">On</button>
+      </div>
+    </div>
+
     <div style="display:flex;gap:8px;">
       <button onclick="cancelConnection()" style="flex:1;font-size:12px;">Cancel</button>
+      <button onclick="confirmConnectionFull()" style="flex:1;font-size:12px;background:var(--ink);color:var(--on-ink);border-color:var(--ink);">Add connection</button>
     </div>
   </div>
 </div>
@@ -2303,7 +2305,7 @@ function selectConnColour(col){
 <!-- ── Edge edit popup ───────────────────────────────────────────────────── -->
 <div id="edge-edit-popup" style="display:none;position:fixed;z-index:400;background:var(--surf);border:1px solid var(--bdr);border-radius:var(--radius-lg);box-shadow:var(--shadow-xl);padding:14px 16px;width:300px;font-family:'DM Sans',sans-serif;">
   <div style="font-size:12px;font-weight:700;color:var(--ink);margin-bottom:2px;" id="edge-popup-label">Connection</div>
-  <div style="font-size:10px;color:var(--ink-h);margin-bottom:12px;">Click a style to apply instantly</div>
+  <div style="font-size:10px;color:var(--ink-h);margin-bottom:12px;">Choose the settings, then press OK</div>
   <div id="edge-style-list" style="display:flex;flex-direction:column;gap:5px;margin-bottom:12px;"></div>
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-top:8px;border-top:1px solid var(--bdr);">
     <span style="font-size:12px;color:var(--ink);flex:1;">Arrow</span>
@@ -2315,10 +2317,10 @@ function selectConnColour(col){
     </div>
   </div>
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-top:8px;border-top:1px solid var(--bdr);">
-    <span style="font-size:12px;color:var(--ink);flex:1;">Line</span>
+    <span style="font-size:12px;color:var(--ink);flex:1;">Dotted connection</span>
     <div id="edge-dot-btns" style="display:flex;gap:4px;">
-      <button data-dotted="0" onclick="setEdgeDotted(false)" title="A solid line" style="width:64px;height:28px;font-size:12px;padding:0;">Solid</button>
-      <button data-dotted="1" onclick="setEdgeDotted(true)" title="A dotted line, for an informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">Dotted</button>
+      <button data-dotted="0" onclick="setEdgeDotted(false)" title="A solid connection" style="width:64px;height:28px;font-size:12px;padding:0;">Off</button>
+      <button data-dotted="1" onclick="setEdgeDotted(true)" title="An informal, planned or unconfirmed connection" style="width:64px;height:28px;font-size:12px;padding:0;">On</button>
     </div>
   </div>
   <!-- Edge polarity (+/-). Meaning changes by map type: cause/effect direction
@@ -2341,6 +2343,7 @@ function selectConnColour(col){
   <div style="display:flex;gap:6px;">
     <button onclick="closeEdgeEditPopup()" style="flex:1;font-size:12px;">Cancel</button>
     <button onclick="deleteCurrentEdge()" style="flex:1;font-size:12px;color:var(--coral-t);border-color:var(--coral-t);">✕ Delete</button>
+    <button onclick="confirmEdgeEdit()" style="flex:1;font-size:12px;background:var(--ink);color:var(--on-ink);border-color:var(--ink);">OK</button>
   </div>
 </div>
 
@@ -2600,6 +2603,14 @@ function selectConnColour(col){
             <button id="btn-label-below" onclick="setNodeLabelPosition('below')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Below</button>
             <button id="btn-label-inside" onclick="setNodeLabelPosition('inside')" style="padding:7px 16px;border-radius:var(--radius);font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--bdr);">Inside</button>
           </div>
+          <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:var(--ink);cursor:pointer;"><input type="checkbox" id="settings-label-overflow" onchange="setNodeLabelOverflow(this.checked)" style="width:auto;margin:0;accent-color:var(--ink);"> Allow inside text to extend beyond the node boundary</label>
+        </div>
+        <div style="margin-bottom:24px;">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Node shape</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Choose the shape for nodes already on this map and for new nodes. Text only removes the visible node while keeping its connections.</p>
+          <select id="settings-default-node-shape" onchange="setDefaultNodeShape(this.value)" style="width:100%;max-width:340px;height:34px;font-size:12px;padding:0 8px;border:1px solid var(--bdr);border-radius:4px;background:var(--surf);color:var(--ink);">
+            <option value="circle">Circle</option><option value="square">Square</option><option value="rectangle">Wide rectangle</option><option value="diamond">Diamond</option><option value="triangle">Triangle</option><option value="hexagon">Hexagon</option><option value="pill">Pill</option><option value="star">Star</option><option value="none">Text only (no visible node)</option>
+          </select>
         </div>
         <div style="margin-bottom:24px;">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Merge marks</h4>
@@ -2734,6 +2745,11 @@ function selectConnColour(col){
         </div>
       </div>
       <div id="customize-content-connections" style="display:none;">
+        <div style="margin-bottom:28px;">
+          <h4 style="margin:0 0 6px 0;font-size:14px;font-weight:600;color:var(--ink);">New connections</h4>
+          <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Choose whether new connections start as solid or dotted. A dotted connection can represent something informal, planned or unconfirmed.</p>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);cursor:pointer;"><input type="checkbox" id="settings-default-dotted" onchange="setDefaultConnectionDotted(this.checked)" style="width:auto;margin:0;accent-color:var(--ink);"> Start new connections as dotted</label>
+        </div>
         <div style="margin-bottom:28px;">
           <h4 style="margin:0 0 6px 0;font-size:14px;font-weight:600;color:var(--ink);">Connection colours</h4>
           <p style="margin:0 0 10px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">On: every connection draws in its strength's colour, the same colours as the key on big maps. Off: connections keep their own colours.</p>
@@ -2896,6 +2912,9 @@ let dragGroupInit=null;   // Shift-drag: {id:{x,y}} for the node and its direct 
 let panDragging=false,panSX=0,panSY=0,panPX=0,panPY=0;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
+let NODE_LABEL_OVERFLOW=false;   // allow inside labels to extend beyond the shape
+let DEFAULT_NODE_SHAPE='circle';
+let DEFAULT_CONNECTION_DOTTED=false;
 let MAP_NOUN='';                  // '' = the default word for the map type; or 'person', 'organisation', 'service', 'item'
 let SHOW_MERGE_MARKS=true;        // the small two-circle badge on nodes that were merged on import
 let FIELD_DEFS=[];
@@ -3459,6 +3478,9 @@ function snap(includeVersions=true){
     dateAsAt:DATE_ASAT,
     areas:AREAS,
     nodeLabelPosition:NODE_LABEL_POSITION,
+    nodeLabelOverflow:NODE_LABEL_OVERFLOW,
+    defaultNodeShape:DEFAULT_NODE_SHAPE,
+    defaultConnectionDotted:DEFAULT_CONNECTION_DOTTED,
     showMergeMarks:SHOW_MERGE_MARKS,
     sizeByConnections:SIZE_BY==='connections',
     sizeBy:SIZE_BY,
@@ -3580,6 +3602,9 @@ function restoreSnap(s,keepVersions){
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
   LINKED_SHEET=d.linkedSheet||null;
+  NODE_LABEL_OVERFLOW=d.nodeLabelOverflow===true;
+  DEFAULT_NODE_SHAPE=['circle','square','rectangle','diamond','triangle','hexagon','pill','star','none'].includes(d.defaultNodeShape)?d.defaultNodeShape:'circle';
+  DEFAULT_CONNECTION_DOTTED=d.defaultConnectionDotted===true;
   LABEL_THIN=d.labelThin!==false; { const lt=document.getElementById('settings-label-thin'); if(lt) lt.checked=LABEL_THIN; }
   EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
   ARROW_SIZE=typeof d.arrowSize==='number'&&d.arrowSize>0?d.arrowSize:1; EDGE_GRADIENT=d.edgeGradient===true;
@@ -4175,15 +4200,19 @@ function draw(){
           ctx.fillText(isPos?'+':'−',bx,by+0.5/zoom);
         }
         if(e.hasDelay){
-          const hx=apS.x+(mx-apS.x)*0.42, hy=apS.y+(my-apS.y)*0.42;
+          const ht=0.42, hu=1-ht;
+          const hx=hu*hu*apS.x+2*hu*ht*mx+ht*ht*bpS.x;
+          const hy=hu*hu*apS.y+2*hu*ht*my+ht*ht*bpS.y;
           const hl=9/zoom;
-          const hNx=-dy/dist, hNy=dx/dist; // perpendicular to the chord, close enough for a short hatch
+          const hTx=2*hu*(mx-apS.x)+2*ht*(bpS.x-mx), hTy=2*hu*(my-apS.y)+2*ht*(bpS.y-my);
+          const hTd=Math.hypot(hTx,hTy)||1, hUx=hTx/hTd, hUy=hTy/hTd;
+          const hNx=-hUy, hNy=hUx;
           ctx.strokeStyle=_dark?'#e4e4e7':'#27272a';
           ctx.lineWidth=1.6/zoom;
           [-2.5/zoom,2.5/zoom].forEach(off=>{
             ctx.beginPath();
-            ctx.moveTo(hx+hNx*hl+ (dx/dist)*off, hy+hNy*hl+ (dy/dist)*off);
-            ctx.lineTo(hx-hNx*hl+ (dx/dist)*off, hy-hNy*hl+ (dy/dist)*off);
+            ctx.moveTo(hx+hNx*hl+hUx*off,hy+hNy*hl+hUy*off);
+            ctx.lineTo(hx-hNx*hl+hUx*off,hy-hNy*hl+hUy*off);
             ctx.stroke();
           });
         }
@@ -4491,7 +4520,9 @@ function draw(){
     const _fs=d.FS;
     ctx.font=`500 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
     const _isRect=(n.shape||'circle')==='rectangle';
-    const _maxW=_isRect?(r*3)|0:(r*3.1)|0;
+    const _naturalW=ctx.measureText(n.label||'').width+8/zoom;
+    const _boundedW=_isRect?(r*3)|0:(r*3.1)|0;
+    const _maxW=NODE_LABEL_OVERFLOW?Math.max(_boundedW,Math.min(_naturalW,r*8)):_boundedW;
     const _lh=_fs+2;
     const _ls=wrapLabel(ctx,n.label,_maxW,3);
     const _y0=n.y-(_ls.length-1)*_lh/2;
@@ -10263,7 +10294,7 @@ function parseImportPreview(){ runImportMapper(); } // legacy compat
 // ── Phase 5: Edge notes ───────────────────────────────────────────────────────
 let selectedEdgeIdx=null;
 // ── Edge edit popup ───────────────────────────────────────────────────────────
-let edgeEditIdx=null;
+let edgeEditIdx=null, edgeEditOriginal=null;
 function updateEdgePopupStyle() {
   const select = document.getElementById('edge-popup-strength');
   const selectedStyle = select.value;
@@ -10302,6 +10333,7 @@ function populateAllDynamicFilters() {
 function openEdgeEditPopup(idx, sx, sy){
   edgeEditIdx=idx;
   const e=edges[idx];
+  edgeEditOriginal={...e};
   const a=nodes.find(n=>n.id===(typeof e.source==='object'?e.source.id:e.source));
   const b=nodes.find(n=>n.id===(typeof e.target==='object'?e.target.id:e.target));
   document.getElementById('edge-popup-label').textContent=(a&&b)?`${a.label} ↔ ${b.label}`:'Connection';
@@ -10333,13 +10365,12 @@ function openEdgeEditPopup(idx, sx, sy){
   popup.style.top=top+'px';
 }
 function confirmEdgeEdit(){
-  const strength=document.getElementById('edge-popup-strength').value;
-  const style = CONNECTION_STYLES.find(s => s.id === strength);
-  edges[edgeEditIdx].strength=strength;
-  edges[edgeEditIdx].colour=style.colour;
-  closeEdgeEditPopup();
-  draw();
-  saveState();
+  if(edgeEditIdx===null) return;
+  edgeEditOriginal=null;
+  closeEdgeEditPopup(false);
+  saveState(); markUnsaved(); draw();
+  showStatus('Connection updated.');
+  if(typeof refreshInsightsIfOpen==='function') refreshInsightsIfOpen();
 }
 function addEdge(a,b){
   const g=argEdgeFor(a.id,b.id);
@@ -10361,11 +10392,15 @@ function deleteCurrentEdge(){
   buildSim();if(forceOn)sim.alpha(0.2).restart();
   saveState();markUnsaved();draw();
   showStatus('Connection deleted.');
-  closeEdgeEditPopup();
+  edgeEditOriginal=null;
+  closeEdgeEditPopup(false);
 }
-function closeEdgeEditPopup(){
+function closeEdgeEditPopup(restore=true){
+  if(restore&&edgeEditOriginal&&edgeEditIdx!==null&&edges[edgeEditIdx]) Object.assign(edges[edgeEditIdx],edgeEditOriginal);
   document.getElementById('edge-edit-popup').style.display='none';
   edgeEditIdx=null;
+  edgeEditOriginal=null;
+  draw();
 }
 function renderEdgeArrowBtns(v){
   document.querySelectorAll('#edge-arrow-btns button').forEach(b=>{
@@ -10388,7 +10423,7 @@ function setEdgeDotted(on){
   if(edgeEditIdx===null) return;
   edges[edgeEditIdx].dotted=!!on;
   renderEdgeDotBtns(!!on);
-  draw(); saveState(); markUnsaved();
+  draw();
 }
 function setEdgeArrow(val){
   if(edgeEditIdx===null) return;
@@ -10396,7 +10431,7 @@ function setEdgeArrow(val){
   e.arrow=val;
   e.twoWay=val==='both';
   renderEdgeArrowBtns(val);
-  draw(); saveState(); markUnsaved();
+  draw();
 }
 function renderEdgePolarityBtns(v){
   document.querySelectorAll('#edge-polarity-btns button').forEach(b=>{
@@ -10420,13 +10455,12 @@ function setEdgePolarity(val){
   e.polarity=val||null;
   if(val&&MAP_TYPE==='systems'&&arrowOf(e)==='none'){ e.arrow='forward'; renderEdgeArrowBtns('forward'); }
   renderEdgePolarityBtns(val);
-  draw(); saveState(); markUnsaved();
-  if(typeof refreshInsightsIfOpen==='function') refreshInsightsIfOpen();
+  draw();
 }
 function setEdgeDelay(on){
   if(edgeEditIdx===null) return;
   edges[edgeEditIdx].hasDelay=!!on;
-  draw(); saveState(); markUnsaved();
+  draw();
 }
 
 function updateColourLegend(){ _updateColourLegend(); syncLegendVisibility(); }
@@ -10829,7 +10863,7 @@ function openAddModal(){
   renderModalFields({});
   { const md=document.getElementById('modal-date'); if(md) md.value=todayISO(); }
   selectedModalColour='#FFB3C8';
-  selectedModalShape='circle';
+  selectedModalShape=DEFAULT_NODE_SHAPE;
   selectedModalSize='medium';
   selectedModalTitleSize='medium';
   buildColourPicker();
@@ -11811,7 +11845,7 @@ function renderConnectionTypeList(){
   container.innerHTML = connStylesForPicker().map(style => {
     const isSelected = style.id === selectedConnType;
     return `
-      <button onclick="pickAndConfirmConn('${style.id}')" id="ctype-${style.id}" style="display:flex;align-items:center;gap:12px;padding:9px 12px;text-align:left;border-radius:var(--radius);${isSelected ? 'background:var(--surf-3);border-color:var(--ink);' : ''}">
+      <button onclick="selectConnType('${style.id}')" id="ctype-${style.id}" style="display:flex;align-items:center;gap:12px;padding:9px 12px;text-align:left;border-radius:var(--radius);${isSelected ? 'background:var(--surf-3);border-color:var(--ink);' : ''}">
         ${renderConnectionStyleIcon(style)}
         <div>
           <div style="font-size:12px;font-weight:600;">${escHtml(style.label)}</div>
@@ -11841,9 +11875,8 @@ function pickEdgeStyle(type){
   if(edgeEditIdx!==null&&edges[edgeEditIdx]){
     edges[edgeEditIdx].strength=type;
     if(style) edges[edgeEditIdx].colour=style.colour;
-    saveState();markUnsaved();draw();
+    renderEdgeStyleList(type); draw();
   }
-  closeEdgeEditPopup();
 }
 function renderConnectionStyleIcon(style) {
   const _dk=document.documentElement.getAttribute('data-theme')==='dark';
@@ -11886,14 +11919,14 @@ function setNewConnPolarity(v){
 }
 function openConnModal(){
   _connShowAll=false;
-  _newConnArrow='none'; _newConnPolarity=''; _newConnDotted=false;
+  _newConnArrow='none'; _newConnPolarity=''; _newConnDotted=DEFAULT_CONNECTION_DOTTED;
   { const isArg=MAP_TYPE==='argument', isStake=MAP_TYPE==='stakeholder', isSys=MAP_TYPE==='systems';
     const arrowRow=document.getElementById('conn-arrow-btns'); if(arrowRow&&arrowRow.parentElement) arrowRow.parentElement.style.display=isArg?'none':'flex';
     const polRow=document.getElementById('conn-pol-row'); if(polRow) polRow.style.display=(isSys||isStake)?'flex':'none';
     const lbl=document.getElementById('conn-pol-label'); if(lbl) lbl.textContent=isStake?'Alignment':'Polarity';
     const pos=document.getElementById('conn-pol-pos'); if(pos) pos.title=isStake?'Alliance: trust, shared incentives, strong collaboration':'Same direction: cause up, effect up';
     const neg=document.getElementById('conn-pol-neg'); if(neg) neg.title=isStake?'Friction: conflict, competing goals, distrust':'Opposite direction: cause up, effect down';
-    const hint=document.getElementById('conn-modal-hint'); if(hint) hint.textContent=isArg?'Click a style to add the connection':'Choose the arrow'+((isSys||isStake)?' and sign':'')+' first, then click a style to add the connection';
+    const hint=document.getElementById('conn-modal-hint'); if(hint) hint.textContent='Choose the settings, then press Add connection';
     const na=pendingConnection&&nodes.find(n=>n.id===pendingConnection.from), nb=pendingConnection&&nodes.find(n=>n.id===pendingConnection.to);
     const f=document.getElementById('conn-arrow-fwd'), b=document.getElementById('conn-arrow-back');
     if(f&&na&&nb) f.title='Arrow from "'+na.label+'" to "'+nb.label+'"';
@@ -15886,15 +15919,15 @@ function resetMap(){ openResetModal(); }
 
 // ── Customize Panel ───────────────────────────────────────────────────────────
 function openCustomizePanel(){
-  console.log('Opening customize panel...');
+  if(document.getElementById('edge-edit-popup').style.display!=='none') closeEdgeEditPopup();
+  const nodeModal=document.getElementById('modal-bg');
+  if(nodeModal&&!nodeModal.classList.contains('hidden')) closeModal();
   const modal = document.getElementById('customize-modal-bg');
   if(!modal) {
-    console.error('Customize modal not found!');
     return;
   }
   modal.classList.remove('hidden');
   renderCustomizePanel();
-  console.log('Customize panel opened');
 }
 
 function closeCustomizePanel(){
@@ -16080,6 +16113,26 @@ function setNodeLabelPosition(pos){
   if(bb){ bb.style.background=pos==='below'?'var(--ink)':''; bb.style.color=pos==='below'?'var(--surf)':''; }
   if(bi){ bi.style.background=pos==='inside'?'var(--ink)':''; bi.style.color=pos==='inside'?'var(--surf)':''; }
   saveState(); draw();
+}
+
+function setNodeLabelOverflow(on){
+  NODE_LABEL_OVERFLOW=!!on;
+  const chk=document.getElementById('settings-label-overflow'); if(chk) chk.checked=NODE_LABEL_OVERFLOW;
+  saveState(); markUnsaved(); draw();
+}
+
+function setDefaultNodeShape(shape){
+  const allowed=['circle','square','rectangle','diamond','triangle','hexagon','pill','star','none'];
+  DEFAULT_NODE_SHAPE=allowed.includes(shape)?shape:'circle';
+  nodes.forEach(n=>{ if(n.type!=='centre') n.shape=DEFAULT_NODE_SHAPE; });
+  const sel=document.getElementById('settings-default-node-shape'); if(sel) sel.value=DEFAULT_NODE_SHAPE;
+  saveState(); markUnsaved(); draw();
+}
+
+function setDefaultConnectionDotted(on){
+  DEFAULT_CONNECTION_DOTTED=!!on;
+  const chk=document.getElementById('settings-default-dotted'); if(chk) chk.checked=DEFAULT_CONNECTION_DOTTED;
+  saveState(); markUnsaved();
 }
 
 function setDefaultNodeStyle(val){
@@ -16300,6 +16353,9 @@ function nodeFill(n){
 function renderCustomizePanel(){
   switchCustomizeTab('nodes');
   setNodeLabelPosition(NODE_LABEL_POSITION);
+  { const chk=document.getElementById('settings-label-overflow'); if(chk) chk.checked=NODE_LABEL_OVERFLOW; }
+  { const sel=document.getElementById('settings-default-node-shape'); if(sel) sel.value=DEFAULT_NODE_SHAPE; }
+  { const chk=document.getElementById('settings-default-dotted'); if(chk) chk.checked=DEFAULT_CONNECTION_DOTTED; }
   syncMergeMarksUI();
   syncNodeStyleButtons();
   syncSizeByConnButtons();

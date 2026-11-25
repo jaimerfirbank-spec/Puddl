@@ -40,6 +40,15 @@ test('map interaction improvements stay available in editor and viewer',()=>{
  assert.match(source,/function scheduleEdgeHoverPanel\(/);
  assert.match(viewerSource,/function showEdgeHoverPanel\(/);
 });
+test('node and connection editors expose explicit appearance controls',()=>{
+ assert.match(source,/id="settings-label-overflow"/);
+ assert.match(source,/id="settings-default-node-shape"/);
+ assert.match(source,/id="settings-default-dotted"/);
+ assert.match(source,/>Dotted connection</);
+ assert.match(source,/onclick="confirmEdgeEdit\(\)"/);
+ assert.match(fn('openCustomizePanel'),/closeEdgeEditPopup\(\)/);
+ assert.match(fn('closeEdgeEditPopup'),/Object\.assign\(edges\[edgeEditIdx\],edgeEditOriginal\)/);
+});
 test('feedback loops receive separate reinforcing and balancing numbers',()=>{
  const c=ctx({},['loopDisplayCodes']);
  assert.deepEqual(Array.from(c.loopDisplayCodes([{type:'R'},{type:'B'},{type:'R'},{type:'unassigned'},{type:'B'}])),['R1','B1','R2','?1','B2']);
