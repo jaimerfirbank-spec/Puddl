@@ -16985,10 +16985,11 @@ function showHoverPanel(id){
   sidePanelNodeId=id;
   { const fb=document.getElementById('hp-focus-btn'); if(fb) fb.style.display=''; }
 
-  // Hover highlight: VIEW MODE ONLY — the node and its immediate connections bright, the next ring out faded, the rest dimmed
+  // Hover highlight: available during ordinary editing as well as view mode. After the
+  // deliberate pause, keep the node and its immediate connections bright and fade the next ring.
   const q=document.getElementById('search-input')?document.getElementById('search-input').value.trim():'';
   const hasActiveFilter=q||getMsValues('cat-filter').length||getMsValues('area-filter').length||getMsValues('tag-filter').length||getMsValues('conn-type-filter').length||getMsValues('member-filter').length;
-  if(isViewMode&&!hasActiveFilter){
+  if(!hasActiveFilter){
     highlightIds.clear();highlightEdges.clear();secondaryIds.clear();
     const endsOf=e=>[typeof e.source==='object'?e.source.id:e.source, typeof e.target==='object'?e.target.id:e.target];
     const near=new Set([id]);                                   // the node and who it connects to directly
@@ -17023,7 +17024,7 @@ function scheduleHoverPanel(id){
     const next=hoverCandidateId;
     hoverCandidateId=null;
     if(next) showHoverPanel(Number(next.slice(5)));
-  },650);
+  },2000);
 }
 
 function scheduleEdgeHoverPanel(index){

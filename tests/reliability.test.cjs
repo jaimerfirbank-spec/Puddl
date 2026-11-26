@@ -59,6 +59,11 @@ test('opening sheep uses a centred plush mouth and smooth head lift',()=>{
  assert.match(source,/@keyframes plushEyes/);
  assert.doesNotMatch(source,/animation:plushMouth[^;]*steps\(/);
 });
+test('node hover focuses connections after two seconds in normal map use',()=>{
+ assert.match(source,/function showHoverPanel\(id\)[\s\S]*?if\(!hasActiveFilter\)\{/);
+ assert.match(source,/function scheduleHoverPanel\(id\)[\s\S]*?\},2000\);/);
+ assert.doesNotMatch(source,/if\(isViewMode&&!hasActiveFilter\)/);
+});
 test('feedback loops receive separate reinforcing and balancing numbers',()=>{
  const c=ctx({},['loopDisplayCodes']);
  assert.deepEqual(Array.from(c.loopDisplayCodes([{type:'R'},{type:'B'},{type:'R'},{type:'unassigned'},{type:'B'}])),['R1','B1','R2','?1','B2']);
