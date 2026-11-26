@@ -64,6 +64,9 @@ test('node hover focuses connections after two seconds in normal map use',()=>{
  assert.match(source,/function scheduleHoverPanel\(id\)[\s\S]*?\},2000\);/);
  assert.doesNotMatch(source,/if\(isViewMode&&!hasActiveFilter\)/);
 });
+test('Explore button hides while the side panel is open',()=>{
+ assert.match(source,/btn\.style\.display=open\?'none':'/);
+});
 test('feedback loops receive separate reinforcing and balancing numbers',()=>{
  const c=ctx({},['loopDisplayCodes']);
  assert.deepEqual(Array.from(c.loopDisplayCodes([{type:'R'},{type:'B'},{type:'R'},{type:'unassigned'},{type:'B'}])),['R1','B1','R2','?1','B2']);

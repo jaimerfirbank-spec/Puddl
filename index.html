@@ -5061,7 +5061,7 @@ function _dockApply(){
   if(ins){ ins.style.display=showGlance?'block':'none'; if(showGlance) renderInsights(); }
   if(open&&_dock.tab==='filter'){ syncDateFilterUI(); renderSheetLink(true); }
   const btn=$('btn-search-toggle');
-  if(btn){ btn.style.background=open?'var(--ink)':'var(--surf)'; btn.style.color=open?'var(--on-ink)':'var(--ink-m)'; btn.style.borderColor=open?'var(--ink)':'var(--bdr)'; }
+  if(btn){ btn.style.display=open?'none':''; btn.style.background=open?'var(--ink)':'var(--surf)'; btn.style.color=open?'var(--on-ink)':'var(--ink-m)'; btn.style.borderColor=open?'var(--ink)':'var(--bdr)'; }
   _dockBadge();
   _dockSize();
 }
