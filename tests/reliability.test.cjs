@@ -52,7 +52,11 @@ test('node and connection editors expose explicit appearance controls',()=>{
 test('opening sheep uses a centred plush mouth and smooth head lift',()=>{
  assert.match(source,/#splash-mouth\{[^}]*left:72%;top:49%/s);
  assert.match(source,/@keyframes plushHeadLift/);
- assert.match(source,/#splash-sheep\{animation:plushHeadLift/);
+ assert.match(source,/#splash-mascot-scene\.play #splash-sheep,#splash-mascot-scene\.play #splash-face-motion\{animation:plushHeadLift/);
+ assert.match(source,/id="splash-face-motion"/);
+ assert.match(source,/class="splash-eye-lid left"/);
+ assert.match(source,/class="splash-eye-lid right"/);
+ assert.match(source,/@keyframes plushEyes/);
  assert.doesNotMatch(source,/animation:plushMouth[^;]*steps\(/);
 });
 test('feedback loops receive separate reinforcing and balancing numbers',()=>{
