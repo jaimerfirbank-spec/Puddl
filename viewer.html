@@ -2823,7 +2823,8 @@ function draw(){
     // Text-only nodes keep their place and connections, but do not draw a shape.
     if((n.shape||'circle')==='none'){
       ctx.save();
-      const _fs=Math.max(11,d.FS);
+      // Text-only nodes have no shape, so start them bigger and let the title-size setting scale up from there
+      const _fs=Math.max(16,Math.round(d.FS*1.3));
       ctx.font=`500 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
       ctx.textAlign='center';ctx.textBaseline='middle';
       ctx.fillStyle=_dark?'#ffffff':'#3f3f46';
