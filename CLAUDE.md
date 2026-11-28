@@ -20,6 +20,7 @@ then `Read` with `offset`/`limit` around it.
 
 ## How to orient at the start of a session
 You do **not** need to re-read `index.html`. Do this instead:
+0. Read **`PROGRESS.md`** first — it says where we're up to, what's in flight and what's next.
 1. Read this file (it auto-loads as project instructions anyway).
 2. Identify the task area in "Task map" below.
 3. `grep -n` the named entry point(s) for that area, read a few hundred lines around each, edit.
