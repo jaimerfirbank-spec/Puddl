@@ -4207,9 +4207,18 @@ function draw(){
         ctx.strokeStyle=isHl?'#FFD166':'#2F80ED';
         ctx.lineWidth=Math.max(lw+0.8,2.6)/zoom; ctx.lineCap='round';
         ctx.setLineDash([6/zoom,9/zoom]);
-        const P=()=>{ctx.beginPath();ctx.moveTo(apS.x,apS.y);ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y);};
-        if(both){ ctx.lineDashOffset=-k; P(); ctx.stroke(); ctx.lineDashOffset=k; P(); ctx.stroke(); }
-        else { ctx.lineDashOffset=(dir==='backward')?k:-k; P(); ctx.stroke(); }
+        if(both){
+          // Both ways: split the curve at its middle and flow each half outward
+          // toward its node, so the two directions read clearly instead of overlapping.
+          const L1x=(apS.x+mx)/2, L1y=(apS.y+my)/2, R1x=(mx+bpS.x)/2, R1y=(my+bpS.y)/2;
+          const Mx=(L1x+R1x)/2, My=(L1y+R1y)/2;
+          ctx.lineDashOffset=-k;
+          ctx.beginPath(); ctx.moveTo(Mx,My); ctx.quadraticCurveTo(R1x,R1y,bpS.x,bpS.y); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(Mx,My); ctx.quadraticCurveTo(L1x,L1y,apS.x,apS.y); ctx.stroke();
+        } else {
+          ctx.lineDashOffset=(dir==='backward')?k:-k;
+          ctx.beginPath(); ctx.moveTo(apS.x,apS.y); ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y); ctx.stroke();
+        }
         ctx.restore();
       }
       // Arrowhead at target: filled triangle — tip=bp, base=bpS, no translate/rotate needed
@@ -13956,6 +13965,13 @@ function confirmWho(){
     if(input){ input.value=''; input.focus(); }
     return;
   }
+  // A new map can't reuse the name of one already saved to the account
+  if(nodes.length===0 && mapNameTaken(name)){
+    const err=document.getElementById('who-error');
+    if(err) err.textContent='You already have a map called that. Choose a different name.';
+    if(input){ input.focus(); input.select(); }
+    return;
+  }
   mapTitle=name;
   if(nodes.length===0) freshMapPanels();
   const hdr=document.getElementById('header-project-name');
@@ -14019,6 +14035,11 @@ function commitProjectName(){
   const inp=document.getElementById('header-project-name-input');
   if(!span||!inp) return;
   const val=inp.value.trim();
+  if(val && mapNameTaken(val,mapTitle)){
+    showStatus('You already have a map called that. Pick a different name.');
+    inp.focus(); inp.select();
+    return;
+  }
   if(val) mapTitle=val;
   span.textContent=mapTitle;
   const mtd=document.getElementById('map-title-display');
@@ -18019,6 +18040,13 @@ async function cloudInit(){
   }
 }
 
+let _knownMapTitles=[];   // lower-cased titles of the account's saved maps, for the duplicate-name check
+function mapNameTaken(name,exceptTitle){
+  const n=String(name||'').trim().toLowerCase();
+  if(!n) return false;
+  const ex=String(exceptTitle||'').trim().toLowerCase();
+  return _knownMapTitles.some(t=>t===n && t!==ex);
+}
 async function cloudListMaps(){
   if (!_cloudReady) return [];
   // updated_by (who last saved) needs supabase/migrations/20261126_edited_by.sql; ask without it if that is not applied yet
@@ -18033,6 +18061,8 @@ async function cloudListMaps(){
       .order('updated_at', { ascending: false }));
   }
   if (error) return [];
+  // Remember the titles so naming a new map can refuse a duplicate
+  _knownMapTitles=(data||[]).map(function(m){ return String(m.title||'').trim().toLowerCase(); });
   // The rules return your own private maps and every map shared with your team
   return (data || []).map(function(m){ return Object.assign({}, m, { mine: m.owner_id === (_authUser && _authUser.id) }); });
 }
@@ -18525,6 +18555,7 @@ async function openMyMaps(){
       if (next === null) return;
       const clean = next.trim();
       if (!clean) return;
+      if (mapNameTaken(clean, m.title)) { if (typeof showStatus === 'function') showStatus('You already have a map called that. Pick a different name.'); return; }
       if (await cloudRenameMap(m.id, clean)) {
         if (m.id === _cloudMapId) {
           mapTitle = clean;

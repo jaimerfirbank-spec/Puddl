@@ -2563,9 +2563,18 @@ function draw(){
         ctx.strokeStyle=isHl?'#FFD166':'#2F80ED';
         ctx.lineWidth=Math.max(lw+0.8,2.6)/zoom; ctx.lineCap='round';
         ctx.setLineDash([6/zoom,9/zoom]);
-        const P=()=>{ctx.beginPath();ctx.moveTo(apS.x,apS.y);ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y);};
-        if(both){ ctx.lineDashOffset=-k; P(); ctx.stroke(); ctx.lineDashOffset=k; P(); ctx.stroke(); }
-        else { ctx.lineDashOffset=(dir==='backward')?k:-k; P(); ctx.stroke(); }
+        if(both){
+          // Both ways: split the curve at its middle and flow each half outward
+          // toward its node, so the two directions read clearly instead of overlapping.
+          const L1x=(apS.x+mx)/2, L1y=(apS.y+my)/2, R1x=(mx+bpS.x)/2, R1y=(my+bpS.y)/2;
+          const Mx=(L1x+R1x)/2, My=(L1y+R1y)/2;
+          ctx.lineDashOffset=-k;
+          ctx.beginPath(); ctx.moveTo(Mx,My); ctx.quadraticCurveTo(R1x,R1y,bpS.x,bpS.y); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(Mx,My); ctx.quadraticCurveTo(L1x,L1y,apS.x,apS.y); ctx.stroke();
+        } else {
+          ctx.lineDashOffset=(dir==='backward')?k:-k;
+          ctx.beginPath(); ctx.moveTo(apS.x,apS.y); ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y); ctx.stroke();
+        }
         ctx.restore();
       }
       // Arrowhead at target: filled triangle — tip=bp, base=bpS, no translate/rotate needed
