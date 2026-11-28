@@ -1520,14 +1520,8 @@ function _flowShouldRun(){
   if(MAP_TYPE!=='systems') return false;
   if(typeof document!=='undefined' && document.hidden) return false;
   if(edges.length>FLOW_MAX_EDGES) return false;
-  return flowAnim || hoverPanelNodeId!=null;
+  return flowAnim;
 }
-function flowTick(){
-  _flowRaf=null;
-  if(_flowShouldRun()){ _flowPhase+=0.5; draw(); _flowRaf=requestAnimationFrame(flowTick); }
-  else { draw(); } // one clean frame so the moving dashes clear when flow stops
-}
-function flowEnsureRunning(){ if(!_flowRaf && _flowShouldRun()) _flowRaf=requestAnimationFrame(flowTick); }
 let DEFAULT_NODE_OUTLINE=false; // false=filled, true=outline
 // A Set whose clear() keeps any pinned items. Pinned feedback loops use this so hovering, scrolling and
 // node clicks don't wipe them; only Clear, clicking the loop again, or clearing the search does.
@@ -1554,7 +1548,7 @@ let colourLegendMap={};
 let lastMouse=null;
 let sim=null;
 let hoverPanelNodeId=null, hoverHideTimer=null, sidePanelNodeId=null;
-let flowAnim=false, _flowPhase=0, _flowRaf=null;
+let flowAnim=false, _flowPhase=0, _flowRaf=null, _flowLast=0;
 const FLOW_MAX_EDGES=400; // above this, flow auto-pauses so big maps stay smooth on weak devices
 
 // ── Presentation Mode state ───────────────────────────────────────────────────
@@ -2197,12 +2191,12 @@ function draw(){
       }
       ctx.setLineDash([]);
       // Flow overlay on loop-edge arcs (systems feedback loops)
-      if(_flowShouldRun() && (flowAnim || (hoverPanelNodeId!=null && (eSid===hoverPanelNodeId||eTid===hoverPanelNodeId)))){
-        const span=16/zoom, k=_flowPhase%span;
+      if(flowAnim && _flowShouldRun()){
+        const span=15/zoom, k=_flowPhase%span;
         ctx.save();
-        ctx.strokeStyle=isHl?'#FFD166':'#4C9AFF';
-        ctx.lineWidth=Math.max(lw,1.8)/zoom; ctx.lineCap='round';
-        ctx.setLineDash([5/zoom,11/zoom]);
+        ctx.strokeStyle=isHl?'#FFD166':'#2F80ED';
+        ctx.lineWidth=Math.max(lw+0.8,2.6)/zoom; ctx.lineCap='round';
+        ctx.setLineDash([6/zoom,9/zoom]);
         ctx.lineDashOffset=antiCW?k:-k;
         ctx.beginPath(); ctx.arc(loopC.x,loopC.y,loopC.r,arcStartAngle,arcAdjEnd,antiCW); ctx.stroke();
         ctx.restore();
@@ -2252,12 +2246,12 @@ function draw(){
         ctx.stroke();ctx.setLineDash([]);
       }
       // Flow overlay: moving dashes along the arrow's direction (systems maps)
-      if(_flowShouldRun() && arrowOf(e)!=='none' && (flowAnim || (hoverPanelNodeId!=null && (eSid===hoverPanelNodeId||eTid===hoverPanelNodeId)))){
-        const span=16/zoom, k=_flowPhase%span, dir=arrowOf(e), both=dir==='both';
+      if(flowAnim && _flowShouldRun() && arrowOf(e)!=='none'){
+        const span=15/zoom, k=_flowPhase%span, dir=arrowOf(e), both=dir==='both';
         ctx.save();
-        ctx.strokeStyle=isHl?'#FFD166':'#4C9AFF';
-        ctx.lineWidth=Math.max(lw,1.8)/zoom; ctx.lineCap='round';
-        ctx.setLineDash([5/zoom,11/zoom]);
+        ctx.strokeStyle=isHl?'#FFD166':'#2F80ED';
+        ctx.lineWidth=Math.max(lw+0.8,2.6)/zoom; ctx.lineCap='round';
+        ctx.setLineDash([6/zoom,9/zoom]);
         const P=()=>{ctx.beginPath();ctx.moveTo(apS.x,apS.y);ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y);};
         if(both){ ctx.lineDashOffset=-k; P(); ctx.stroke(); ctx.lineDashOffset=k; P(); ctx.stroke(); }
         else { ctx.lineDashOffset=(dir==='backward')?k:-k; P(); ctx.stroke(); }
@@ -5231,7 +5225,6 @@ function showHoverPanel(id){
   if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
   hoverPanelNodeId=id;
   sidePanelNodeId=id;
-  if(typeof flowEnsureRunning==='function') flowEnsureRunning(); // flow this node's connections on hover
 
   // Hover highlight: VIEW MODE ONLY — primary node bright, neighbours faded
   const q=document.getElementById('search-input')?document.getElementById('search-input').value.trim():'';
