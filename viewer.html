@@ -2496,12 +2496,12 @@ function draw(){
       // Flow overlay on loop-edge arcs (systems feedback loops, toggle on)
       if(flowAnim && _flowShouldRun()){
         const span=15/zoom, k=_flowPhase%span;
-        ctx.save();
-        ctx.strokeStyle=isHl?'#FFD166':'#2F80ED';
-        ctx.lineWidth=Math.max(lw+0.8,2.6)/zoom; ctx.lineCap='round';
-        ctx.setLineDash([6/zoom,9/zoom]);
-        ctx.lineDashOffset=antiCW?k:-k;
-        ctx.beginPath(); ctx.arc(loopC.x,loopC.y,loopC.r,arcStartAngle,arcAdjEnd,antiCW); ctx.stroke();
+        const bright=isHl?'#FFE08A':'#38BDF8';
+        const core=Math.max(2.0,Math.min(lw,3.0))/zoom, cased=core+1.6/zoom;
+        ctx.save(); ctx.lineCap='round'; ctx.setLineDash([5/zoom,10/zoom]); ctx.lineDashOffset=antiCW?k:-k;
+        ctx.beginPath(); ctx.arc(loopC.x,loopC.y,loopC.r,arcStartAngle,arcAdjEnd,antiCW);
+        ctx.strokeStyle='rgba(15,23,42,0.45)'; ctx.lineWidth=cased; ctx.stroke();
+        ctx.strokeStyle=bright; ctx.lineWidth=core; ctx.stroke();
         ctx.restore();
       }
     } else {
@@ -2559,21 +2559,18 @@ function draw(){
       // Flow overlay: moving dashes along the arrow's direction (systems maps, toggle on)
       if(flowAnim && _flowShouldRun() && arrowOf(e)!=='none'){
         const span=15/zoom, k=_flowPhase%span, dir=arrowOf(e), both=dir==='both';
-        ctx.save();
-        ctx.strokeStyle=isHl?'#FFD166':'#2F80ED';
-        ctx.lineWidth=Math.max(lw+0.8,2.6)/zoom; ctx.lineCap='round';
-        ctx.setLineDash([6/zoom,9/zoom]);
+        // A bright moving pulse with a dark casing, so it shows on any line colour
+        // or thickness. Two-way flows out from the middle in its own colour.
+        const bright=isHl?'#FFE08A':(both?'#A78BFA':'#38BDF8');
+        const core=Math.max(2.0,Math.min(lw,3.0))/zoom, cased=core+1.6/zoom;
+        ctx.save(); ctx.lineCap='round'; ctx.setLineDash([5/zoom,10/zoom]);
+        const pulse=(off,build)=>{ ctx.lineDashOffset=off; build(); ctx.strokeStyle='rgba(15,23,42,0.45)'; ctx.lineWidth=cased; ctx.stroke(); ctx.strokeStyle=bright; ctx.lineWidth=core; ctx.stroke(); };
         if(both){
-          // Both ways: split the curve at its middle and flow each half outward
-          // toward its node, so the two directions read clearly instead of overlapping.
-          const L1x=(apS.x+mx)/2, L1y=(apS.y+my)/2, R1x=(mx+bpS.x)/2, R1y=(my+bpS.y)/2;
-          const Mx=(L1x+R1x)/2, My=(L1y+R1y)/2;
-          ctx.lineDashOffset=-k;
-          ctx.beginPath(); ctx.moveTo(Mx,My); ctx.quadraticCurveTo(R1x,R1y,bpS.x,bpS.y); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(Mx,My); ctx.quadraticCurveTo(L1x,L1y,apS.x,apS.y); ctx.stroke();
+          const L1x=(apS.x+mx)/2,L1y=(apS.y+my)/2,R1x=(mx+bpS.x)/2,R1y=(my+bpS.y)/2,Mx=(L1x+R1x)/2,My=(L1y+R1y)/2;
+          pulse(-k,()=>{ctx.beginPath();ctx.moveTo(Mx,My);ctx.quadraticCurveTo(R1x,R1y,bpS.x,bpS.y);});
+          pulse(-k,()=>{ctx.beginPath();ctx.moveTo(Mx,My);ctx.quadraticCurveTo(L1x,L1y,apS.x,apS.y);});
         } else {
-          ctx.lineDashOffset=(dir==='backward')?k:-k;
-          ctx.beginPath(); ctx.moveTo(apS.x,apS.y); ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y); ctx.stroke();
+          pulse(dir==='backward'?k:-k,()=>{ctx.beginPath();ctx.moveTo(apS.x,apS.y);ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y);});
         }
         ctx.restore();
       }
