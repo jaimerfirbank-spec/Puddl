@@ -4141,10 +4141,10 @@ function draw(){
       if(flowAnim && _flowShouldRun()){
         const span=15/zoom, k=_flowPhase%span;
         const bright=isHl?'#FFE08A':'#38BDF8';
-        const core=Math.max(2.0,Math.min(lw,3.0))/zoom, cased=core+1.6/zoom;
+        const core=(Math.max(2.2,lw)+1.1)/zoom, cased=core+2.0/zoom;
         ctx.save(); ctx.lineCap='round'; ctx.setLineDash([5/zoom,10/zoom]); ctx.lineDashOffset=antiCW?k:-k;
         ctx.beginPath(); ctx.arc(loopC.x,loopC.y,loopC.r,arcStartAngle,arcAdjEnd,antiCW);
-        ctx.strokeStyle='rgba(15,23,42,0.45)'; ctx.lineWidth=cased; ctx.stroke();
+        ctx.strokeStyle='rgba(15,23,42,0.6)'; ctx.lineWidth=cased; ctx.stroke();
         ctx.strokeStyle=bright; ctx.lineWidth=core; ctx.stroke();
         ctx.restore();
       }
@@ -4206,9 +4206,9 @@ function draw(){
         // A bright moving pulse with a dark casing, so it shows on any line colour
         // or thickness. Two-way flows out from the middle in its own colour.
         const bright=isHl?'#FFE08A':(both?'#A78BFA':'#38BDF8');
-        const core=Math.max(2.0,Math.min(lw,3.0))/zoom, cased=core+1.6/zoom;
+        const core=(Math.max(2.2,lw)+1.1)/zoom, cased=core+2.0/zoom;
         ctx.save(); ctx.lineCap='round'; ctx.setLineDash([5/zoom,10/zoom]);
-        const pulse=(off,build)=>{ ctx.lineDashOffset=off; build(); ctx.strokeStyle='rgba(15,23,42,0.45)'; ctx.lineWidth=cased; ctx.stroke(); ctx.strokeStyle=bright; ctx.lineWidth=core; ctx.stroke(); };
+        const pulse=(off,build)=>{ ctx.lineDashOffset=off; build(); ctx.strokeStyle='rgba(15,23,42,0.6)'; ctx.lineWidth=cased; ctx.stroke(); ctx.strokeStyle=bright; ctx.lineWidth=core; ctx.stroke(); };
         if(both){
           const L1x=(apS.x+mx)/2,L1y=(apS.y+my)/2,R1x=(mx+bpS.x)/2,R1y=(my+bpS.y)/2,Mx=(L1x+R1x)/2,My=(L1y+R1y)/2;
           pulse(-k,()=>{ctx.beginPath();ctx.moveTo(Mx,My);ctx.quadraticCurveTo(R1x,R1y,bpS.x,bpS.y);});
