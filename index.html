@@ -1514,6 +1514,9 @@ body.share-mode #present-exit{display:none !important;}
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:auto;"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2.35"/><line x1="12" y1="8" x2="12" y2="12" stroke="currentColor" stroke-width="2.55" stroke-linecap="round"/><circle cx="12" cy="16" r="1.35" fill="currentColor"/></svg>
     </button>
     <button onclick="toggleNodeLabels()" id="btn-labels-toggle" title="Hide node names" style="width:40px;height:40px;padding:0;font-size:13.5px;font-weight:700;letter-spacing:-0.2px;">Aa</button>
+    <button onclick="toggleFlow()" id="btn-flow-toggle" title="Animate connection flow (systems maps)" style="width:40px;height:40px;padding:0;opacity:0.45;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:auto;"><path d="M3 12h13" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-dasharray="3 3.5"/><path d="M14 7l5 5-5 5" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
     <button onclick="toggleFullscreen()" id="btn-fullscreen" title="Full screen" style="width:40px;height:40px;padding:0;">
       <svg id="icon-fs-enter" width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:auto;"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <svg id="icon-fs-exit" width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:none;margin:auto;"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -3222,6 +3225,30 @@ function _animateHoverFocus(){
   };
   hoverBlendFrame=requestAnimationFrame(step);
 }
+// ── Connection flow animation (systems maps). Toggle-only, throttled. ──────────
+let flowAnim=false, _flowPhase=0, _flowRaf=null, _flowLast=0;
+const FLOW_MAX_EDGES=400; // above this, flow auto-pauses so big maps stay smooth
+function _flowShouldRun(){
+  if(MAP_TYPE!=='systems') return false;
+  if(typeof document!=='undefined' && document.hidden) return false;
+  if(edges.length>FLOW_MAX_EDGES) return false;
+  return flowAnim;
+}
+function flowTick(ts){
+  _flowRaf=null;
+  if(_flowShouldRun()){
+    if(!ts) ts=(typeof performance!=='undefined'?performance.now():Date.now());
+    if(ts-_flowLast>=45){ _flowLast=ts; _flowPhase+=1.4; draw(); } // cap redraws so flow never hogs frames
+    _flowRaf=requestAnimationFrame(flowTick);
+  } else { draw(); } // one clean frame so the moving dashes clear when flow stops
+}
+function flowEnsureRunning(){ if(!_flowRaf && _flowShouldRun()) _flowRaf=requestAnimationFrame(flowTick); }
+function toggleFlow(){
+  flowAnim=!flowAnim; syncFlowBtn();
+  showStatus(flowAnim ? (MAP_TYPE==='systems'?'Connection flow on.':'Flow shows on systems maps.') : 'Connection flow off.');
+  flowEnsureRunning(); if(!flowAnim) draw();
+}
+function syncFlowBtn(){ const b=document.getElementById('btn-flow-toggle'); if(b) b.style.opacity=flowAnim?'1':'0.45'; }
 
 // ── Presentation Mode state ───────────────────────────────────────────────────
 let presMapOnly=false;           // hide notes: map fills the screen, controls float
@@ -4110,6 +4137,17 @@ function draw(){
         ctx.stroke();
       }
       ctx.setLineDash([]);
+      // Flow overlay on loop-edge arcs (systems feedback loops, toggle on)
+      if(flowAnim && _flowShouldRun()){
+        const span=15/zoom, k=_flowPhase%span;
+        ctx.save();
+        ctx.strokeStyle=isHl?'#FFD166':'#2F80ED';
+        ctx.lineWidth=Math.max(lw+0.8,2.6)/zoom; ctx.lineCap='round';
+        ctx.setLineDash([6/zoom,9/zoom]);
+        ctx.lineDashOffset=antiCW?k:-k;
+        ctx.beginPath(); ctx.arc(loopC.x,loopC.y,loopC.r,arcStartAngle,arcAdjEnd,antiCW); ctx.stroke();
+        ctx.restore();
+      }
     } else {
       // Non-loop: compute connected arrow geometry so the stroke ends exactly at the arrowhead base
       const as=(10*arrowScale)*lineZoomClamp()/zoom;
@@ -4161,6 +4199,18 @@ function draw(){
         else if(style.dashPattern){ctx.setLineDash(style.dashPattern.map(d=>d/zoom));}
         else{ctx.setLineDash([]);}
         ctx.stroke();ctx.setLineDash([]);ctx.lineCap='butt';
+      }
+      // Flow overlay: moving dashes along the arrow's direction (systems maps, toggle on)
+      if(flowAnim && _flowShouldRun() && arrowOf(e)!=='none'){
+        const span=15/zoom, k=_flowPhase%span, dir=arrowOf(e), both=dir==='both';
+        ctx.save();
+        ctx.strokeStyle=isHl?'#FFD166':'#2F80ED';
+        ctx.lineWidth=Math.max(lw+0.8,2.6)/zoom; ctx.lineCap='round';
+        ctx.setLineDash([6/zoom,9/zoom]);
+        const P=()=>{ctx.beginPath();ctx.moveTo(apS.x,apS.y);ctx.quadraticCurveTo(mx,my,bpS.x,bpS.y);};
+        if(both){ ctx.lineDashOffset=-k; P(); ctx.stroke(); ctx.lineDashOffset=k; P(); ctx.stroke(); }
+        else { ctx.lineDashOffset=(dir==='backward')?k:-k; P(); ctx.stroke(); }
+        ctx.restore();
       }
       // Arrowhead at target: filled triangle — tip=bp, base=bpS, no translate/rotate needed
       if(headT){
