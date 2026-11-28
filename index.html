@@ -10096,7 +10096,7 @@ const BIG_MAP_WIDEN=1.45;   // push past the raw screen ratio: the layout settle
 // A round map on a wide screen wastes the sides: it has to zoom out to fit the height, which
 // shrinks every node and name. Matching the screen's shape keeps the same gaps but fits at a
 // closer zoom, so everything reads bigger. Worth doing at any size past a handful of nodes.
-const ASPECT_THRESHOLD=24;
+const ASPECT_THRESHOLD=100;  // under this many nodes the map stays a circle; above it widens into an oblong/eyeball
 function _mapAspect(){
   if(nodes.length<ASPECT_THRESHOLD) return 1;
   const a=(W&&H)?W/H:1.6;
