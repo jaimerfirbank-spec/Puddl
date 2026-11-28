@@ -3904,7 +3904,9 @@ function draw(){
   // follow their cluster; detached regions keep their last position.
   CLUSTERS.forEach(c=>{
     if(!c.region) return;
-    const r=c.region, b=r.detached&&Number.isFinite(r.cx)?r:clusterBounds(c);
+    const bounds=clusterBounds(c);
+    if(!bounds) return;
+    const r=c.region, b=r.detached&&Number.isFinite(r.cx)?r:bounds;
     ctx.save();
     ctx.globalAlpha=Math.max(0.04,Math.min(0.55,Number(r.opacity)||0.16));
     ctx.fillStyle=r.colour||'#60A5FA';
@@ -5343,11 +5345,9 @@ function computeInsights(){
   // a reason the card is not shown, never as a score of zero.
   const structureEligible=pool.length>=MIN_STRUCTURE_NODES;
   const brokersMeaningful=structureEligible&&density<=MAX_BROKER_DENSITY;
-  // Links carrying a written label, and links without one. Only worth raising
-  // when some links DO have labels: that is a map someone meant to annotate and
-  // left part-done, rather than one that simply does not use labels.
-  let labelledLinks=0;
-  edgesIn.forEach(e=>{ if(String(e.note||'').trim()) labelledLinks++; });
+  // Keep these fields for answer compatibility, but do not count legacy notes:
+  // connection notes are no longer visible or editable in Puddle.
+  const labelledLinks=0; // legacy connection notes are no longer visible or editable
   const unlabelledLinks=edgesIn.length-labelledLinks;
 
   // Betweenness centrality (Brandes' algorithm): how often a node sits on the
@@ -10988,6 +10988,7 @@ function deleteModalNode(){
     return s!==modalNodeId&&t!==modalNodeId;
   });
   loops=loops.filter(l=>{ l.nodeIds=l.nodeIds.filter(id=>id!==modalNodeId); return l.nodeIds.length>=2; });
+  removeNodeFromClusters(modalNodeId);
   nodes=nodes.filter(nd=>nd.id!==modalNodeId);
   addLog('deleted node "'+n.label+'"');
   buildSim(); if(sim&&forceOn)sim.alpha(0.3).restart();
@@ -14084,6 +14085,13 @@ function markSaved(){
 function autoSave(){
   if(inDemoMode) return;
   if(!hasUnsavedChanges) return;
+  // The connection popup previews against the live canvas. Keep that draft out
+  // of saved data until OK commits it or Cancel restores the original edge.
+  if(edgeEditIdx!==null&&edgeEditOriginal){
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer=setTimeout(()=>{ autoSave(); },1000);
+    return;
+  }
   try {
     if(currentMapMode==='personal'&&currentUser){
       // Serialise edges correctly (D3 may have replaced IDs with objects)
@@ -14350,7 +14358,7 @@ function ctxDeleteNode(){
     return s!==ctxMenuNodeId&&t!==ctxMenuNodeId;
   });
   loops=loops.filter(l=>{ l.nodeIds=l.nodeIds.filter(id=>id!==ctxMenuNodeId); return l.nodeIds.length>=2; });
-  CLUSTERS=CLUSTERS.filter(c=>{ c.nodeIds=c.nodeIds.filter(id=>id!==ctxMenuNodeId); return c.centerId!==ctxMenuNodeId&&c.nodeIds.length>=2; });
+  removeNodeFromClusters(ctxMenuNodeId);
   nodes=nodes.filter(nd=>nd.id!==ctxMenuNodeId);
   addLog('deleted node "'+n.label+'"');
   buildSim(); if(sim&&forceOn)sim.alpha(0.3).restart();
@@ -14586,6 +14594,13 @@ function updateCluster(id,key,value){
   renderClusterSettings(); buildSim(); draw(); saveState(); markUnsaved();
 }
 function dissolveCluster(id){ CLUSTERS=CLUSTERS.filter(c=>c.id!==id); refreshClusterCache(); renderClusterSettings(); draw(); saveState(); markUnsaved(); showStatus('Cluster dissolved. Nodes and connections remain.'); }
+function removeNodeFromClusters(id){
+  CLUSTERS=CLUSTERS.filter(c=>{
+    c.nodeIds=c.nodeIds.filter(nodeId=>nodeId!==id);
+    return c.centerId!==id&&c.nodeIds.length>=2;
+  });
+  refreshClusterCache();
+}
 function setClusterRegion(id,on){
   const c=CLUSTERS.find(x=>x.id===id); if(!c) return;
   c.region=on?(c.region||{colour:'#60A5FA',opacity:0.16,shape:'ellipse',label:'',detached:false}):null;
@@ -14596,13 +14611,14 @@ function updateClusterRegion(id,key,value){
   if(key==='opacity') c.region.opacity=Math.max(0.04,Math.min(0.55,Number(value)||0.16));
   else if(key==='detached'){
     c.region.detached=!!value;
-    if(c.region.detached){ const b=clusterBounds(c); c.region.cx=b.cx; c.region.cy=b.cy; c.region.rx=b.rx; c.region.ry=b.ry; }
+    if(c.region.detached){ const b=clusterBounds(c); if(b){ c.region.cx=b.cx; c.region.cy=b.cy; c.region.rx=b.rx; c.region.ry=b.ry; } else c.region.detached=false; }
   } else c.region[key]=value;
   draw(); saveState(); markUnsaved();
 }
 function nudgeClusterRegion(id,dx,dy){ const c=CLUSTERS.find(x=>x.id===id); if(!c||!c.region||!c.region.detached) return; c.region.cx+=dx; c.region.cy+=dy; draw(); saveState(); markUnsaved(); }
 function clusterBounds(c){
   const ns=[c.centerId,...c.nodeIds].map(id=>nodes.find(n=>n.id===id)).filter(Boolean);
+  if(!ns.length) return null;
   const xs=ns.map(n=>n.x), ys=ns.map(n=>n.y), pad=65;
   const minX=Math.min(...xs)-pad,maxX=Math.max(...xs)+pad,minY=Math.min(...ys)-pad,maxY=Math.max(...ys)+pad;
   return {cx:(minX+maxX)/2,cy:(minY+maxY)/2,rx:(maxX-minX)/2,ry:(maxY-minY)/2};
@@ -17435,6 +17451,8 @@ function confirmHoverDelete(){
     const t=typeof e.target==='object'?e.target.id:e.target;
     return s!==id&&t!==id;
   });
+  loops=loops.filter(l=>{ l.nodeIds=l.nodeIds.filter(nodeId=>nodeId!==id); return l.nodeIds.length>=2; });
+  removeNodeFromClusters(id);
   nodes=nodes.filter(nd=>nd.id!==id);
   hideHoverPanel(true);
   buildSim();if(sim&&forceOn)sim.alpha(0.3).restart();

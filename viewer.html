@@ -2278,7 +2278,9 @@ function draw(){
   // follow their cluster; detached regions keep their last position.
   CLUSTERS.forEach(c=>{
     if(!c.region) return;
-    const r=c.region, b=r.detached&&Number.isFinite(r.cx)?r:clusterBounds(c);
+    const bounds=clusterBounds(c);
+    if(!bounds) return;
+    const r=c.region, b=r.detached&&Number.isFinite(r.cx)?r:bounds;
     ctx.save();
     ctx.globalAlpha=Math.max(0.04,Math.min(0.55,Number(r.opacity)||0.16));
     ctx.fillStyle=r.colour||'#60A5FA';
@@ -3466,11 +3468,9 @@ function computeInsights(){
   // a reason the card is not shown, never as a score of zero.
   const structureEligible=pool.length>=MIN_STRUCTURE_NODES;
   const brokersMeaningful=structureEligible&&density<=MAX_BROKER_DENSITY;
-  // Links carrying a written label, and links without one. Only worth raising
-  // when some links DO have labels: that is a map someone meant to annotate and
-  // left part-done, rather than one that simply does not use labels.
-  let labelledLinks=0;
-  edgesIn.forEach(e=>{ if(String(e.note||'').trim()) labelledLinks++; });
+  // Keep these fields for answer compatibility, but do not count legacy notes:
+  // connection notes are no longer visible or editable in Puddle.
+  const labelledLinks=0; // legacy connection notes are no longer visible or editable
   const unlabelledLinks=edgesIn.length-labelledLinks;
 
   // Betweenness centrality (Brandes' algorithm): how often a node sits on the
@@ -6688,6 +6688,7 @@ function clusterMemberFlagged(c,id){
 }
 function clusterBounds(c){
   const ns=[c.centerId,...c.nodeIds].map(id=>nodes.find(n=>n.id===id)).filter(Boolean);
+  if(!ns.length) return null;
   const xs=ns.map(n=>n.x), ys=ns.map(n=>n.y), pad=65;
   const minX=Math.min(...xs)-pad,maxX=Math.max(...xs)+pad,minY=Math.min(...ys)-pad,maxY=Math.max(...ys)+pad;
   return {cx:(minX+maxX)/2,cy:(minY+maxY)/2,rx:(maxX-minX)/2,ry:(maxY-minY)/2};

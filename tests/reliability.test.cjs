@@ -78,6 +78,27 @@ test('clusters persist without hiding nodes or connections',()=>{
  assert.match(source,/Automatically arrange eligible clusters after import/);
  assert.match(source,/Shaded region/);
 });
+test('every node deletion route cleans clusters and empty regions are skipped',()=>{
+ assert.match(fn('deleteModalNode'),/removeNodeFromClusters\(modalNodeId\)/);
+ assert.match(fn('ctxDeleteNode'),/removeNodeFromClusters\(ctxMenuNodeId\)/);
+ assert.match(fn('confirmHoverDelete'),/removeNodeFromClusters\(id\)/);
+ const c=ctx({nodes:[]},['clusterBounds']);
+ assert.equal(c.clusterBounds({centerId:1,nodeIds:[2]}),null);
+ const d=ctx({CLUSTERS:[{centerId:1,nodeIds:[2,3]},{centerId:4,nodeIds:[2,5,6]}],refreshClusterCache(){}},['removeNodeFromClusters']);
+ d.removeNodeFromClusters(2);
+ assert.deepEqual(JSON.parse(JSON.stringify(d.CLUSTERS)),[{centerId:4,nodeIds:[5,6]}]);
+ assert.match(source,/const bounds=clusterBounds\(c\);\s*if\(!bounds\) return;/);
+});
+test('hidden legacy connection notes do not create labelled-link findings',()=>{
+ assert.match(source,/const labelledLinks=0; \/\/ legacy connection notes are no longer visible or editable/);
+ assert.doesNotMatch(source,/String\(e\.note\|\|''\)\.trim\(\)\) labelledLinks\+\+/);
+});
+test('autosave waits while connection appearance is only a preview',()=>{
+ let queued=false;
+ const c=ctx({inDemoMode:false,hasUnsavedChanges:true,edgeEditIdx:0,edgeEditOriginal:{},autoSaveTimer:null,clearTimeout(){},setTimeout(fn){queued=fn;return 1;}},['autoSave']);
+ c.autoSave();
+ assert.equal(typeof queued,'function');
+});
 test('invalid snapshots are rejected before changing live map or history guard',()=>{
  const nodes=[{id:99}],c=ctx({nodes,skipSave:false},['validateMapSnapshot','restoreSnap']);
  for(const d of [{}, {...valid(),nodes:[{id:1,x:Infinity,y:0}]},{...valid(),edges:[{from:1,to:7}]},{...valid(),loops:{}}]){
