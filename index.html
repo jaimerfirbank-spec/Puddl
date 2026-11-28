@@ -10953,6 +10953,8 @@ function openAddModal(){
 
 function openEditModal(id){
   const n=nodes.find(nd=>nd.id===id);if(!n) return;
+  // Clear any hover-focus dimming so the map isn't left greyed out behind the editor
+  if(highlightIds.size){ highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear(); }
   modalMode='edit';modalNodeId=id;modalEditMode=false;
   selectedCatId=n.catId||null;
   selectedArea=n.area||null;
@@ -11241,8 +11243,11 @@ canvas.addEventListener('dblclick',e=>{
   const n=nodeAt(e.offsetX,e.offsetY);
   if(n){
     if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
+    if(hoverShowTimer){ clearTimeout(hoverShowTimer); hoverShowTimer=null; hoverCandidateId=null; }
     document.getElementById('hover-panel').classList.remove('visible');
-    hoverPanelNodeId=null;
+    hoverPanelNodeId=null; hoverEdgeIndex=null; sidePanelNodeId=null;
+    // Clear the hover-focus dimming too, or the map stays greyed out behind the editor
+    highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
     // Open directly in edit mode — no view panel flash
     openEditModal(n.id);
     requestAnimationFrame(()=>switchToEditMode());
