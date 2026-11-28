@@ -3,10 +3,13 @@
 Last updated: 28 Nov 2026. Keep this short. Update it at the end of a working session ("save progress").
 
 ## Now / next
-- No feature in progress. Last change: CLAUDE.md rewritten as a name-based map (commit c224795, pushed to ccr-96a2b833-y73ecq).
-- Agreed next step for AI insights work: an **insights coverage audit** — for each map type, which user questions the insights answer vs miss. Not started.
+- **Animated connections — phase 1 DONE** (this session). Flowing dashes along arrow direction on systems maps: toggle button + hover kick, forward/backward/both-ways, RAF loop paused when tab hidden or edges>400. In editor + carried into viewer (hover only there). Flow is a view pref, not saved to the map.
+- Phase 1b / next: persistent flow in the viewer (toggle is stripped from viewer, so it only flows on hover there — decide if a share should auto-flow); then **node pulse** (size-based, on hover); then **polarity +/- interaction**. Build in that order.
+- Still open from before: the AI-insights **coverage audit** (for each map type, which user questions insights answer vs miss). Not started.
+- Note: Puddle is desktop only (small-screen gate confirmed), so no mobile perf worry.
 
 ## Recently done
+- Connection flow animation phase 1 (see Now/next). Entry points: `toggleFlow`, `_flowShouldRun`, `flowTick`, overlay code inside `draw()` edge branches; button `btn-flow-toggle`.
 - #20 (merged): structural insights (critical links, bottlenecks, overloaded hubs, density) now show per map type with type-specific wording.
 - CLAUDE.md turned into a task-to-symbol map so sessions grep by name, not line number.
 
