@@ -22,9 +22,10 @@ OUT    = os.path.join(ROOT, 'viewer.html')
 
 # What a viewer may do. Everything these reach is kept; everything else is cut.
 ENTRIES = [
-    'draw', 'restoreSnap', 'nodeAt', 'fitAll', 'zoomBy', 'zoomReset',
+    'draw', 'restoreSnap', 'nodeAt', 'edgeIndexAt', 'fitAll', 'zoomBy', 'zoomReset',
     'enterPresentationMode', 'exitPresentationMode', 'presGoToStop', 'presPlayStart',
-    'showHoverPanel', 'renderHoverPanel', 'toggleHoverDock',
+    'showHoverPanel', 'showEdgeHoverPanel', 'scheduleHoverPanel',
+    'scheduleEdgeHoverPanel', 'renderHoverPanel', 'toggleHoverDock',
     'renderInsights', 'computeInsights', 'toggleInsights', 'toggleSec',
     'setTheme', 'restoreNodeImages', 'loadNodeImage',
     'applyFilters', 'rebuildCatFilter', 'updateColourLegend', 'buildSim',
@@ -310,11 +311,12 @@ VIEWER_SHELL = r'''<!DOCTYPE html>
     var c=document.getElementById('bg');
     if(!c||c.dataset.viewerWired) return;
     c.dataset.viewerWired='1';
-    var dragging=false,startX=0,startY=0,startPanX=0,startPanY=0,hovered=null;
+    var dragging=false,startX=0,startY=0,startPanX=0,startPanY=0;
 
     c.addEventListener('wheel',function(e){
       e.preventDefault();
-      var factor=e.deltaY<0?1.1:0.91,oldZoom=zoom;
+      var step=Math.min(40,Math.abs(e.deltaY));
+      var factor=Math.exp((e.deltaY<0?1:-1)*step*0.0018),oldZoom=zoom;
       zoom=Math.max(minZoomAllowed(),Math.min(MAX_ZOOM,zoom*factor));
       panX=e.offsetX-(e.offsetX-panX)*(zoom/oldZoom);
       panY=e.offsetY-(e.offsetY-panY)*(zoom/oldZoom);
@@ -335,12 +337,21 @@ VIEWER_SHELL = r'''<!DOCTYPE html>
       }
       var n=nodeAt(e.offsetX,e.offsetY);
       if(n){
-        if(hovered!==n.id){ hovered=n.id; showHoverPanel(n.id); }
-      }else if(hovered!==null){
-        hovered=null;
+        if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
+        if(n.id!==hoverPanelNodeId) scheduleHoverPanel(n.id);
+        return;
+      }
+      var edgeIdx=edgeIndexAt(e.offsetX,e.offsetY);
+      if(edgeIdx!==null){
+        if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
+        if(edgeIdx!==hoverEdgeIndex) scheduleEdgeHoverPanel(edgeIdx);
+        return;
+      }
+      if(hoverShowTimer){ clearTimeout(hoverShowTimer); hoverShowTimer=null; hoverCandidateId=null; }
+      if(hoverPanelNodeId!==null||hoverEdgeIndex!==null){
         try{ highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear(); }catch(_){}
         var panel=document.getElementById('hover-panel'); if(panel) panel.classList.remove('visible');
-        try{ hoverPanelNodeId=null; }catch(_){}
+        try{ hoverPanelNodeId=null; hoverEdgeIndex=null; }catch(_){}
         draw();
       }
     });

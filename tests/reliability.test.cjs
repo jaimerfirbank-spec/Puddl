@@ -32,6 +32,73 @@ test('downloaded spreadsheet templates use the importer columns',()=>{
  c.MAP_TYPE='network'; c.downloadImportTemplate();
  assert.deepEqual(Array.from(rows[0]),['Name','Connected to','Connection type','Arrow','Date added','Connection date','Connected to main node','Notes','Area']);
 });
+test('map interaction improvements stay available in editor and viewer',()=>{
+ assert.ok(!source.includes('Update this map from the spreadsheet it came from'));
+ assert.ok(!source.includes('function openEdgeNoteModal('));
+ assert.match(source,/>Map Editor<\/button>/);
+ assert.match(source,/id:'none',\s+label:'Text only'/);
+ assert.match(source,/function scheduleEdgeHoverPanel\(/);
+ assert.match(viewerSource,/function showEdgeHoverPanel\(/);
+});
+test('node and connection editors expose explicit appearance controls',()=>{
+ assert.match(source,/id="settings-label-overflow"/);
+ assert.match(source,/id="settings-default-node-shape"/);
+ assert.match(source,/id="settings-default-dotted"/);
+ assert.match(source,/>Dotted connection</);
+ assert.match(source,/onclick="confirmEdgeEdit\(\)"/);
+ assert.match(fn('openCustomizePanel'),/closeEdgeEditPopup\(\)/);
+ assert.match(fn('closeEdgeEditPopup'),/Object\.assign\(edges\[edgeEditIdx\],edgeEditOriginal\)/);
+});
+test('opening sheep uses a centred plush mouth and smooth head lift',()=>{
+ assert.match(source,/#splash-mouth\{[^}]*left:72%;top:49%/s);
+ assert.match(source,/@keyframes plushHeadLift/);
+ assert.match(source,/#splash-mascot-scene\.play #splash-sheep,#splash-mascot-scene\.play #splash-face-motion\{animation:plushHeadLift/);
+ assert.match(source,/id="splash-face-motion"/);
+ assert.match(source,/class="splash-eye-lid left"/);
+ assert.match(source,/class="splash-eye-lid right"/);
+ assert.match(source,/@keyframes plushEyes/);
+ assert.doesNotMatch(source,/animation:plushMouth[^;]*steps\(/);
+});
+test('node hover focuses connections after two seconds in normal map use',()=>{
+ assert.match(source,/function showHoverPanel\(id\)[\s\S]*?if\(!hasActiveFilter\)\{/);
+ assert.match(source,/function scheduleHoverPanel\(id\)[\s\S]*?\},2000\);/);
+ assert.doesNotMatch(source,/if\(isViewMode&&!hasActiveFilter\)/);
+});
+test('Explore button hides while the side panel is open',()=>{
+ assert.match(source,/btn\.style\.display=open\?'none':'/);
+});
+test('feedback loops receive separate reinforcing and balancing numbers',()=>{
+ const c=ctx({},['loopDisplayCodes']);
+ assert.deepEqual(Array.from(c.loopDisplayCodes([{type:'R'},{type:'B'},{type:'R'},{type:'unassigned'},{type:'B'}])),['R1','B1','R2','?1','B2']);
+});
+test('clusters persist without hiding nodes or connections',()=>{
+ assert.match(fn('snap'),/clusters:CLUSTERS\|\|\[\]/);
+ assert.match(fn('dissolveCluster'),/Nodes and connections remain/);
+ assert.match(fn('clusterExclusiveMembers'),/===1/);
+ assert.match(source,/Automatically arrange eligible clusters after import/);
+ assert.match(source,/Shaded region/);
+});
+test('every node deletion route cleans clusters and empty regions are skipped',()=>{
+ assert.match(fn('deleteModalNode'),/removeNodeFromClusters\(modalNodeId\)/);
+ assert.match(fn('ctxDeleteNode'),/removeNodeFromClusters\(ctxMenuNodeId\)/);
+ assert.match(fn('confirmHoverDelete'),/removeNodeFromClusters\(id\)/);
+ const c=ctx({nodes:[]},['clusterBounds']);
+ assert.equal(c.clusterBounds({centerId:1,nodeIds:[2]}),null);
+ const d=ctx({CLUSTERS:[{centerId:1,nodeIds:[2,3]},{centerId:4,nodeIds:[2,5,6]}],refreshClusterCache(){}},['removeNodeFromClusters']);
+ d.removeNodeFromClusters(2);
+ assert.deepEqual(JSON.parse(JSON.stringify(d.CLUSTERS)),[{centerId:4,nodeIds:[5,6]}]);
+ assert.match(source,/const bounds=clusterBounds\(c\);\s*if\(!bounds\) return;/);
+});
+test('hidden legacy connection notes do not create labelled-link findings',()=>{
+ assert.match(source,/const labelledLinks=0; \/\/ legacy connection notes are no longer visible or editable/);
+ assert.doesNotMatch(source,/String\(e\.note\|\|''\)\.trim\(\)\) labelledLinks\+\+/);
+});
+test('autosave waits while connection appearance is only a preview',()=>{
+ let queued=false;
+ const c=ctx({inDemoMode:false,hasUnsavedChanges:true,edgeEditIdx:0,edgeEditOriginal:{},autoSaveTimer:null,clearTimeout(){},setTimeout(fn){queued=fn;return 1;}},['autoSave']);
+ c.autoSave();
+ assert.equal(typeof queued,'function');
+});
 test('invalid snapshots are rejected before changing live map or history guard',()=>{
  const nodes=[{id:99}],c=ctx({nodes,skipSave:false},['validateMapSnapshot','restoreSnap']);
  for(const d of [{}, {...valid(),nodes:[{id:1,x:Infinity,y:0}]},{...valid(),edges:[{from:1,to:7}]},{...valid(),loops:{}}]){

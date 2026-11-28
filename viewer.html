@@ -287,20 +287,27 @@ select{
 #splash-mascot-scene.play{opacity:1;}
 #splash-sheep-wrap{position:absolute;z-index:3;left:7%;right:7%;top:4%;bottom:12%;transform-origin:50% 88%;}
 #splash-sheep{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 13px 14px rgba(24,24,27,.18));}
-#splash-mouth{position:absolute;z-index:5;left:67.5%;top:42.5%;width:20px;height:18px;margin-left:-10px;border:2px solid #09090b;border-radius:0;background:linear-gradient(135deg,#242428 0 48%,#111114 49% 100%);opacity:0;overflow:hidden;transform-origin:50% 0;box-shadow:inset 1px 1px 0 #3f3f46,inset -1px -1px 0 #000,0 1px 1px rgba(0,0,0,.28);}
-#splash-mouth::before{content:'';position:absolute;inset:1px;border:1px dashed rgba(113,113,122,.65);}
-#splash-mouth::after{content:'';position:absolute;left:3px;bottom:0;width:10px;height:7px;border-radius:0;background:linear-gradient(135deg,#ffb3c7 0 45%,#e8799a 46% 100%);box-shadow:inset 1px 1px 0 #ffd0dc,inset -1px -1px 0 #be5677;}
+#splash-face-motion{position:absolute;z-index:5;inset:0;pointer-events:none;transform-origin:72% 58%;}
+#splash-mouth{position:absolute;left:72%;top:49%;width:15px;height:16px;margin-left:-7.5px;margin-top:-2px;border:0;border-radius:45% 45% 48% 48%;background:linear-gradient(90deg,#171719,#29292d 52%,#111113);opacity:0;overflow:hidden;transform:translateY(-2px) scale(.92,.04);transform-origin:50% 0;box-shadow:inset 0 1px 1px rgba(255,255,255,.12),inset 0 -1px 1px rgba(0,0,0,.7);}
+#splash-mouth::before{content:'';position:absolute;inset:1px;border:1px dashed rgba(161,161,170,.42);border-radius:inherit;}
+#splash-mouth::after{content:'';position:absolute;left:3px;right:3px;bottom:1px;height:6px;border-radius:45% 45% 35% 35%;background:linear-gradient(#f3a2b9,#d96c8c);box-shadow:inset 0 1px 1px #ffd0dc,inset 0 -1px 1px #a83f60;}
+.splash-eye-lid{position:absolute;top:32.5%;width:12px;height:11px;margin-left:-6px;border-radius:2px;background:linear-gradient(#f7f1e8,#eee5d8);opacity:0;transform:scaleY(.08);transform-origin:50% 50%;box-shadow:inset 0 -1px 0 #b9ab99;}
+.splash-eye-lid.left{left:66.3%}.splash-eye-lid.right{left:74.3%}
 .puddle-pixel{position:absolute;z-index:4;width:8px;height:5px;background:#16c7eb;box-shadow:inset 1px 1px 0 #67e8f9,inset -1px -1px 0 #0891b2;opacity:0;}
 .puddle-pixel.p1{left:14%;bottom:14%}.puddle-pixel.p2{left:23%;bottom:9%}.puddle-pixel.p3{left:34%;bottom:15%}.puddle-pixel.p4{left:47%;bottom:8%}.puddle-pixel.p5{left:61%;bottom:13%}.puddle-pixel.p6{left:75%;bottom:9%}.puddle-pixel.p7{left:84%;bottom:15%}.puddle-pixel.p8{left:53%;bottom:17%}
 #splash-mascot-scene.play #splash-sheep-wrap{animation:plushSheepAppear .65s ease-out both;}
+#splash-mascot-scene.play #splash-sheep,#splash-mascot-scene.play #splash-face-motion{animation:plushHeadLift 1.15s 1.08s cubic-bezier(.45,0,.25,1) both;transform-origin:72% 58%;}
 #splash-mascot-scene.play .puddle-pixel{animation:plushPixelRipple 1.4s ease-in-out infinite;}
 #splash-mascot-scene.play .puddle-pixel:nth-of-type(2n){animation-delay:.28s;animation-direction:reverse;}
 #splash-mascot-scene.play .puddle-pixel:nth-of-type(3n){animation-delay:.55s;}
-#splash-mascot-scene.play #splash-mouth{animation:plushMouth .72s 1.22s steps(3,end) both;}
+#splash-mascot-scene.play #splash-mouth{animation:plushMouth 1.15s 1.08s cubic-bezier(.4,0,.2,1) both;}
+#splash-mascot-scene.play .splash-eye-lid{animation:plushEyes 1.15s 1.08s ease-in-out both;}
 @keyframes plushSheepAppear{0%{opacity:0;transform:scale(.96)}100%{opacity:1;transform:scale(1)}}
 @keyframes plushPixelRipple{0%,100%{opacity:.2;transform:translateX(-3px) scaleX(.8)}35%,65%{opacity:.85;transform:translateX(3px) scaleX(1.2)}}
-@keyframes plushMouth{0%,100%{opacity:0;transform:scaleY(.12)}25%,75%{opacity:1;transform:scaleY(1)}}
-@media(prefers-reduced-motion:reduce){#splash-mascot-scene{opacity:1}#splash-sheep-wrap{animation:none!important}.puddle-pixel,#splash-mouth{display:none!important}}
+@keyframes plushHeadLift{0%,18%,100%{transform:rotate(0deg) translateY(0)}32%,72%{transform:rotate(-2.5deg) translateY(-2px)}88%{transform:rotate(-.5deg) translateY(0)}}
+@keyframes plushEyes{0%,18%,88%,100%{opacity:0;transform:scaleY(.08)}30%,74%{opacity:1;transform:scaleY(1)}}
+@keyframes plushMouth{0%,22%,78%,100%{opacity:0;transform:translateY(-2px) scale(.92,.04)}32%,70%{opacity:1;transform:translateY(0) scale(1,1)}}
+@media(prefers-reduced-motion:reduce){#splash-mascot-scene{opacity:1}#splash-sheep-wrap,#splash-sheep,#splash-face-motion{animation:none!important}.puddle-pixel,#splash-mouth,.splash-eye-lid{display:none!important}}
 /* ── Splash logo drop + bounce ───────────────────────────────────────────── */
 @keyframes logoDrop{
   0%   { opacity:0; transform:translateY(-70px) scale(0.92); }
@@ -1495,6 +1502,9 @@ let loopNodes=[],loopDirection='cw',loopAddingNode=false;
 let selectedLoopId=null;
 let forceOn=false;
 let NODE_LABEL_POSITION='below'; // 'below' | 'inside'
+let NODE_LABEL_OVERFLOW=false;   // allow inside labels to extend beyond the shape
+let DEFAULT_NODE_SHAPE='circle';
+let DEFAULT_CONNECTION_DOTTED=false;
 let MAP_NOUN='';                  // '' = the default word for the map type; or 'person', 'organisation', 'service', 'item'
 let SHOW_MERGE_MARKS=true;        // the small two-circle badge on nodes that were merged on import
 let FIELD_DEFS=[];
@@ -1563,22 +1573,28 @@ function _usedStyleIds(){
 }
 function _legendSig(){
   const u=[..._usedStyleIds()].sort().join(',');
-  return u+'|'+document.documentElement.getAttribute('data-theme')+'|'+thinLinesOn()+'|'+CONNECTION_STYLES.map(st=>st.id+st.label+st.colour).join('');
+  const pol=edges.reduce((a,e)=>a+(e.polarity==='positive'?'+':e.polarity==='negative'?'-':''),'');
+  return u+'|'+MAP_TYPE+'|'+pol+'|'+document.documentElement.getAttribute('data-theme')+'|'+thinLinesOn()+'|'+CONNECTION_STYLES.map(st=>st.id+st.label+st.colour).join('');
 }
 function syncStrengthLegend(){
   const el=document.getElementById('strength-legend');
   if(!el) return;
   const used=_usedStyleIds();
   const list=CONNECTION_STYLES.filter(st=>st.id!=='loop'&&used.has(st.id));
-  if(list.length<2){ el.innerHTML=''; syncLegendVisibility(); return; }
   const thin=thinLinesOn(), dark=document.documentElement.getAttribute('data-theme')==='dark';
-  el.innerHTML=list.map(st=>{
+  let html=(list.length<2?'':list.map(st=>{
     const dash=(st.dashPattern&&st.dashPattern.length)?'dashed':'solid';
     const w=thin?thinWidth(st):Math.max(1.5,Math.min(3,(st.lineWidth||2)*0.6));
     const bw=st.isDouble?'3px double':w+'px '+dash;
     const sc=escHtml(dark?adaptColourForDark(st.colour):st.colour);
     return `<div class="l-row"><span style="width:30px;border-top:${bw} ${sc};display:inline-block;flex-shrink:0;"></span><span>${escHtml(st.label)}</span></div>`;
-  }).join('');
+  }).join(''));
+  if((MAP_TYPE==='systems'||MAP_TYPE==='stakeholder')&&edges.some(e=>e.polarity)){
+    const pos=MAP_TYPE==='systems'?'Move in the same direction':'Alliance';
+    const neg=MAP_TYPE==='systems'?'Move in opposite directions':'Friction';
+    html+=`<div class="l-row"><span style="width:18px;text-align:center;color:#16A34A;font-weight:800;">+</span><span>${pos}</span></div><div class="l-row"><span style="width:18px;text-align:center;color:#DC2626;font-weight:800;">−</span><span>${neg}</span></div>`;
+  }
+  el.innerHTML=html;
   syncLegendVisibility();
 }
 function syncLegendVisibility(){
@@ -1691,6 +1707,8 @@ const LOOP_COLOURS=['#E11D48','#2563EB','#16A34A','#D97706','#9333EA','#0D9488',
 const _pinColourIdx=new Map();  // loop key -> colour number
 let _pinEdgeCols=new Map(), _pinNodeCols=new Map();  // edge index / node id -> [colour numbers]
 let _loopCircle=null;           // {cx,cy,r,order:Map(id->position),n} while a loop is shown as a circle
+let CLUSTERS=[];
+let CLUSTER_MIN_SIZE=3;
 function loopColourOf(idx,dark){
   const c=LOOP_COLOURS[idx%LOOP_COLOURS.length];
   return {col:dark?adaptColourForDark(c):c, raw:c, dash:Math.floor(idx/LOOP_COLOURS.length)%2===1};
@@ -1700,7 +1718,22 @@ let history=[],histIdx=-1;
 let colourLegendMap={};
 let lastMouse=null;
 let sim=null;
-let hoverPanelNodeId=null, hoverHideTimer=null, sidePanelNodeId=null;
+let hoverPanelNodeId=null, hoverEdgeIndex=null, hoverHideTimer=null, hoverShowTimer=null, hoverCandidateId=null, sidePanelNodeId=null;
+let HOVER_BLEND=1, hoverBlendFrame=null;
+function _focusAlpha(target){ return 1-(1-target)*HOVER_BLEND; }
+function _animateHoverFocus(){
+  if(hoverBlendFrame) cancelAnimationFrame(hoverBlendFrame);
+  HOVER_BLEND=0;
+  const started=performance.now(), duration=320;
+  const step=now=>{
+    const t=Math.min(1,(now-started)/duration);
+    HOVER_BLEND=1-Math.pow(1-t,3);
+    draw();
+    if(t<1) hoverBlendFrame=requestAnimationFrame(step);
+    else hoverBlendFrame=null;
+  };
+  hoverBlendFrame=requestAnimationFrame(step);
+}
 let presMapOnly=false;           // hide notes: map fills the screen, controls float
 let presentationStops=[];       // [{id,panX,panY,zoom,header,subheader,body}] — the draft being built
 let presSavedId=null;              // which saved presentation the draft being edited belongs to
@@ -1832,6 +1865,29 @@ function nodeAt(sx,sy){
   }
   return null;
 }
+function edgeIndexAt(sx,sy){
+  // Returns the index of the closest edge curve under the pointer.
+  const wx=(sx-panX)/zoom, wy=(sy-panY)/zoom;
+  const thresh=8/zoom;
+  for(let i=0;i<edges.length;i++){
+    const e=edges[i];
+    const a=typeof e.source==='object'?e.source:nodes.find(n=>n.id===e.source);
+    const b=typeof e.target==='object'?e.target:nodes.find(n=>n.id===e.target);
+    if(!a||!b) continue;
+    if(_focusHidden.size&&(_focusHidden.has(a.id)||_focusHidden.has(b.id))) continue;
+    const dx=b.x-a.x, dy=b.y-a.y, dist=Math.sqrt(dx*dx+dy*dy)||1;
+    const curve=_curveOffset(dist);
+    const mx=(a.x+b.x)/2-dy/dist*curve;
+    const my=(a.y+b.y)/2+dx/dist*curve;
+    // Sample points along the quadratic bezier
+    for(let t=0;t<=1;t+=0.05){
+      const qx=(1-t)*(1-t)*a.x+2*(1-t)*t*mx+t*t*b.x;
+      const qy=(1-t)*(1-t)*a.y+2*(1-t)*t*my+t*t*b.y;
+      if(Math.abs(qx-wx)<thresh&&Math.abs(qy-wy)<thresh) return i;
+    }
+  }
+  return null;
+}
 function snap(includeVersions=true){
   // Save personal maps into snapshot too
   if(currentUser&&currentMapMode==='personal'){
@@ -1854,6 +1910,8 @@ function snap(includeVersions=true){
     mapTitle,
     currentMapMode,
     loops:loops||[],
+    clusters:CLUSTERS||[],
+    clusterMinSize:CLUSTER_MIN_SIZE,
     loopConnectionStyle:LOOP_CONNECTION_STYLE,
     connectionStyles:CONNECTION_STYLES,
     presentationStops:presentationStops||[],
@@ -1864,6 +1922,9 @@ function snap(includeVersions=true){
     dateAsAt:DATE_ASAT,
     areas:AREAS,
     nodeLabelPosition:NODE_LABEL_POSITION,
+    nodeLabelOverflow:NODE_LABEL_OVERFLOW,
+    defaultNodeShape:DEFAULT_NODE_SHAPE,
+    defaultConnectionDotted:DEFAULT_CONNECTION_DOTTED,
     showMergeMarks:SHOW_MERGE_MARKS,
     sizeByConnections:SIZE_BY==='connections',
     sizeBy:SIZE_BY,
@@ -1899,7 +1960,7 @@ function validateMapSnapshot(d){
     if(!e||!ids.has(e.from)||!ids.has(e.to)) throw new Error('A connection refers to a missing node.');
     if(!safeColour(e.colour)) throw new Error('Invalid connection colour.');
   }
-  for(const key of ['loops','categories','connectionStyles','presentationStops','savedPresentations','namedVersions','fieldDefs']){
+  for(const key of ['loops','clusters','categories','connectionStyles','presentationStops','savedPresentations','namedVersions','fieldDefs']){
     if(d[key]!==undefined&&!Array.isArray(d[key])) throw new Error('Invalid map '+key+'.');
   }
   // These IDs become control IDs and handler arguments in older settings UI.
@@ -1943,6 +2004,8 @@ function restoreSnap(s,keepVersions){
   if(d.mapTitle!==undefined&&d.mapTitle!==null) mapTitle=d.mapTitle;
   if(d.currentMapMode) currentMapMode=d.currentMapMode;
   if(d.loops) loops=d.loops; else loops=[];
+  CLUSTERS=Array.isArray(d.clusters)?d.clusters:[];
+  CLUSTER_MIN_SIZE=Math.max(2,Math.min(50,Number(d.clusterMinSize)||3));
   if(d.loopConnectionStyle) LOOP_CONNECTION_STYLE={...LOOP_CONNECTION_STYLE,...d.loopConnectionStyle};
   if(d.connectionStyles&&Array.isArray(d.connectionStyles)) CONNECTION_STYLES=d.connectionStyles;
   _retireConnStyles();
@@ -1975,6 +2038,9 @@ function restoreSnap(s,keepVersions){
   MAP_FOCUS=(d.mapFocus!==undefined&&d.mapFocus!==null)?d.mapFocus:null;
   EDGE_COLOUR_BY_STRENGTH=d.edgeColourByStrength===true;
   LINKED_SHEET=d.linkedSheet||null;
+  NODE_LABEL_OVERFLOW=d.nodeLabelOverflow===true;
+  DEFAULT_NODE_SHAPE=['circle','square','rectangle','diamond','triangle','hexagon','pill','star','none'].includes(d.defaultNodeShape)?d.defaultNodeShape:'circle';
+  DEFAULT_CONNECTION_DOTTED=d.defaultConnectionDotted===true;
   LABEL_THIN=d.labelThin!==false; { const lt=document.getElementById('settings-label-thin'); if(lt) lt.checked=LABEL_THIN; }
   EDGE_CURVE=typeof d.edgeCurve==='number'?d.edgeCurve:0.2; EDGE_OPACITY=typeof d.edgeOpacity==='number'?d.edgeOpacity:0.8;
   ARROW_SIZE=typeof d.arrowSize==='number'&&d.arrowSize>0?d.arrowSize:1; EDGE_GRADIENT=d.edgeGradient===true;
@@ -2116,7 +2182,7 @@ function drawSimpleEdges(hasHL,_dark){
     const style=CONNECTION_STYLES.find(s=>s.id===(e.strength||'moderate'))||CONNECTION_STYLES[1];
     let col=isHl?'#FF8C8C':(e.colour||style.colour);
     if(_dark&&!isHl) col=adaptColourForDark(col);
-    const alpha=knockEdgeAlpha(i,hasHL&&!isHl?DIM_EDGE_ALPHA:1);
+    const alpha=knockEdgeAlpha(i,hasHL&&!isHl?_focusAlpha(DIM_EDGE_ALPHA):1);
     const key=col+'|'+alpha+'|'+(isHl?1:0);
     let g=groups.get(key); if(!g){ g={col,alpha,hl:isHl,segs:[]}; groups.set(key,g); }
     g.segs.push(a.x,a.y,b.x,b.y);
@@ -2139,7 +2205,7 @@ function drawSimpleNodes(hasHL,_dark){
     if(_dateHidden.size&&_dateHidden.has(n.id)) return;
     if(_focusHidden.size&&_focusHidden.has(n.id)) return;
     const isHl=highlightIds.has(n.id), isSec=secondaryIds.has(n.id)&&!isHl;
-    ctx.globalAlpha=knockNodeAlpha(n,hasHL&&!isHl&&!isSec?DIM_ALPHA:isSec?DIM_SECONDARY:1);
+    ctx.globalAlpha=knockNodeAlpha(n,hasHL&&!isHl&&!isSec?_focusAlpha(DIM_ALPHA):isSec?_focusAlpha(DIM_SECONDARY):1);
     const r=Math.max(_simpleDrawR(n),2.2/zoom);
     ctx.fillStyle=nodeInk(n)||nodeFill(n);
     ctx.fillRect(n.x-r,n.y-r,r*2,r*2);
@@ -2175,6 +2241,7 @@ function drawSimpleNodes(hasHL,_dark){
   ctx.restore(); ctx.globalAlpha=1;
 }
 function draw(){
+  refreshClusterCache();
   if((_pinnedLoops.size||_insightFocus)&&_pinEdgeSig!==edges.length) refreshLoopPins();
   _lblBoxCache=new Map();
   _checkLegend();
@@ -2206,6 +2273,27 @@ function draw(){
   ctx.scale(zoom,zoom);
 
   const hasHL=highlightIds.size>0;
+
+  // Shaded regions sit behind every connection and node. Attached regions
+  // follow their cluster; detached regions keep their last position.
+  CLUSTERS.forEach(c=>{
+    if(!c.region) return;
+    const bounds=clusterBounds(c);
+    if(!bounds) return;
+    const r=c.region, b=r.detached&&Number.isFinite(r.cx)?r:bounds;
+    ctx.save();
+    ctx.globalAlpha=Math.max(0.04,Math.min(0.55,Number(r.opacity)||0.16));
+    ctx.fillStyle=r.colour||'#60A5FA';
+    ctx.strokeStyle=r.colour||'#60A5FA';
+    ctx.lineWidth=2/zoom;
+    ctx.beginPath();
+    if(r.shape==='round') rr(ctx,b.cx-b.rx,b.cy-b.ry,b.rx*2,b.ry*2,Math.min(32,b.rx,b.ry));
+    else ctx.ellipse(b.cx,b.cy,b.rx,b.ry,0,0,Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    ctx.globalAlpha=0.8;
+    if(r.label){ ctx.fillStyle=_dark?'#ffffff':'#18181b'; ctx.font=`600 ${12/zoom}px 'DM Sans',sans-serif`; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText(r.label,b.cx,b.cy-b.ry-6/zoom); }
+    ctx.restore();
+  });
 
   // ── Edge helpers (defined once, outside loop) ──────────────────────────────
 
@@ -2368,7 +2456,7 @@ function draw(){
     ctx.save();
     // Edges pass under nodes — no clipping needed (nodes drawn on top in render order)
 
-    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
+    ctx.globalAlpha=knockEdgeAlpha(i,dimmed?_focusAlpha(0.06):isSecondaryEdge?_focusAlpha(0.30):(isHl?1:EDGE_OPACITY));
     const _pc=_pinEdgeCols.size?_pinEdgeCols.get(i):null;
     const _pcs=_pc?_pc.map(ci=>loopColourOf(ci,_dark)):null;
     const _typeCol=isHl&&_ctFilterOn?(_dark?adaptColourForDark(style.colour):style.colour):null;
@@ -2461,7 +2549,7 @@ function draw(){
       // Arrowhead at source (backward or both)
       if(headS){
         ctx.save();
-        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?0.06:isSecondaryEdge?0.30:(isHl?1:EDGE_OPACITY));
+        ctx.globalAlpha=knockEdgeAlpha(i,dimmed?_focusAlpha(0.06):isSecondaryEdge?_focusAlpha(0.30):(isHl?1:EDGE_OPACITY));
         ctx.beginPath();
         ctx.moveTo(ap.x,ap.y);
         ctx.lineTo(apS.x+rPx*as*0.55,apS.y+rPy*as*0.55);
@@ -2495,15 +2583,19 @@ function draw(){
           ctx.fillText(isPos?'+':'−',bx,by+0.5/zoom);
         }
         if(e.hasDelay){
-          const hx=apS.x+(mx-apS.x)*0.42, hy=apS.y+(my-apS.y)*0.42;
+          const ht=0.42, hu=1-ht;
+          const hx=hu*hu*apS.x+2*hu*ht*mx+ht*ht*bpS.x;
+          const hy=hu*hu*apS.y+2*hu*ht*my+ht*ht*bpS.y;
           const hl=9/zoom;
-          const hNx=-dy/dist, hNy=dx/dist; // perpendicular to the chord, close enough for a short hatch
+          const hTx=2*hu*(mx-apS.x)+2*ht*(bpS.x-mx), hTy=2*hu*(my-apS.y)+2*ht*(bpS.y-my);
+          const hTd=Math.hypot(hTx,hTy)||1, hUx=hTx/hTd, hUy=hTy/hTd;
+          const hNx=-hUy, hNy=hUx;
           ctx.strokeStyle=_dark?'#e4e4e7':'#27272a';
           ctx.lineWidth=1.6/zoom;
           [-2.5/zoom,2.5/zoom].forEach(off=>{
             ctx.beginPath();
-            ctx.moveTo(hx+hNx*hl+ (dx/dist)*off, hy+hNy*hl+ (dy/dist)*off);
-            ctx.lineTo(hx-hNx*hl+ (dx/dist)*off, hy-hNy*hl+ (dy/dist)*off);
+            ctx.moveTo(hx+hNx*hl+hUx*off,hy+hNy*hl+hUy*off);
+            ctx.lineTo(hx-hNx*hl+hUx*off,hy-hNy*hl+hUy*off);
             ctx.stroke();
           });
         }
@@ -2523,26 +2615,6 @@ function draw(){
       ctx.translate(arcTipX,arcTipY);ctx.rotate(ang);
       ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-as,-as*0.55);ctx.lineTo(-as,as*0.55);ctx.closePath();
       ctx.fillStyle=drawStroke;ctx.fill();
-      ctx.restore();
-    }
-
-    // Phase 5: edge note label
-    if(e.note&&e.note.trim()&&!dimmed){
-      ctx.save();
-      ctx.globalAlpha=0.85;
-      ctx.font=`${Math.max(9,10/zoom)}px 'DM Sans',sans-serif`;
-      ctx.textAlign='center';ctx.textBaseline='middle';
-      const noteText=e.note.length>28?e.note.slice(0,27)+'…':e.note;
-      const tw=ctx.measureText(noteText).width+8/zoom;
-      const th=13/zoom;
-      ctx.fillStyle='rgba(255,255,255,0.92)';
-      ctx.strokeStyle='rgba(0,0,0,0.10)';
-      ctx.lineWidth=0.5/zoom;
-      ctx.beginPath();
-      rr(ctx,mx-tw/2,my-th/2,tw,th,3/zoom);
-      ctx.fill();ctx.stroke();
-      ctx.fillStyle='#52525b';
-      ctx.fillText(noteText,mx,my);
       ctx.restore();
     }
 
@@ -2633,7 +2705,7 @@ function draw(){
     const isHl=highlightIds.has(n.id);
     const isSecondary=secondaryIds.has(n.id)&&!highlightIds.has(n.id)||false;
     const dimmed=hasHL&&!isHl&&!isSecondary;
-    ctx.globalAlpha=knockNodeAlpha(n,dimmed?DIM_ALPHA:isSecondary?DIM_SECONDARY:1);
+    ctx.globalAlpha=knockNodeAlpha(n,dimmed?_focusAlpha(DIM_ALPHA):isSecondary?_focusAlpha(DIM_SECONDARY):1);
 
     // ── Central event node: logo card ────────────────────────────────────────
     if(n.type==='centre'){
@@ -2646,7 +2718,7 @@ function draw(){
       const pad=7/zoom;
       ctx.beginPath();rr(ctx,cx2-pad,cy2-pad,cw+pad*2,ch+pad*2,(10/zoom)+pad);
       ctx.strokeStyle=_dark?'rgba(255,255,255,0.35)':centreCol;
-      ctx.globalAlpha=knockNodeAlpha(n,dimmed?DIM_ALPHA:isSecondary?DIM_SECONDARY:1)*0.40;
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?_focusAlpha(DIM_ALPHA):isSecondary?_focusAlpha(DIM_SECONDARY):1)*0.40;
       ctx.lineWidth=1.5/zoom;
       ctx.setLineDash([5/zoom,4/zoom]);
       ctx.stroke();
@@ -2710,6 +2782,21 @@ function draw(){
     // ── Regular nodes ────────────────────────────────────────────────────────
     const d=nodeDims(n);
     const r=d.r||40;
+    // Text-only nodes keep their place and connections, but do not draw a shape.
+    if((n.shape||'circle')==='none'){
+      ctx.save();
+      const _fs=Math.max(11,d.FS);
+      ctx.font=`500 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillStyle=_dark?'#ffffff':'#3f3f46';
+      const _ls=wrapLabel(ctx,n.label,r*6,4);
+      const _lh=_fs+3;
+      const _y0=n.y-(_ls.length-1)*_lh/2;
+      _ls.forEach((t,i)=>ctx.fillText(t,Math.round(n.x),Math.round(_y0+i*_lh)));
+      ctx.restore();
+      ctx.globalAlpha=1;
+      return;
+    }
     // ── Node body — shape-aware fill ─────────────────────────────────────────
     if(isHl){ctx.shadowColor='rgba(0,0,0,0.18)';ctx.shadowBlur=18/zoom;}
     drawNodeShape(ctx,n.x,n.y,r,n.shape,zoom);
@@ -2816,12 +2903,23 @@ function draw(){
     const _fs=d.FS;
     ctx.font=`500 ${_fs}px -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif`;
     const _isRect=(n.shape||'circle')==='rectangle';
-    const _maxW=_isRect?(r*2.6)|0:(r*2*0.80)|0;
+    const _naturalW=ctx.measureText(n.label||'').width+8/zoom;
+    const _boundedW=_isRect?(r*3)|0:(r*3.1)|0;
+    const _maxW=NODE_LABEL_OVERFLOW?Math.max(_boundedW,Math.min(_naturalW,r*8)):_boundedW;
     const _lh=_fs+2;
-    const _ls=wrapLabel(ctx,n.label,_maxW,_isRect?3:2);
+    const _ls=wrapLabel(ctx,n.label,_maxW,3);
     const _y0=n.y-(_ls.length-1)*_lh/2;
-    _ls.forEach((t,i)=>ctx.fillText(t,Math.round(n.x),Math.round(_y0+i*_lh),_maxW));
+    _ls.forEach((t,i)=>ctx.fillText(t,Math.round(n.x),Math.round(_y0+i*_lh)));
     ctx.restore();
+    }
+
+    const _cluster=clusterForNode(n.id);
+    if(_cluster&&clusterMemberFlagged(_cluster,n.id)){
+      ctx.save();
+      const bx=n.x+r*0.72, by=n.y-r*0.72, br=9/zoom;
+      ctx.beginPath(); ctx.arc(bx,by,br,0,Math.PI*2); ctx.fillStyle='#F59E0B'; ctx.fill();
+      ctx.fillStyle='#18181b'; ctx.font=`800 ${11/zoom}px 'DM Sans',sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('!',bx,by+0.5/zoom);
+      ctx.restore();
     }
 
     // ── Video badge ───────────────────────────────────────────
@@ -2854,7 +2952,7 @@ function draw(){
         : _shapeBot + 7/zoom;
       const _pilX=n.x-_spw/2;
       // pill background
-      ctx.globalAlpha=knockNodeAlpha(n,dimmed?0.10:isSecondary?0.45:0.88);
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?_focusAlpha(0.10):isSecondary?_focusAlpha(0.45):0.88);
       ctx.fillStyle=_dark?'rgba(59,130,246,0.25)':'rgba(59,130,246,0.12)';
       ctx.beginPath();
       const _pr=_sph/2;
@@ -2875,7 +2973,7 @@ function draw(){
       // pill text
       ctx.fillStyle=_dark?'rgba(147,197,253,1)':'rgba(29,78,216,1)';
       ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.globalAlpha=knockNodeAlpha(n,dimmed?DIM_ALPHA:isSecondary?DIM_SECONDARY:1);
+      ctx.globalAlpha=knockNodeAlpha(n,dimmed?_focusAlpha(DIM_ALPHA):isSecondary?_focusAlpha(DIM_SECONDARY):1);
       ctx.fillText(n.groupStatus,n.x,_pilY+_sph/2);
       ctx.restore();
     }
@@ -3370,11 +3468,9 @@ function computeInsights(){
   // a reason the card is not shown, never as a score of zero.
   const structureEligible=pool.length>=MIN_STRUCTURE_NODES;
   const brokersMeaningful=structureEligible&&density<=MAX_BROKER_DENSITY;
-  // Links carrying a written label, and links without one. Only worth raising
-  // when some links DO have labels: that is a map someone meant to annotate and
-  // left part-done, rather than one that simply does not use labels.
-  let labelledLinks=0;
-  edgesIn.forEach(e=>{ if(String(e.note||'').trim()) labelledLinks++; });
+  // Keep these fields for answer compatibility, but do not count legacy notes:
+  // connection notes are no longer visible or editable in Puddle.
+  const labelledLinks=0; // legacy connection notes are no longer visible or editable
   const unlabelledLinks=edgesIn.length-labelledLinks;
 
   // Betweenness centrality (Brandes' algorithm): how often a node sits on the
@@ -3800,6 +3896,14 @@ function classifySystemsLoop(loopNodes, edgeByPair){
   }
   if(unknown>0) return {type:'unassigned',minus,unknown};
   return {type:(minus%2===0)?'R':'B',minus,unknown:0};
+}
+function loopDisplayCodes(classes){
+  const count={R:0,B:0,unassigned:0};
+  return (classes||[]).map(c=>{
+    const t=c&&c.type==='R'?'R':c&&c.type==='B'?'B':'unassigned';
+    count[t]++;
+    return t==='unassigned'?'?'+count[t]:t+count[t];
+  });
 }
 function findLimitsToGrowth(loops, loopClass, deg, maxResults){
   const rIdx=[], bIdx=[];
@@ -4236,10 +4340,11 @@ function renderInsights(){
         sub('Affected by the most',I.sinks,I.inDeg,'in'));
     }
     _insightLoops=I.loops;
-    const rbBadge=(cls)=>{
-      if(!cls||cls.type==='unassigned') return '<span style="display:inline-block;min-width:16px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:var(--surf-3);color:var(--ink-h);" title="One or more connections in this loop have no polarity yet">?</span>';
+    const loopCodes=loopDisplayCodes(I.loopClass);
+    const rbBadge=(cls,code)=>{
+      if(!cls||cls.type==='unassigned') return `<span style="display:inline-block;min-width:20px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:var(--surf-3);color:var(--ink-h);" title="One or more connections in this loop have no polarity yet">${code||'?'}</span>`;
       const isR=cls.type==='R';
-      return `<span style="display:inline-block;min-width:16px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:${isR?'#FEF3C7':'#DBEAFE'};color:${isR?'#92400E':'#1E40AF'};" title="${isR?'Reinforcing: '+cls.minus+' minus sign(s), compounds in one direction':'Balancing: '+cls.minus+' minus sign(s), seeks equilibrium'}">${cls.type}</span>`;
+      return `<span style="display:inline-block;min-width:20px;text-align:center;font-size:9.5px;font-weight:700;border-radius:4px;padding:1px 4px;background:${isR?'#FEF3C7':'#DBEAFE'};color:${isR?'#92400E':'#1E40AF'};" title="${isR?'Reinforcing: '+cls.minus+' minus sign(s), compounds in one direction':'Balancing: '+cls.minus+' minus sign(s), seeks equilibrium'}">${code||cls.type}</span>`;
     };
     const rCount=I.loopClass.filter(c=>c.type==='R').length, bCount=I.loopClass.filter(c=>c.type==='B').length, uCount=I.loopClass.filter(c=>c.type==='unassigned').length;
     let lh='';
@@ -4259,7 +4364,7 @@ function renderInsights(){
       lh += I.loops.map((L,li)=>{
         const on=_pinnedLoops.has(loopKey(L));
         const lc=on?loopColourOf(_pinColourIdx.get(loopKey(L))||0,document.documentElement.getAttribute('data-theme')==='dark').col:'';
-        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span>${rbBadge(I.loopClass[li])}<span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span>${(I.loopVariants&&I.loopVariants[li]>1)?`<span style="color:var(--ink-h);" title="Near-identical loops differing by a node or two, shown as this one">+${I.loopVariants[li]-1} similar</span>`:''}</span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
+        return `<div onclick="highlightLoopByIdx(${li})" style="display:flex;align-items:center;gap:6px;padding:4px 6px;font-size:11.5px;border-radius:6px;cursor:pointer;margin:1px 0;${on?`background:var(--surf-3);box-shadow:inset 4px 0 0 ${lc};`:''}" onmouseover="if(!${on})this.style.background='var(--surf-3)'" onmouseout="if(!${on})this.style.background=''" title="${on?'Click to remove this loop from the highlight':'Click to highlight this loop'}"><span style="width:14px;flex-shrink:0;color:${lc||'inherit'};font-weight:700;">${on?'✓':''}</span>${rbBadge(I.loopClass[li],loopCodes[li])}<span style="flex:1;">${L.map(n=>esc(n.label)).join(' → ')} → ${esc(L[0].label)} <span style="color:var(--ink-h);">(${L.length})</span>${(I.loopVariants&&I.loopVariants[li]>1)?`<span style="color:var(--ink-h);" title="Near-identical loops differing by a node or two, shown as this one">+${I.loopVariants[li]-1} similar</span>`:''}</span><button onclick="event.stopPropagation();loopCircleView(${li})" title="Show this loop as a circle. Press again to put it back" style="font-size:10px;height:20px;padding:0 7px;flex-shrink:0;">⭕</button></div>`;
       }).join('');
     } else lh += none('None found. A loop is a chain of arrows that circles back, like A → B → C → A.');
     if(I.pool.length>LOOP_NODE_CAP)
@@ -5068,11 +5173,12 @@ function _systemsReportHTML(I){
   // Each loop
   if(loops.length){
     _insightLoops=loops;
+    const loopCodes=loopDisplayCodes(cls);
     const card=(L,i)=>{
       const t=cls[i].type, col=t==='R'?_R_COL:t==='B'?_B_COL:_U_COL, name=t==='R'?'Reinforcing':t==='B'?'Balancing':'Not yet classifiable';
       const more=I.loopVariants&&I.loopVariants[i]>1?` <span style="font-size:10.5px;color:var(--txt-m);">+${I.loopVariants[i]-1} similar</span>`:'';
       return `<div class="report-row" onclick="highlightLoopFromReport(${i})" style="display:block;cursor:pointer;border-left:4px solid ${col};padding:6px 10px;margin:6px 0;" title="Click to show this loop on the map">
-        <div style="font-size:10px;font-weight:700;letter-spacing:0.05em;color:${col};text-transform:uppercase;">${name} &middot; ${L.length} steps${more}</div>
+        <div style="font-size:10px;font-weight:700;letter-spacing:0.05em;color:${col};text-transform:uppercase;">${loopCodes[i]} &middot; ${name} &middot; ${L.length} steps${more}</div>
         ${_loopTrailHTML(L,steps[i]||[],t)}
         <div style="font-size:11.5px;color:var(--txt-m);line-height:1.5;">${_loopSentence(L,steps[i]||[],t)}</div></div>`;
     };
@@ -6569,6 +6675,24 @@ function clearKnock(){
   const el=document.getElementById('knock-banner');
   if(el) el.style.display='none';
 }
+let _clusterByNode=new Map(), _clusterFlagged=new Set();
+function refreshClusterCache(){
+  _clusterByNode=new Map(); _clusterFlagged=new Set();
+  const deg=new Map(), neighbours=new Map();
+  edges.forEach(e=>{ const a=typeof e.source==='object'?e.source.id:e.source,b=typeof e.target==='object'?e.target.id:e.target; deg.set(a,(deg.get(a)||0)+1); deg.set(b,(deg.get(b)||0)+1); if(!neighbours.has(a)) neighbours.set(a,new Set()); if(!neighbours.has(b)) neighbours.set(b,new Set()); neighbours.get(a).add(b); neighbours.get(b).add(a); });
+  CLUSTERS.forEach(c=>{ _clusterByNode.set(c.centerId,c); c.nodeIds.forEach(id=>{ _clusterByNode.set(id,c); if((deg.get(id)||0)!==1||!(neighbours.get(id)||new Set()).has(c.centerId)) _clusterFlagged.add(id); }); });
+}
+function clusterForNode(id){ return _clusterByNode.get(id)||CLUSTERS.find(c=>c.centerId===id||c.nodeIds.includes(id))||null; }
+function clusterMemberFlagged(c,id){
+  return id!==c.centerId&&_clusterFlagged.has(id);
+}
+function clusterBounds(c){
+  const ns=[c.centerId,...c.nodeIds].map(id=>nodes.find(n=>n.id===id)).filter(Boolean);
+  if(!ns.length) return null;
+  const xs=ns.map(n=>n.x), ys=ns.map(n=>n.y), pad=65;
+  const minX=Math.min(...xs)-pad,maxX=Math.max(...xs)+pad,minY=Math.min(...ys)-pad,maxY=Math.max(...ys)+pad;
+  return {cx:(minX+maxX)/2,cy:(minY+maxY)/2,rx:(maxX-minX)/2,ry:(maxY-minY)/2};
+}
 let ctxMenuNodeId=null,_ctxClientX=0,_ctxClientY=0;
 function closeNodeCtxMenu(){
   const m=document.getElementById('node-ctx-menu');
@@ -6856,12 +6980,15 @@ function showHoverPanel(id){
   if(!n) return;
   if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
   hoverPanelNodeId=id;
+  hoverEdgeIndex=null;
   sidePanelNodeId=id;
+  { const fb=document.getElementById('hp-focus-btn'); if(fb) fb.style.display=''; }
 
-  // Hover highlight: VIEW MODE ONLY — the node and its immediate connections bright, the next ring out faded, the rest dimmed
+  // Hover highlight: available during ordinary editing as well as view mode. After the
+  // deliberate pause, keep the node and its immediate connections bright and fade the next ring.
   const q=document.getElementById('search-input')?document.getElementById('search-input').value.trim():'';
   const hasActiveFilter=q||getMsValues('cat-filter').length||getMsValues('area-filter').length||getMsValues('tag-filter').length||getMsValues('conn-type-filter').length||getMsValues('member-filter').length;
-  if(isViewMode&&!hasActiveFilter){
+  if(!hasActiveFilter){
     highlightIds.clear();highlightEdges.clear();secondaryIds.clear();
     const endsOf=e=>[typeof e.source==='object'?e.source.id:e.source, typeof e.target==='object'?e.target.id:e.target];
     const near=new Set([id]);                                   // the node and who it connects to directly
@@ -6875,7 +7002,7 @@ function showHoverPanel(id){
       else if(near.has(b)&&!near.has(a)) outer.add(a);
     });
     outer.forEach(x=>secondaryIds.add(x));
-    draw();
+    _animateHoverFocus();
   }
 
   // Populate content
@@ -6884,6 +7011,45 @@ function showHoverPanel(id){
 
   const panel=document.getElementById('hover-panel');
   panel.classList.add('visible');
+}
+function scheduleHoverPanel(id){
+  const key='node:'+id;
+  if(!hoverPanelEnabled||key===hoverCandidateId) return;
+  if(hoverShowTimer) clearTimeout(hoverShowTimer);
+  hoverCandidateId=key;
+  hoverShowTimer=setTimeout(()=>{
+    hoverShowTimer=null;
+    const next=hoverCandidateId;
+    hoverCandidateId=null;
+    if(next) showHoverPanel(Number(next.slice(5)));
+  },2000);
+}
+function scheduleEdgeHoverPanel(index){
+  const key='edge:'+index;
+  if(!hoverPanelEnabled||key===hoverCandidateId) return;
+  if(hoverShowTimer) clearTimeout(hoverShowTimer);
+  hoverCandidateId=key;
+  hoverShowTimer=setTimeout(()=>{
+    hoverShowTimer=null;
+    const next=hoverCandidateId;
+    hoverCandidateId=null;
+    if(next) showEdgeHoverPanel(Number(next.slice(5)));
+  },650);
+}
+function showEdgeHoverPanel(index){
+  const e=edges[index]; if(!e) return;
+  const aid=typeof e.source==='object'?e.source.id:e.source;
+  const bid=typeof e.target==='object'?e.target.id:e.target;
+  const a=nodes.find(n=>n.id===aid), b=nodes.find(n=>n.id===bid);
+  if(!a||!b) return;
+  hoverPanelNodeId=null; hoverEdgeIndex=index;
+  { const fb=document.getElementById('hp-focus-btn'); if(fb) fb.style.display='none'; }
+  highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear();
+  highlightIds.add(aid); highlightIds.add(bid); highlightEdges.add(index);
+  _animateHoverFocus();
+  document.getElementById('hover-panel-title').textContent='Connection';
+  document.getElementById('hover-panel-content').innerHTML=`<div class="hp-row"><div class="hp-k">From</div><div class="hp-v">${escHtml(a.label)}</div></div><div class="hp-row"><div class="hp-k">To</div><div class="hp-v">${escHtml(b.label)}</div></div><div class="hp-row"><div class="hp-k">Strength</div><div class="hp-v">${escHtml(e.strength||'Moderate')}</div></div>${e.polarity?`<div class="hp-row"><div class="hp-k">Effect</div><div class="hp-v">${e.polarity==='negative'?'Negative (−)':'Positive (+)'}</div></div>`:''}`;
+  document.getElementById('hover-panel').classList.add('visible');
 }
 function toggleHoverDock(force){
   const hp=document.getElementById('hover-panel'), area=document.getElementById('canvas-area');
@@ -7098,11 +7264,12 @@ function renderHoverPanel(n){
     var c=document.getElementById('bg');
     if(!c||c.dataset.viewerWired) return;
     c.dataset.viewerWired='1';
-    var dragging=false,startX=0,startY=0,startPanX=0,startPanY=0,hovered=null;
+    var dragging=false,startX=0,startY=0,startPanX=0,startPanY=0;
 
     c.addEventListener('wheel',function(e){
       e.preventDefault();
-      var factor=e.deltaY<0?1.1:0.91,oldZoom=zoom;
+      var step=Math.min(40,Math.abs(e.deltaY));
+      var factor=Math.exp((e.deltaY<0?1:-1)*step*0.0018),oldZoom=zoom;
       zoom=Math.max(minZoomAllowed(),Math.min(MAX_ZOOM,zoom*factor));
       panX=e.offsetX-(e.offsetX-panX)*(zoom/oldZoom);
       panY=e.offsetY-(e.offsetY-panY)*(zoom/oldZoom);
@@ -7123,12 +7290,21 @@ function renderHoverPanel(n){
       }
       var n=nodeAt(e.offsetX,e.offsetY);
       if(n){
-        if(hovered!==n.id){ hovered=n.id; showHoverPanel(n.id); }
-      }else if(hovered!==null){
-        hovered=null;
+        if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
+        if(n.id!==hoverPanelNodeId) scheduleHoverPanel(n.id);
+        return;
+      }
+      var edgeIdx=edgeIndexAt(e.offsetX,e.offsetY);
+      if(edgeIdx!==null){
+        if(hoverHideTimer){ clearTimeout(hoverHideTimer); hoverHideTimer=null; }
+        if(edgeIdx!==hoverEdgeIndex) scheduleEdgeHoverPanel(edgeIdx);
+        return;
+      }
+      if(hoverShowTimer){ clearTimeout(hoverShowTimer); hoverShowTimer=null; hoverCandidateId=null; }
+      if(hoverPanelNodeId!==null||hoverEdgeIndex!==null){
         try{ highlightIds.clear(); highlightEdges.clear(); secondaryIds.clear(); }catch(_){}
         var panel=document.getElementById('hover-panel'); if(panel) panel.classList.remove('visible');
-        try{ hoverPanelNodeId=null; }catch(_){}
+        try{ hoverPanelNodeId=null; hoverEdgeIndex=null; }catch(_){}
         draw();
       }
     });
