@@ -2705,6 +2705,11 @@ function selectConnColour(col){
             <button id="btn-settings-remove-bg" onclick="removeBgImage()" style="display:none;padding:7px 16px;font-size:12px;">Remove image</button>
           </div>
         </div>
+        <div style="margin-bottom:24px;padding-top:18px;border-top:1px solid var(--bdr);">
+          <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--ink);">Spreadsheet template</h4>
+          <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Download the correct columns for this map type, with three example rows showing how connections work.</p>
+          <button onclick="downloadImportTemplate()" style="padding:7px 16px;font-size:12px;font-weight:600;">Download spreadsheet template</button>
+        </div>
         <div style="margin-bottom:8px;padding-top:18px;border-top:1px solid var(--bdr);">
           <h4 style="margin:0 0 8px 0;font-size:14px;font-weight:600;color:var(--coral-t);">Reset map</h4>
           <p style="margin:0 0 12px 0;font-size:12px;color:var(--txt-m);line-height:1.4;">Clear every node and connection and start again. You will be asked to confirm.</p>
@@ -4905,9 +4910,8 @@ function toggleSearchPanel(){
 // One panel, four tabs. The old Search & filter pop-up, At a glance, the Ask box and the report picks
 // all live in it. Nothing is rebuilt: the existing pieces are moved in, so their ids and code still work.
 const DOCK_TABS=['glance','ask','filter','report'];
-let _dock={open:(typeof innerWidth!=='undefined'&&innerWidth>=1100),tab:'glance',frac:0.30,popped:false,suspended:false};   // open the first time on a wide screen; after that it stays as left
+let _dock={open:false,tab:'glance',frac:0.30,popped:false,suspended:false};   // folded whenever Puddle starts; the person opens Explore when they need it
 try{ const _d=JSON.parse(localStorage.getItem('puddl-dock')||'null'); if(_d&&typeof _d==='object'){
-  if(typeof _d.open==='boolean') _dock.open=_d.open;
   if(DOCK_TABS.indexOf(_d.tab)>=0) _dock.tab=_d.tab;
   if(_d.frac>=0.25&&_d.frac<=0.40) _dock.frac=_d.frac;
   if(typeof _d.popped==='boolean') _dock.popped=_d.popped;
@@ -7877,7 +7881,13 @@ function clearSearch(){
   { const _ins=document.getElementById('sec-insights-body'); if(_ins&&typeof _dock!=='undefined'&&_dock.open&&!_dock.suspended&&_dock.tab==='glance'){ _ins.style.display='block'; try{ renderInsights(); }catch(e){} } }
 }
 // A different or brand-new map should not inherit the last one's open dropdowns or filters
-function freshMapPanels(){ try{ clearSearch(); }catch(e){} LINKED_SHEET=null; }
+function freshMapPanels(){
+  try{ clearSearch(); }catch(e){}
+  LINKED_SHEET=null;
+  // A new, replaced or newly opened map starts with the full canvas visible.
+  // Explore can still be opened from the top-left button.
+  try{ if(typeof dockFold==='function') dockFold(); }catch(e){}
+}
 function clearHighlight(){
   clearKnock();
   if(typeof revertLoopCircle==='function') revertLoopCircle();
@@ -8662,13 +8672,18 @@ function downloadArgumentTemplate(){
 }
 function downloadImportTemplate(){
   if(MAP_TYPE==='argument') return downloadArgumentTemplate();
-  const heads=['Name','Connected to','Connection type','Arrow','Date added','Notes',...FIELD_DEFS.map(f=>f.name)];
+  const signed=MAP_TYPE==='systems'||MAP_TYPE==='stakeholder';
+  const heads=['Name','Connected to','Connection type','Arrow',...(signed?['Polarity (+/-)']:[]),'Date added','Connection date','Connected to main node','Notes',...FIELD_DEFS.map(f=>f.name)];
   const slug=((mapTitle||'puddl').trim().toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'puddl')+'-template';
   const pad=r=>{ while(r.length<heads.length) r.push(''); return r; };
-  const exampleRows=[
-    pad(['Allotment Society','','','','2019-01-20','Example rows: delete these three before adding your own']),
-    pad(['Ruth Calder','Allotment Society','Strong','none','2021-05-04','One connection, to the group above']),
-    pad(['Sam Carter','Allotment Society, Ruth Calder','Moderate','none','2023-02-11','Two connections in one cell, separated by a comma']),
+  const exampleRows=signed?[
+    pad(['Staff capacity','','','','','2019-01-20','','','Example rows: delete these three before adding your own']),
+    pad(['Service quality','Staff capacity','Strong','forward','+','2021-05-04','2021-05-04','','A plus means both factors move in the same direction']),
+    pad(['Waiting time','Service quality','Moderate','forward','-','2023-02-11','2023-02-11','','A minus means they move in opposite directions']),
+  ]:[
+    pad(['Allotment Society','','','none','2019-01-20','','','Example rows: delete these three before adding your own']),
+    pad(['Ruth Calder','Allotment Society','Strong','none','2021-05-04','2021-05-04','','One connection, to the group above']),
+    pad(['Sam Carter','Allotment Society, Ruth Calder','Moderate','none','2023-02-11','2023-02-11','','Two connections in one cell, separated by a comma']),
   ];
   if(typeof XLSX!=='undefined'){
     const ws=XLSX.utils.aoa_to_sheet([heads,...exampleRows]);
@@ -8679,7 +8694,7 @@ function downloadImportTemplate(){
     const csv=[heads,...exampleRows].map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\n')+'\n';
     const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=slug+'.csv'; a.click();
   }
-  showStatus('Template downloaded. It has three example rows showing the layout. Delete them before adding your own. You can also put one connection per row and repeat the name.');
+  showStatus('Spreadsheet template downloaded. Its columns match Puddle. Delete the three example rows before adding your own.');
 }
 
 // ── Colour inference from category ───────────────────────────────────────────
@@ -11862,7 +11877,7 @@ function cancelConnection(){
 }
 
 // ── Map info bar ─────────────────────────────────────────────────────────────
-// The side panel is open when a map arrives (it now opens by default), so At a glance must fill in then, not only when someone presses a tab.
+// Keep At a glance ready in the background so it is current when someone opens Explore.
 let _insBuiltKey='', _insBuiltTimer=null;
 function updateMapInfoBar(){
   { const k=nodes.length+'|'+edges.length;

@@ -2,6 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync('index.html','utf8');
+const viewerSource=fs.readFileSync('viewer.html','utf8');
 function fn(name){
   const start=source.search(new RegExp('^(?:async )?function '+name+'\\(','m'));
   assert.notEqual(start,-1,name);
@@ -16,6 +17,20 @@ test('all inline scripts parse, editor and generated viewer',()=>{
 });
 test('sign-in leaves the saved-map list on the start screen instead of opening the old modal',()=>{
  assert.ok(!fn('afterSignIn').includes('openMyMaps('));
+});
+test('Explore starts folded and folds again for a fresh map',()=>{
+ assert.match(source,/let _dock=\{open:false,/);
+ assert.match(viewerSource,/let _dock=\{open:false,/);
+ assert.match(fn('freshMapPanels'),/dockFold\(\)/);
+});
+test('downloaded spreadsheet templates use the importer columns',()=>{
+ let rows;
+ const XLSX={utils:{aoa_to_sheet:v=>(rows=v,{}),book_new:()=>({}),book_append_sheet(){}},writeFile(){}};
+ const c=ctx({MAP_TYPE:'systems',FIELD_DEFS:[{name:'Area'}],mapTitle:'',XLSX,showStatus(){}},['downloadImportTemplate']);
+ c.downloadImportTemplate();
+ assert.deepEqual(Array.from(rows[0]),['Name','Connected to','Connection type','Arrow','Polarity (+/-)','Date added','Connection date','Connected to main node','Notes','Area']);
+ c.MAP_TYPE='network'; c.downloadImportTemplate();
+ assert.deepEqual(Array.from(rows[0]),['Name','Connected to','Connection type','Arrow','Date added','Connection date','Connected to main node','Notes','Area']);
 });
 test('invalid snapshots are rejected before changing live map or history guard',()=>{
  const nodes=[{id:99}],c=ctx({nodes,skipSave:false},['validateMapSnapshot','restoreSnap']);

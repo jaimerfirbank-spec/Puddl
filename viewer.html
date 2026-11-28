@@ -3214,9 +3214,8 @@ function toggleSearchPanel(){
   if(open) setTimeout(()=>document.getElementById('search-input').focus(),50);
 }
 const DOCK_TABS=['glance','ask','filter','report'];
-let _dock={open:(typeof innerWidth!=='undefined'&&innerWidth>=1100),tab:'glance',frac:0.30,popped:false,suspended:false};   // open the first time on a wide screen; after that it stays as left
+let _dock={open:false,tab:'glance',frac:0.30,popped:false,suspended:false};   // folded whenever Puddle starts; the person opens Explore when they need it
 try{ const _d=JSON.parse(localStorage.getItem('puddl-dock')||'null'); if(_d&&typeof _d==='object'){
-  if(typeof _d.open==='boolean') _dock.open=_d.open;
   if(DOCK_TABS.indexOf(_d.tab)>=0) _dock.tab=_d.tab;
   if(_d.frac>=0.25&&_d.frac<=0.40) _dock.frac=_d.frac;
   if(typeof _d.popped==='boolean') _dock.popped=_d.popped;
